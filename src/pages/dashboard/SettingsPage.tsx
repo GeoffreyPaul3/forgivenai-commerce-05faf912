@@ -87,9 +87,9 @@ const SettingsPage = () => {
             </div>
             <div className="flex items-center gap-2">
               {int.status === "connected" ? (
-                <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle className="w-3 h-3" /> Connected</span>
+                <span className="flex items-center gap-1 text-xs text-green-700"><CheckCircle className="w-3 h-3" /> Connected</span>
               ) : (
-                <span className="flex items-center gap-1 text-xs text-amber-600"><AlertCircle className="w-3 h-3" /> Not configured</span>
+                <span className="flex items-center gap-1 text-xs text-amber-700"><AlertCircle className="w-3 h-3" /> Not configured</span>
               )}
             </div>
           </div>
