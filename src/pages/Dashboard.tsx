@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ShoppingBag,
   LayoutDashboard,
@@ -8,6 +10,8 @@ import {
   Video,
   Settings,
   Bot,
+  Package,
+  TrendingUp,
 } from "lucide-react";
 import {
   Sidebar,
@@ -77,6 +81,108 @@ function DashboardSidebar() {
   );
 }
 
+function DashboardOverview() {
+  const { data: productCount } = useQuery({
+    queryKey: ["products-count"],
+    queryFn: async () => {
+      const { count } = await supabase.from("products").select("*", { count: "exact", head: true });
+      return count || 0;
+    },
+  });
+
+  const { data: orderCount } = useQuery({
+    queryKey: ["orders-count"],
+    queryFn: async () => {
+      const { count } = await supabase.from("orders").select("*", { count: "exact", head: true });
+      return count || 0;
+    },
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ["product-categories"],
+    queryFn: async () => {
+      const { data } = await supabase.from("products").select("category").not("category", "is", null);
+      const cats = new Set((data || []).map(d => d.category));
+      return Array.from(cats);
+    },
+  });
+
+  const { data: recentProducts } = useQuery({
+    queryKey: ["recent-products"],
+    queryFn: async () => {
+      const { data } = await supabase.from("products").select("*").order("created_at", { ascending: false }).limit(6);
+      return data || [];
+    },
+  });
+
+  const stats = [
+    { label: "Total Products", value: productCount?.toString() || "0", icon: Package, change: `${categories?.length || 0} categories` },
+    { label: "Active Orders", value: orderCount?.toString() || "0", icon: CreditCard, change: "Real-time tracking" },
+    { label: "Revenue", value: "MWK 0", icon: TrendingUp, change: "Start selling" },
+    { label: "Conversations", value: "0", icon: MessageSquare, change: "Connect WhatsApp" },
+  ];
+
+  return (
+    <div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {stats.map((stat) => (
+          <div key={stat.label} className="p-6 rounded-xl border border-border bg-card hover:border-gold/20 transition-colors">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-muted-foreground text-sm font-body">{stat.label}</p>
+              <stat.icon className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <p className="text-3xl font-heading font-bold text-foreground">{stat.value}</p>
+            <p className="text-muted-foreground text-xs mt-2 font-body">{stat.change}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Recent Products */}
+      {recentProducts && recentProducts.length > 0 && (
+        <div>
+          <h3 className="font-heading text-lg font-semibold text-foreground mb-4">Recent Products (Imported)</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recentProducts.map((product) => (
+              <div key={product.id} className="rounded-xl border border-border bg-card overflow-hidden hover:border-gold/20 transition-colors">
+                {product.images && product.images.length > 0 && (
+                  <img
+                    src={product.images[0]}
+                    alt={product.name}
+                    className="w-full h-48 object-cover"
+                    loading="lazy"
+                  />
+                )}
+                <div className="p-4">
+                  <h4 className="font-heading font-semibold text-foreground text-sm truncate">{product.name}</h4>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-muted-foreground font-body">{product.category}</span>
+                    <span className="text-sm font-semibold text-primary font-body">
+                      {product.currency} {product.price?.toLocaleString()}
+                    </span>
+                  </div>
+                  <span className="inline-block mt-2 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary font-body">
+                    {product.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(!recentProducts || recentProducts.length === 0) && (
+        <div className="rounded-xl border border-border bg-card p-8 text-center">
+          <Bot className="w-12 h-12 text-primary mx-auto mb-4" />
+          <h3 className="font-heading text-xl font-semibold text-foreground mb-2">Welcome to Forgiven AI Commerce</h3>
+          <p className="text-muted-foreground font-body max-w-md mx-auto">
+            Your AI-powered commerce operating system is ready. Start by adding products or connecting your WhatsApp channel.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const DashboardPage = () => {
   return (
     <SidebarProvider>
@@ -88,28 +194,7 @@ const DashboardPage = () => {
             <h1 className="font-heading text-xl font-semibold text-foreground">Dashboard</h1>
           </header>
           <main className="flex-1 p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {[
-                { label: "Total Products", value: "0", change: "Add your first product" },
-                { label: "Active Orders", value: "0", change: "No orders yet" },
-                { label: "Revenue", value: "$0", change: "Start selling" },
-                { label: "Conversations", value: "0", change: "Connect WhatsApp" },
-              ].map((stat) => (
-                <div key={stat.label} className="p-6 rounded-xl border border-border bg-card">
-                  <p className="text-muted-foreground text-sm font-body">{stat.label}</p>
-                  <p className="text-3xl font-heading font-bold text-foreground mt-1">{stat.value}</p>
-                  <p className="text-muted-foreground text-xs mt-2 font-body">{stat.change}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="rounded-xl border border-border bg-card p-8 text-center">
-              <Bot className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h3 className="font-heading text-xl font-semibold text-foreground mb-2">Welcome to Forgiven AI Commerce</h3>
-              <p className="text-muted-foreground font-body max-w-md mx-auto">
-                Your AI-powered commerce operating system is ready. Start by adding products or connecting your WhatsApp channel.
-              </p>
-            </div>
+            <DashboardOverview />
           </main>
         </div>
       </div>
