@@ -1,33 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Routes, Route, useLocation } from "react-router-dom";
 import {
-  ShoppingBag,
-  LayoutDashboard,
-  MessageSquare,
-  CreditCard,
-  Users,
-  BarChart3,
-  Video,
-  Settings,
-  Bot,
-  Package,
-  TrendingUp,
+  ShoppingBag, LayoutDashboard, MessageSquare, CreditCard,
+  Users, BarChart3, Video, Settings, Bot, Package, TrendingUp,
 } from "lucide-react";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
+  SidebarProvider, SidebarTrigger, useSidebar,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+
+import ProductsPage from "@/pages/dashboard/ProductsPage";
+import ContentPage from "@/pages/dashboard/ContentPage";
+import OrdersPage from "@/pages/dashboard/OrdersPage";
+import ConversationsPage from "@/pages/dashboard/ConversationsPage";
+import AgentsPage from "@/pages/dashboard/AgentsPage";
+import AnalyticsPage from "@/pages/dashboard/AnalyticsPage";
+import AIAssistantPage from "@/pages/dashboard/AIAssistantPage";
+import SettingsPage from "@/pages/dashboard/SettingsPage";
 
 const menuItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
@@ -45,7 +37,6 @@ function DashboardSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const isActive = (path: string) => location.pathname === path;
 
   return (
     <Sidebar collapsible="icon">
@@ -58,14 +49,13 @@ function DashboardSidebar() {
             <span className="font-heading text-lg font-bold text-sidebar-foreground">Forgiven</span>
           )}
         </div>
-
         <SidebarGroup>
           <SidebarGroupLabel className="text-sidebar-foreground/40">Commerce OS</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
                     <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
                       <item.icon className="mr-2 h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
@@ -81,7 +71,7 @@ function DashboardSidebar() {
   );
 }
 
-function DashboardOverview() {
+function OverviewPage() {
   const { data: productCount } = useQuery({
     queryKey: ["products-count"],
     queryFn: async () => {
@@ -89,7 +79,6 @@ function DashboardOverview() {
       return count || 0;
     },
   });
-
   const { data: orderCount } = useQuery({
     queryKey: ["orders-count"],
     queryFn: async () => {
@@ -97,16 +86,20 @@ function DashboardOverview() {
       return count || 0;
     },
   });
-
-  const { data: categories } = useQuery({
-    queryKey: ["product-categories"],
+  const { data: agentCount } = useQuery({
+    queryKey: ["agents-count"],
     queryFn: async () => {
-      const { data } = await supabase.from("products").select("category").not("category", "is", null);
-      const cats = new Set((data || []).map(d => d.category));
-      return Array.from(cats);
+      const { count } = await supabase.from("agents").select("*", { count: "exact", head: true });
+      return count || 0;
     },
   });
-
+  const { data: contentCount } = useQuery({
+    queryKey: ["content-count"],
+    queryFn: async () => {
+      const { count } = await supabase.from("content").select("*", { count: "exact", head: true });
+      return count || 0;
+    },
+  });
   const { data: recentProducts } = useQuery({
     queryKey: ["recent-products"],
     queryFn: async () => {
@@ -116,85 +109,89 @@ function DashboardOverview() {
   });
 
   const stats = [
-    { label: "Total Products", value: productCount?.toString() || "0", icon: Package, change: `${categories?.length || 0} categories` },
-    { label: "Active Orders", value: orderCount?.toString() || "0", icon: CreditCard, change: "Real-time tracking" },
-    { label: "Revenue", value: "MWK 0", icon: TrendingUp, change: "Start selling" },
-    { label: "Conversations", value: "0", icon: MessageSquare, change: "Connect WhatsApp" },
+    { label: "Products", value: productCount?.toString() || "0", icon: Package, sub: "In catalog" },
+    { label: "Orders", value: orderCount?.toString() || "0", icon: CreditCard, sub: "Total orders" },
+    { label: "Agents", value: agentCount?.toString() || "0", icon: Users, sub: "Registered" },
+    { label: "Content", value: contentCount?.toString() || "0", icon: Video, sub: "Pieces created" },
   ];
 
   return (
-    <div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat) => (
-          <div key={stat.label} className="p-6 rounded-xl border border-border bg-card hover:border-gold/20 transition-colors">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-muted-foreground text-sm font-body">{stat.label}</p>
-              <stat.icon className="w-4 h-4 text-muted-foreground" />
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map(s => (
+          <div key={s.label} className="p-5 rounded-xl border border-border bg-card hover:border-gold/20 transition-colors">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm text-muted-foreground font-body">{s.label}</span>
+              <s.icon className="w-4 h-4 text-muted-foreground" />
             </div>
-            <p className="text-3xl font-heading font-bold text-foreground">{stat.value}</p>
-            <p className="text-muted-foreground text-xs mt-2 font-body">{stat.change}</p>
+            <p className="text-3xl font-heading font-bold text-foreground">{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-1 font-body">{s.sub}</p>
           </div>
         ))}
       </div>
 
-      {/* Recent Products */}
       {recentProducts && recentProducts.length > 0 && (
         <div>
-          <h3 className="font-heading text-lg font-semibold text-foreground mb-4">Recent Products (Imported)</h3>
+          <h3 className="font-heading text-lg font-semibold text-foreground mb-4">Recent Products</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recentProducts.map((product) => (
+            {recentProducts.map(product => (
               <div key={product.id} className="rounded-xl border border-border bg-card overflow-hidden hover:border-gold/20 transition-colors">
                 {product.images && product.images.length > 0 && (
-                  <img
-                    src={product.images[0]}
-                    alt={product.name}
-                    className="w-full h-48 object-cover"
-                    loading="lazy"
-                  />
+                  <img src={product.images[0]} alt={product.name} className="w-full h-40 object-cover" loading="lazy" />
                 )}
-                <div className="p-4">
+                <div className="p-3">
                   <h4 className="font-heading font-semibold text-foreground text-sm truncate">{product.name}</h4>
-                  <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center justify-between mt-1">
                     <span className="text-xs text-muted-foreground font-body">{product.category}</span>
-                    <span className="text-sm font-semibold text-primary font-body">
-                      {product.currency} {product.price?.toLocaleString()}
-                    </span>
+                    <span className="text-sm font-semibold text-primary font-body">{product.currency} {product.price?.toLocaleString()}</span>
                   </div>
-                  <span className="inline-block mt-2 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary font-body">
-                    {product.status}
-                  </span>
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      {(!recentProducts || recentProducts.length === 0) && (
-        <div className="rounded-xl border border-border bg-card p-8 text-center">
-          <Bot className="w-12 h-12 text-primary mx-auto mb-4" />
-          <h3 className="font-heading text-xl font-semibold text-foreground mb-2">Welcome to Forgiven AI Commerce</h3>
-          <p className="text-muted-foreground font-body max-w-md mx-auto">
-            Your AI-powered commerce operating system is ready. Start by adding products or connecting your WhatsApp channel.
-          </p>
-        </div>
-      )}
     </div>
   );
 }
 
+const pageTitles: Record<string, string> = {
+  "/dashboard": "Overview",
+  "/dashboard/products": "Products",
+  "/dashboard/content": "Content & UGC",
+  "/dashboard/orders": "Orders",
+  "/dashboard/conversations": "Conversations",
+  "/dashboard/agents": "Agents",
+  "/dashboard/analytics": "Analytics",
+  "/dashboard/assistant": "AI Assistant",
+  "/dashboard/settings": "Settings",
+};
+
 const DashboardPage = () => {
+  const location = useLocation();
+  const title = pageTitles[location.pathname] || "Dashboard";
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <DashboardSidebar />
-        <div className="flex-1 flex flex-col">
-          <header className="h-14 flex items-center border-b border-border px-4">
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="h-14 flex items-center border-b border-border px-4 shrink-0">
             <SidebarTrigger className="mr-4" />
-            <h1 className="font-heading text-xl font-semibold text-foreground">Dashboard</h1>
+            <h1 className="font-heading text-xl font-semibold text-foreground">{title}</h1>
           </header>
-          <main className="flex-1 p-6">
-            <DashboardOverview />
+          <main className="flex-1 p-6 overflow-y-auto">
+            <Routes>
+              <Route index element={<OverviewPage />} />
+              <Route path="products" element={<ProductsPage />} />
+              <Route path="content" element={<ContentPage />} />
+              <Route path="orders" element={<OrdersPage />} />
+              <Route path="conversations" element={<ConversationsPage />} />
+              <Route path="agents" element={<AgentsPage />} />
+              <Route path="analytics" element={<AnalyticsPage />} />
+              <Route path="assistant" element={<AIAssistantPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Routes>
           </main>
         </div>
       </div>
