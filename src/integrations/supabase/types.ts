@@ -14,7 +14,282 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agents: {
+        Row: {
+          commission_rate: number | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          referral_code: string
+          status: string | null
+          total_commission: number | null
+          total_sales: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          commission_rate?: number | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          referral_code: string
+          status?: string | null
+          total_commission?: number | null
+          total_sales?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          commission_rate?: number | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          referral_code?: string
+          status?: string | null
+          total_commission?: number | null
+          total_sales?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      content: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          media_url: string | null
+          metadata: Json | null
+          product_id: string | null
+          status: string | null
+          title: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          media_url?: string | null
+          metadata?: Json | null
+          product_id?: string | null
+          status?: string | null
+          title?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          media_url?: string | null
+          metadata?: Json | null
+          product_id?: string | null
+          status?: string | null
+          title?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          channel: string | null
+          created_at: string
+          customer_name: string | null
+          customer_phone: string | null
+          id: string
+          last_message_at: string | null
+          metadata: Json | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel?: string | null
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          last_message_at?: string | null
+          metadata?: Json | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string | null
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          last_message_at?: string | null
+          metadata?: Json | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          agent_id: string | null
+          channel: string | null
+          created_at: string
+          currency: string | null
+          customer_email: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          id: string
+          items: Json
+          notes: string | null
+          payment_reference: string | null
+          status: string | null
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          agent_id?: string | null
+          channel?: string | null
+          created_at?: string
+          currency?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          items?: Json
+          notes?: string | null
+          payment_reference?: string | null
+          status?: string | null
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string | null
+          channel?: string | null
+          created_at?: string
+          currency?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          items?: Json
+          notes?: string | null
+          payment_reference?: string | null
+          status?: string | null
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_orders_agent"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          ai_description: string | null
+          category: string | null
+          created_at: string
+          currency: string | null
+          description: string | null
+          id: string
+          images: string[] | null
+          metadata: Json | null
+          name: string
+          price: number | null
+          source_url: string | null
+          status: string | null
+          subcategory: string | null
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          ai_description?: string | null
+          category?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          id?: string
+          images?: string[] | null
+          metadata?: Json | null
+          name: string
+          price?: number | null
+          source_url?: string | null
+          status?: string | null
+          subcategory?: string | null
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          ai_description?: string | null
+          category?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          id?: string
+          images?: string[] | null
+          metadata?: Json | null
+          name?: string
+          price?: number | null
+          source_url?: string | null
+          status?: string | null
+          subcategory?: string | null
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
