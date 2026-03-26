@@ -254,7 +254,7 @@ function ProductDialog({
     status: "draft",
   });
 
-  useState(() => {
+  useEffect(() => {
     if (product) {
       setForm({
         name: product.name,
@@ -266,7 +266,7 @@ function ProductDialog({
     } else {
       setForm({ name: "", category: "", price: "", description: "", status: "draft" });
     }
-  });
+  }, [product]);
 
   const handleSave = () => {
     if (!form.name.trim()) return;
