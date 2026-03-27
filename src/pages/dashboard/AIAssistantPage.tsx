@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Bot, Send, Loader2, Sparkles } from "lucide-react";
+import { Bot, Send, Loader2, Sparkles, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -36,7 +37,6 @@ const AIAssistantPage = () => {
     setLoading(true);
 
     try {
-      // Get product context for the AI
       const { data: products } = await supabase.from("products").select("name, category, price, currency, status").limit(20);
       const { data: orders } = await supabase.from("orders").select("status, total, channel").limit(20);
 
@@ -51,14 +51,13 @@ const AIAssistantPage = () => {
       const { data, error } = await supabase.functions.invoke("ai-generate", {
         body: {
           type: "chat",
-          context: `${msg}\n\nBusiness context:\n${productSummary}\n${orderSummary}`,
+          context: `${msg}\n\nBusiness context:\n${productSummary}\n${orderSummary}\n\nIMPORTANT: Format your response using markdown. Use headers (##), bullet points, bold text, and numbered lists to make your response clear and well-structured. Include actionable recommendations.`,
         },
       });
 
       if (error) throw error;
-
       setMessages(prev => [...prev, { role: "assistant", content: data?.content || "Sorry, I couldn't generate a response." }]);
-    } catch (e) {
+    } catch {
       toast({ title: "Failed to get response", variant: "destructive" });
       setMessages(prev => [...prev, { role: "assistant", content: "Sorry, something went wrong. Please try again." }]);
     } finally {
@@ -95,21 +94,43 @@ const AIAssistantPage = () => {
         )}
 
         {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            {msg.role === "assistant" && (
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-1">
+                <Bot className="w-4 h-4 text-primary" />
+              </div>
+            )}
             <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm ${
               msg.role === "user"
                 ? "bg-primary text-primary-foreground rounded-br-md"
                 : "bg-muted text-foreground rounded-bl-md"
             }`}>
-              <p className="font-body whitespace-pre-wrap">{msg.content}</p>
+              {msg.role === "assistant" ? (
+                <div className="prose prose-sm max-w-none font-body prose-headings:font-heading prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1">
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="font-body whitespace-pre-wrap">{msg.content}</p>
+              )}
             </div>
+            {msg.role === "user" && (
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 mt-1">
+                <User className="w-4 h-4 text-primary-foreground" />
+              </div>
+            )}
           </div>
         ))}
 
         {loading && (
-          <div className="flex justify-start">
+          <div className="flex gap-3 justify-start">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Bot className="w-4 h-4 text-primary" />
+            </div>
             <div className="bg-muted px-4 py-3 rounded-2xl rounded-bl-md">
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                <span className="text-xs text-muted-foreground font-body">Thinking...</span>
+              </div>
             </div>
           </div>
         )}
