@@ -12,18 +12,16 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
   Pagination, PaginationContent, PaginationItem, PaginationLink,
   PaginationNext, PaginationPrevious,
 } from "@/components/ui/pagination";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Sparkles, Pencil, Trash2, ExternalLink, Loader2, Image as ImageIcon } from "lucide-react";
+import { Search, Plus, Sparkles, Pencil, Trash2, ExternalLink, Loader2, Image as ImageIcon, Package } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { motion } from "framer-motion";
 
 type Product = Tables<"products">;
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 12;
 
 const ProductsPage = () => {
   const { toast } = useToast();
@@ -55,7 +53,6 @@ const ProductsPage = () => {
     },
   });
 
-  // Reset page on filter change
   useEffect(() => { setPage(1); }, [search, categoryFilter]);
 
   const totalPages = Math.ceil((products?.length || 0) / PAGE_SIZE);
@@ -122,19 +119,19 @@ const ProductsPage = () => {
   };
 
   const statusColor = (status: string | null) => {
-    if (status === "active") return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400";
-    if (status === "archived") return "bg-muted text-muted-foreground";
-    return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
+    if (status === "active") return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
+    if (status === "archived") return "bg-muted text-muted-foreground border-border";
+    return "bg-amber-500/10 text-amber-700 border-amber-500/20";
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="font-heading text-2xl font-bold text-foreground">Products</h2>
+          <h2 className="font-heading text-2xl font-bold text-foreground tracking-tight">Products</h2>
           <p className="text-muted-foreground text-sm font-body">{products?.length || 0} products in catalog</p>
         </div>
-        <Button onClick={() => setShowAdd(true)} className="gap-2">
+        <Button onClick={() => setShowAdd(true)} className="gap-2 bg-primary hover:bg-primary/90">
           <Plus className="w-4 h-4" /> Add Product
         </Button>
       </div>
@@ -143,10 +140,10 @@ const ProductsPage = () => {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+          <Input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card border-border" />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[180px] bg-card">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -158,96 +155,114 @@ const ProductsPage = () => {
         </Select>
       </div>
 
-      {/* Table */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="w-14"></TableHead>
-              <TableHead>Product</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead className="text-right">Price</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((_, j) => (
-                    <TableCell key={j}><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : paginatedProducts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground font-body">
-                  No products found
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedProducts.map(product => (
-                <TableRow key={product.id} className="group">
-                  <TableCell>
-                    {product.images && product.images.length > 0 ? (
-                      <img src={product.images[0]} alt={product.name} className="w-10 h-10 rounded-lg object-cover" loading="lazy" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                        <ImageIcon className="w-4 h-4 text-muted-foreground" />
-                      </div>
+      {/* Product Grid */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="h-48 bg-muted animate-pulse" />
+              <div className="p-4 space-y-2">
+                <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
+                <div className="h-3 bg-muted animate-pulse rounded w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : paginatedProducts.length === 0 ? (
+        <div className="text-center py-20">
+          <Package className="w-12 h-12 mx-auto mb-4 text-muted-foreground/40" />
+          <p className="text-muted-foreground font-body">No products found</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {paginatedProducts.map((product, idx) => (
+            <motion.div
+              key={product.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.05, duration: 0.3 }}
+              className="group rounded-xl border border-border bg-card overflow-hidden hover:border-gold/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
+            >
+              {/* Image */}
+              <div className="relative h-48 bg-muted overflow-hidden">
+                {product.images && product.images.length > 0 ? (
+                  <img
+                    src={product.images[0]}
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
+                  </div>
+                )}
+                {/* Status badge overlay */}
+                <div className="absolute top-3 left-3">
+                  <Badge variant="outline" className={`text-[10px] font-semibold backdrop-blur-sm ${statusColor(product.status)}`}>
+                    {product.status || "draft"}
+                  </Badge>
+                </div>
+                {/* Quick actions overlay */}
+                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="h-7 w-7 backdrop-blur-sm bg-background/80 hover:bg-background"
+                    onClick={() => setEditProduct(product)}
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="h-7 w-7 backdrop-blur-sm bg-background/80 hover:bg-background"
+                    onClick={() => generateAiDescription(product)}
+                    disabled={aiLoading === product.id}
+                  >
+                    {aiLoading === product.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Info */}
+              <div className="p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-heading text-sm font-semibold text-foreground line-clamp-2 leading-tight">{product.name}</h3>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground font-body">{product.category || "Uncategorized"}</span>
+                  <span className="text-sm font-bold text-primary font-body">
+                    {product.currency} {product.price?.toLocaleString() || "—"}
+                  </span>
+                </div>
+                {product.ai_description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 font-body leading-relaxed">{product.ai_description}</p>
+                )}
+
+                {/* Bottom actions */}
+                <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                  <div className="flex gap-1">
+                    {product.source_url && (
+                      <a href={product.source_url} target="_blank" rel="noopener noreferrer">
+                        <Button size="icon" variant="ghost" className="h-7 w-7"><ExternalLink className="w-3 h-3" /></Button>
+                      </a>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-heading font-semibold text-sm text-foreground">{product.name}</p>
-                      {product.ai_description && (
-                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5 max-w-xs">{product.ai_description}</p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground font-body">{product.category || "—"}</span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className="text-sm font-semibold text-foreground font-body">
-                      {product.currency} {product.price?.toLocaleString() || "—"}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className={`text-xs ${statusColor(product.status)}`}>
-                      {product.status || "draft"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                      <Button size="icon" variant="ghost" onClick={() => setEditProduct(product)} className="h-8 w-8">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        size="icon" variant="ghost"
-                        onClick={() => generateAiDescription(product)}
-                        disabled={aiLoading === product.id}
-                        className="h-8 w-8"
-                      >
-                        {aiLoading === product.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                      </Button>
-                      {product.source_url && (
-                        <a href={product.source_url} target="_blank" rel="noopener noreferrer">
-                          <Button size="icon" variant="ghost" className="h-8 w-8"><ExternalLink className="w-3.5 h-3.5" /></Button>
-                        </a>
-                      )}
-                      <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(product.id)} className="h-8 w-8 text-destructive hover:text-destructive">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => deleteMutation.mutate(product.id)}
+                    className="h-7 w-7 text-destructive/60 hover:text-destructive"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -259,9 +274,9 @@ const ProductsPage = () => {
             {Array.from({ length: totalPages }, (_, i) => i + 1)
               .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
               .map((p, idx, arr) => {
-                const elements = [];
+                const elements: React.ReactNode[] = [];
                 if (idx > 0 && arr[idx - 1] !== p - 1) {
-                  elements.push(<PaginationItem key={`ellipsis-${p}`}><span className="px-2 text-muted-foreground">…</span></PaginationItem>);
+                  elements.push(<PaginationItem key={`e-${p}`}><span className="px-2 text-muted-foreground">…</span></PaginationItem>);
                 }
                 elements.push(
                   <PaginationItem key={p}>
