@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,22 +25,22 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   Sparkles, Loader2, Video, FileText, Share2, Pencil, Trash2, Eye, Download,
-  User, Wand2, Play, Upload,
+  User, Wand2, Play, Upload, ImageIcon, X,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import type { Tables } from "@/integrations/supabase/types";
+import { motion } from "framer-motion";
 
 type Content = Tables<"content">;
 const PAGE_SIZE = 8;
 
 const ContentPage = () => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("content");
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-heading text-2xl font-bold text-foreground">Content & UGC</h2>
+        <h2 className="font-heading text-2xl font-bold text-foreground tracking-tight">Content & UGC</h2>
         <p className="text-muted-foreground text-sm font-body">AI-powered content generation & UGC video creator</p>
       </div>
 
@@ -74,7 +74,7 @@ function ContentManager() {
   const [editItem, setEditItem] = useState<Content | null>(null);
   const [viewItem, setViewItem] = useState<Content | null>(null);
 
-  const { data: content, isLoading } = useQuery({
+  const { data: content, isLoading, refetch } = useQuery({
     queryKey: ["content", filter],
     queryFn: async () => {
       let q = supabase.from("content").select("*").order("created_at", { ascending: false });
@@ -116,18 +116,23 @@ function ContentManager() {
       if (error) throw error;
       if (data?.content) {
         const labels: Record<string, string> = { social_post: "Social Post", campaign: "Campaign", description: "Description" };
-        await supabase.from("content").insert({
+        const { error: insertError } = await supabase.from("content").insert({
           type: genType,
           title: `${labels[genType] || genType} - ${product?.name || "General"}`,
           body: data.content,
           product_id: selectedProduct !== "none" ? selectedProduct : null,
           status: "draft",
         });
-        queryClient.invalidateQueries({ queryKey: ["content"] });
-        toast({ title: "Content generated!" });
+        if (insertError) {
+          console.error("Insert error:", insertError);
+          throw insertError;
+        }
+        await refetch();
+        toast({ title: "Content generated & saved!" });
         setGenContext("");
       }
-    } catch {
+    } catch (err) {
+      console.error("Generation error:", err);
       toast({ title: "Generation failed", variant: "destructive" });
     } finally {
       setGenerating(false);
@@ -140,7 +145,7 @@ function ContentManager() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["content"] });
+      refetch();
       setEditItem(null);
       toast({ title: "Content updated" });
     },
@@ -148,13 +153,13 @@ function ContentManager() {
 
   const deleteContent = async (id: string) => {
     await supabase.from("content").delete().eq("id", id);
-    queryClient.invalidateQueries({ queryKey: ["content"] });
+    refetch();
     toast({ title: "Content deleted" });
   };
 
   const updateStatus = async (id: string, status: string) => {
     await supabase.from("content").update({ status }).eq("id", id);
-    queryClient.invalidateQueries({ queryKey: ["content"] });
+    refetch();
   };
 
   const typeIcon = (type: string) => {
@@ -168,7 +173,7 @@ function ContentManager() {
       {/* Generator */}
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-accent" /> AI Content Generator
+          <Sparkles className="w-5 h-5 text-gold" /> AI Content Generator
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Select value={genType} onValueChange={setGenType}>
@@ -227,8 +232,8 @@ function ContentManager() {
             ) : paginatedContent.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-12 text-muted-foreground font-body">
-                  <Sparkles className="w-8 h-8 mx-auto mb-3 text-accent" />
-                  No content yet. Use the AI generator above.
+                  <Sparkles className="w-8 h-8 mx-auto mb-3 text-gold/60" />
+                  No content yet. Use the AI generator above to create your first piece.
                 </TableCell>
               </TableRow>
             ) : (
@@ -247,7 +252,7 @@ function ContentManager() {
                     <Badge variant="secondary" className="text-xs capitalize">{item.type.replace("_", " ")}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className={`text-xs ${item.status === "published" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                    <Badge variant="secondary" className={`text-xs ${item.status === "published" ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>
                       {item.status}
                     </Badge>
                   </TableCell>
@@ -297,7 +302,7 @@ function ContentManager() {
         </Pagination>
       )}
 
-      {/* View Dialog */}
+      {/* View Dialog with Markdown */}
       <Dialog open={!!viewItem} onOpenChange={v => !v && setViewItem(null)}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="font-heading">{viewItem?.title}</DialogTitle></DialogHeader>
@@ -306,7 +311,9 @@ function ContentManager() {
               <Badge variant="secondary" className="capitalize">{viewItem?.type.replace("_", " ")}</Badge>
               <Badge variant="secondary">{viewItem?.status}</Badge>
             </div>
-            <p className="text-sm font-body whitespace-pre-wrap text-foreground">{viewItem?.body}</p>
+            <div className="prose prose-sm max-w-none font-body prose-headings:font-heading prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground">
+              <ReactMarkdown>{viewItem?.body || ""}</ReactMarkdown>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -356,7 +363,8 @@ function UGCVideoCreator() {
   const [avatarGender, setAvatarGender] = useState("female");
   const [avatarEthnicity, setAvatarEthnicity] = useState("african");
   const [avatarSetting, setAvatarSetting] = useState("studio");
-  const [customAvatarUrl, setCustomAvatarUrl] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedPreview, setUploadedPreview] = useState("");
   const [script, setScript] = useState("");
   const [generatingScript, setGeneratingScript] = useState(false);
   const [generatingAvatar, setGeneratingAvatar] = useState(false);
@@ -364,6 +372,7 @@ function UGCVideoCreator() {
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: products } = useQuery({
     queryKey: ["products-active"],
@@ -375,6 +384,22 @@ function UGCVideoCreator() {
 
   const selectedProd = products?.find(p => p.id === selectedProduct);
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadedFile(file);
+    const url = URL.createObjectURL(file);
+    setUploadedPreview(url);
+    setAvatarPreview(""); // clear AI avatar
+    toast({ title: "File uploaded!", description: file.name });
+  };
+
+  const clearUpload = () => {
+    setUploadedFile(null);
+    setUploadedPreview("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const generateScript = async () => {
     if (!selectedProd) { toast({ title: "Select a product first", variant: "destructive" }); return; }
     setGeneratingScript(true);
@@ -382,7 +407,7 @@ function UGCVideoCreator() {
       const { data, error } = await supabase.functions.invoke("ai-generate", {
         body: {
           type: "chat",
-          context: `Write a 30-second UGC-style video script for the product "${selectedProd.name}" (${selectedProd.category}, ${selectedProd.currency} ${selectedProd.price}). The script should be engaging, authentic, and feel like a real person reviewing the product. Include: 1) Hook (first 3 seconds), 2) Product showcase, 3) Key benefits, 4) Call to action. Format with clear scene directions in [brackets]. Keep it natural and conversational.`,
+          context: `Write a 30-second UGC-style video script for the product "${selectedProd.name}" (${selectedProd.category}, ${selectedProd.currency} ${selectedProd.price}). The script should be engaging, authentic, and feel like a real person reviewing the product. Format using markdown:\n\n## Title\n**Product:** name\n**Price:** price\n**Tone:** style\n\n---\n\n### [Scene 1: Hook (0:00-0:03)]\n[Camera direction in brackets]\n**Creator:** "Dialog here"\n\n### [Scene 2: Product Showcase (0:03-0:12)]\n[Camera direction]\n**Creator:** "Dialog here"\n\n### [Scene 3: Key Benefits (0:12-0:22)]\n[Camera direction]\n**Creator:** "Dialog here"\n\n### [Scene 4: CTA (0:22-0:30)]\n[Camera direction]\n**Creator:** "Dialog here"\n\nUse bullet points for text overlays at the end.`,
         },
       });
       if (error) throw error;
@@ -409,24 +434,25 @@ function UGCVideoCreator() {
       if (error) throw error;
       if (data?.imageUrl) {
         setAvatarPreview(data.imageUrl);
+        setUploadedPreview(""); // clear upload
+        setUploadedFile(null);
         toast({ title: "Avatar generated!" });
       }
     } catch {
-      toast({ title: "Avatar generation failed. Make sure the UGC function is deployed.", variant: "destructive" });
+      toast({ title: "Avatar generation failed", variant: "destructive" });
     } finally {
       setGeneratingAvatar(false);
     }
   };
 
   const generateVideo = async () => {
-    if (!script || (!avatarPreview && !customAvatarUrl)) {
+    if (!script || (!avatarPreview && !uploadedPreview)) {
       toast({ title: "Generate avatar and script first", variant: "destructive" });
       return;
     }
     setGeneratingVideo(true);
     setVideoProgress(0);
 
-    // Simulate progress since video generation takes time
     const interval = setInterval(() => {
       setVideoProgress(p => Math.min(p + 2, 90));
     }, 1000);
@@ -436,7 +462,7 @@ function UGCVideoCreator() {
         body: {
           action: "generate-video",
           script,
-          avatarUrl: customAvatarUrl || avatarPreview,
+          avatarUrl: avatarPreview || uploadedPreview,
           productName: selectedProd?.name,
           productImages: selectedProd?.images || [],
         },
@@ -446,7 +472,6 @@ function UGCVideoCreator() {
       setVideoProgress(100);
       if (data?.videoUrl) {
         setVideoUrl(data.videoUrl);
-        // Save to content table
         await supabase.from("content").insert({
           type: "ugc",
           title: `UGC Video - ${selectedProd?.name || "Product"}`,
@@ -466,9 +491,12 @@ function UGCVideoCreator() {
     }
   };
 
+  const currentAvatarSrc = uploadedPreview || avatarPreview;
+  const isVideo = uploadedFile?.type?.startsWith("video/");
+
   return (
     <div className="space-y-6">
-      {/* Steps indicator */}
+      {/* Steps */}
       <div className="flex items-center gap-2">
         {[
           { n: 1, label: "Select Product" },
@@ -488,12 +516,11 @@ function UGCVideoCreator() {
         ))}
       </div>
 
-      {/* Step 1: Product Selection */}
+      {/* Step 1 */}
       {step === 1 && (
         <div className="rounded-xl border border-border bg-card p-6 space-y-4">
           <h3 className="font-heading text-lg font-semibold">Select Product</h3>
           <p className="text-sm text-muted-foreground font-body">Choose a product to create UGC video for</p>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {products?.map(p => (
               <button
@@ -514,7 +541,7 @@ function UGCVideoCreator() {
         </div>
       )}
 
-      {/* Step 2: Avatar & Script */}
+      {/* Step 2 */}
       {step === 2 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Avatar Panel */}
@@ -568,18 +595,35 @@ function UGCVideoCreator() {
             </Button>
 
             <div className="border-t border-border pt-4">
-              <p className="text-xs text-muted-foreground mb-2 font-body">Or upload your own photo/video</p>
-              <Input placeholder="Paste image URL..." value={customAvatarUrl} onChange={e => setCustomAvatarUrl(e.target.value)} />
+              <p className="text-xs text-muted-foreground mb-2 font-body">Or upload your own photo / video</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Button variant="outline" className="w-full gap-2" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="w-4 h-4" /> Choose File
+              </Button>
+              {uploadedFile && (
+                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+                  <span className="truncate">{uploadedFile.name}</span>
+                  <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={clearUpload}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              )}
             </div>
 
-            {/* Avatar Preview */}
-            {(avatarPreview || customAvatarUrl) && (
+            {/* Avatar/Upload Preview */}
+            {currentAvatarSrc && (
               <div className="rounded-lg overflow-hidden border border-border">
-                <img
-                  src={customAvatarUrl || avatarPreview}
-                  alt="Avatar preview"
-                  className="w-full h-48 object-cover"
-                />
+                {isVideo ? (
+                  <video src={currentAvatarSrc} controls className="w-full h-48 object-cover" />
+                ) : (
+                  <img src={currentAvatarSrc} alt="Avatar preview" className="w-full h-48 object-cover" />
+                )}
               </div>
             )}
           </div>
@@ -607,12 +651,27 @@ function UGCVideoCreator() {
               Generate AI Script
             </Button>
 
-            <Textarea
-              placeholder="Your video script will appear here. You can edit it..."
-              value={script}
-              onChange={e => setScript(e.target.value)}
-              className="min-h-[200px] font-body text-sm"
-            />
+            {/* Script with markdown preview toggle */}
+            {script ? (
+              <div className="space-y-2">
+                <div className="rounded-lg border border-border bg-muted/30 p-4 max-h-[300px] overflow-y-auto">
+                  <div className="prose prose-sm max-w-none font-body prose-headings:font-heading prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-headings:mt-2 prose-headings:mb-1">
+                    <ReactMarkdown>{script}</ReactMarkdown>
+                  </div>
+                </div>
+                <Textarea
+                  placeholder="Edit your script..."
+                  value={script}
+                  onChange={e => setScript(e.target.value)}
+                  className="min-h-[120px] font-body text-sm"
+                />
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-8 text-center">
+                <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
+                <p className="text-xs text-muted-foreground">Click "Generate AI Script" to create a video script</p>
+              </div>
+            )}
 
             <Button onClick={() => setStep(3)} disabled={!script} className="w-full gap-2">
               <Play className="w-4 h-4" /> Continue to Generate
@@ -621,7 +680,7 @@ function UGCVideoCreator() {
         </div>
       )}
 
-      {/* Step 3: Generate Video */}
+      {/* Step 3 */}
       {step === 3 && (
         <div className="rounded-xl border border-border bg-card p-6 space-y-6">
           <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
@@ -630,16 +689,22 @@ function UGCVideoCreator() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-lg bg-muted/50 p-4 space-y-2">
-              <p className="text-xs text-muted-foreground font-body">Avatar</p>
-              {(customAvatarUrl || avatarPreview) ? (
-                <img src={customAvatarUrl || avatarPreview} alt="Avatar" className="w-full h-32 object-cover rounded-lg" />
+              <p className="text-xs text-muted-foreground font-body font-semibold uppercase tracking-wider">Avatar</p>
+              {currentAvatarSrc ? (
+                isVideo ? (
+                  <video src={currentAvatarSrc} controls className="w-full h-32 object-cover rounded-lg" />
+                ) : (
+                  <img src={currentAvatarSrc} alt="Avatar" className="w-full h-32 object-cover rounded-lg" />
+                )
               ) : (
                 <div className="h-32 bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-xs">No avatar</div>
               )}
             </div>
             <div className="rounded-lg bg-muted/50 p-4 space-y-2">
-              <p className="text-xs text-muted-foreground font-body">Script Preview</p>
-              <p className="text-xs text-foreground font-body line-clamp-6 whitespace-pre-wrap">{script}</p>
+              <p className="text-xs text-muted-foreground font-body font-semibold uppercase tracking-wider">Script Preview</p>
+              <div className="text-xs text-foreground font-body line-clamp-6 prose prose-xs max-w-none">
+                <ReactMarkdown>{script}</ReactMarkdown>
+              </div>
             </div>
           </div>
 
@@ -649,15 +714,15 @@ function UGCVideoCreator() {
           </Button>
 
           {generatingVideo && (
-            <div className="space-y-2">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
               <Progress value={videoProgress} className="h-2" />
               <p className="text-xs text-muted-foreground text-center font-body">{videoProgress}% — Processing with AI...</p>
-            </div>
+            </motion.div>
           )}
 
           {videoUrl && (
-            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-4">
-              <div className="aspect-video rounded-lg overflow-hidden bg-black">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border bg-muted/30 p-4 space-y-4">
+              <div className="aspect-video rounded-lg overflow-hidden bg-charcoal">
                 <video src={videoUrl} controls className="w-full h-full" />
               </div>
               <div className="flex gap-2">
@@ -668,7 +733,7 @@ function UGCVideoCreator() {
                   <Share2 className="w-4 h-4" />
                 </Button>
               </div>
-            </div>
+            </motion.div>
           )}
         </div>
       )}
