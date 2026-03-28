@@ -1,0 +1,11 @@
+CREATE POLICY "Public can insert content" ON public.content FOR INSERT TO public WITH CHECK (true);
+CREATE POLICY "Public can update content" ON public.content FOR UPDATE TO public USING (true) WITH CHECK (true);
+CREATE POLICY "Public can delete content" ON public.content FOR DELETE TO public USING (true);
+CREATE POLICY "Public can insert orders" ON public.orders FOR INSERT TO public WITH CHECK (true);
+CREATE POLICY "Public can update orders" ON public.orders FOR UPDATE TO public USING (true) WITH CHECK (true);
+CREATE POLICY "Public can delete orders" ON public.orders FOR DELETE TO public USING (true);
+CREATE POLICY "Public can view orders" ON public.orders FOR SELECT TO public USING (true);
+CREATE POLICY "Public can manage agents" ON public.agents FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY "Public can manage conversations" ON public.conversations FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY "Public can manage messages" ON public.messages FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY "Public can manage products" ON public.products FOR ALL TO public USING (true) WITH CHECK (true);
