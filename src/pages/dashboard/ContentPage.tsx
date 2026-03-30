@@ -809,9 +809,33 @@ function UGCVideoCreator() {
             </div>
           </div>
 
+          {/* Provider selector */}
+          <div className="rounded-lg border border-border p-3 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Generation Engine</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setVideoProvider("auto")}
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all ${videoProvider === "auto" ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+              >
+                🎬 Auto (fal.ai → AI Fallback)
+              </button>
+              <button
+                onClick={() => setVideoProvider("lovable-ai")}
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all ${videoProvider === "lovable-ai" ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+              >
+                ✨ AI Storyboard Only
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              {videoProvider === "auto"
+                ? "Tries fal.ai Veo for full video first, falls back to AI-generated storyboard if unavailable."
+                : "Generates a cinematic AI storyboard frame — no fal.ai balance needed."}
+            </p>
+          </div>
+
           <Button onClick={generateVideo} disabled={generatingVideo} className="w-full gap-2" size="lg">
             {generatingVideo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-            {generatingVideo ? "Generating Video..." : "Generate UGC Video"}
+            {generatingVideo ? "Generating..." : videoProvider === "lovable-ai" ? "Generate AI Storyboard" : "Generate UGC Video"}
           </Button>
 
           {generatingVideo && (
@@ -831,6 +855,26 @@ function UGCVideoCreator() {
                   <Button className="w-full gap-2"><Download className="w-4 h-4" /> Download Video</Button>
                 </a>
                 <Button variant="outline" onClick={() => { navigator.clipboard.writeText(videoUrl); toast({ title: "Link copied!" }); }}>
+                  <Share2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {storyboardUrl && !videoUrl && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border bg-muted/30 p-4 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary" className="text-[10px]">✨ AI Storyboard</Badge>
+                <span className="text-[10px] text-muted-foreground">Generated with Lovable AI</span>
+              </div>
+              <div className="aspect-[9/16] max-h-[400px] rounded-lg overflow-hidden bg-charcoal mx-auto">
+                <img src={storyboardUrl} alt="AI Storyboard" className="w-full h-full object-cover" />
+              </div>
+              <div className="flex gap-2">
+                <a href={storyboardUrl} download className="flex-1">
+                  <Button className="w-full gap-2"><Download className="w-4 h-4" /> Download Storyboard</Button>
+                </a>
+                <Button variant="outline" onClick={() => { navigator.clipboard.writeText(storyboardUrl); toast({ title: "Link copied!" }); }}>
                   <Share2 className="w-4 h-4" />
                 </Button>
               </div>
