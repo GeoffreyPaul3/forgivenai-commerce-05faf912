@@ -12,6 +12,22 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
@@ -25,7 +41,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   Sparkles, Loader2, Video, FileText, Share2, Pencil, Trash2, Eye, Download,
-  User, Wand2, Play, Upload, ImageIcon, X,
+  User, Wand2, Play, Upload, X, MoreHorizontal,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import type { Tables } from "@/integrations/supabase/types";
@@ -73,6 +89,7 @@ function ContentManager() {
   const [selectedProduct, setSelectedProduct] = useState("none");
   const [editItem, setEditItem] = useState<Content | null>(null);
   const [viewItem, setViewItem] = useState<Content | null>(null);
+  const [deleteItem, setDeleteItem] = useState<Content | null>(null);
 
   const { data: content, isLoading, refetch } = useQuery({
     queryKey: ["content", filter],
@@ -152,14 +169,10 @@ function ContentManager() {
   });
 
   const deleteContent = async (id: string) => {
-    await supabase.from("content").delete().eq("id", id);
+    const { error } = await supabase.from("content").delete().eq("id", id);
+    if (error) throw error;
     refetch();
     toast({ title: "Content deleted" });
-  };
-
-  const updateStatus = async (id: string, status: string) => {
-    await supabase.from("content").update({ status }).eq("id", id);
-    refetch();
   };
 
   const typeIcon = (type: string) => {
@@ -257,16 +270,27 @@ function ContentManager() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewItem(item)}><Eye className="w-3.5 h-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditItem(item)}><Pencil className="w-3.5 h-3.5" /></Button>
-                      {item.status === "draft" && (
-                        <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => updateStatus(item.id, "published")}>Publish</Button>
-                      )}
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteContent(item.id)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="icon" variant="ghost" className="h-8 w-8">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-36">
+                        <DropdownMenuItem onClick={() => setViewItem(item)}>
+                          <Eye className="w-4 h-4 mr-2" /> View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setEditItem(item)}>
+                          <Pencil className="w-4 h-4 mr-2" /> Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setDeleteItem(item)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -320,6 +344,36 @@ function ContentManager() {
 
       {/* Edit Dialog */}
       <ContentEditDialog item={editItem} open={!!editItem} onClose={() => setEditItem(null)} onSave={(data) => updateMutation.mutate(data)} />
+
+      {/* Delete Alert Dialog */}
+      <AlertDialog open={!!deleteItem} onOpenChange={(open) => !open && setDeleteItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading">Delete content?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove "{deleteItem?.title || "this content"}" from your AI content library.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deleteItem) return;
+                try {
+                  await deleteContent(deleteItem.id);
+                } catch {
+                  toast({ title: "Delete failed", variant: "destructive" });
+                } finally {
+                  setDeleteItem(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -482,10 +536,35 @@ function UGCVideoCreator() {
         });
         queryClient.invalidateQueries({ queryKey: ["content"] });
         toast({ title: "Video generated!" });
+      } else {
+        throw new Error(data?.error || "Video generation did not return a video URL.");
       }
-    } catch {
+    } catch (err) {
       clearInterval(interval);
-      toast({ title: "Video generation failed. Ensure fal.ai API key is configured.", variant: "destructive" });
+      setVideoProgress(0);
+
+      let message = "Video generation failed. Please try again.";
+
+      if (err && typeof err === "object" && "context" in err) {
+        try {
+          const context = (err as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+          const payload = await context?.json?.();
+          if (payload?.error) message = payload.error;
+        } catch {
+          // no-op
+        }
+      }
+
+      if (message === "Video generation failed. Please try again." && err instanceof Error) {
+        const jsonMatch = err.message.match(/\{\s*"error"\s*:\s*"([^"]+)"\s*\}/);
+        message = jsonMatch?.[1] || err.message;
+      }
+
+      toast({
+        title: "Video generation failed",
+        description: message,
+        variant: "destructive",
+      });
     } finally {
       setGeneratingVideo(false);
     }

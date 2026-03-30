@@ -91,7 +91,26 @@ serve(async (req) => {
       if (!falResponse.ok) {
         const errText = await falResponse.text();
         console.error("fal.ai error:", falResponse.status, errText);
-        throw new Error(`Video generation failed: ${falResponse.status}`);
+        const lower = errText.toLowerCase();
+
+        if (falResponse.status === 401) {
+          return new Response(
+            JSON.stringify({ error: "fal.ai API key is invalid. Please update FAL_API_KEY." }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (falResponse.status === 403 && (lower.includes("exhausted balance") || lower.includes("user is locked"))) {
+          return new Response(
+            JSON.stringify({ error: "fal.ai balance is exhausted. Please top up billing to generate videos." }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ error: `Video generation failed on fal.ai (${falResponse.status}).` }),
+          { status: falResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       const falData = await falResponse.json();
