@@ -499,6 +499,9 @@ function UGCVideoCreator() {
     }
   };
 
+  const [storyboardUrl, setStoryboardUrl] = useState<string | null>(null);
+  const [videoProvider, setVideoProvider] = useState<"auto" | "lovable-ai">("auto");
+
   const generateVideo = async () => {
     if (!script || (!avatarPreview && !uploadedPreview)) {
       toast({ title: "Generate avatar and script first", variant: "destructive" });
@@ -506,6 +509,7 @@ function UGCVideoCreator() {
     }
     setGeneratingVideo(true);
     setVideoProgress(0);
+    setStoryboardUrl(null);
 
     const interval = setInterval(() => {
       setVideoProgress(p => Math.min(p + 2, 90));
@@ -519,11 +523,13 @@ function UGCVideoCreator() {
           avatarUrl: avatarPreview || uploadedPreview,
           productName: selectedProd?.name,
           productImages: selectedProd?.images || [],
+          provider: videoProvider === "lovable-ai" ? "lovable-ai" : undefined,
         },
       });
       if (error) throw error;
       clearInterval(interval);
       setVideoProgress(100);
+
       if (data?.videoUrl) {
         setVideoUrl(data.videoUrl);
         await supabase.from("content").insert({
@@ -536,8 +542,24 @@ function UGCVideoCreator() {
         });
         queryClient.invalidateQueries({ queryKey: ["content"] });
         toast({ title: "Video generated!" });
+      } else if (data?.storyboardUrl) {
+        setStoryboardUrl(data.storyboardUrl);
+        await supabase.from("content").insert({
+          type: "ugc",
+          title: `UGC Storyboard - ${selectedProd?.name || "Product"}`,
+          body: script,
+          media_url: data.storyboardUrl,
+          product_id: selectedProduct !== "none" ? selectedProduct : null,
+          status: "draft",
+          metadata: { provider: "lovable-ai", type: "storyboard" },
+        });
+        queryClient.invalidateQueries({ queryKey: ["content"] });
+        toast({
+          title: "AI Storyboard generated!",
+          description: data.message || "A cinematic storyboard frame was created using AI.",
+        });
       } else {
-        throw new Error(data?.error || "Video generation did not return a video URL.");
+        throw new Error(data?.error || "Generation did not return output.");
       }
     } catch (err) {
       clearInterval(interval);

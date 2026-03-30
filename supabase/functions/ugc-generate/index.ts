@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { action, gender, ethnicity, setting, script, avatarUrl, productName, productImages } = await req.json();
+    const { action, gender, ethnicity, setting, script, avatarUrl, productName, productImages, provider } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -63,61 +63,103 @@ serve(async (req) => {
     }
 
     if (action === "generate-video") {
-      // Check for fal.ai API key
-      const FAL_API_KEY = Deno.env.get("FAL_API_KEY");
-      if (!FAL_API_KEY) {
-        return new Response(
-          JSON.stringify({ error: "FAL_API_KEY is not configured. Please add your fal.ai API key to generate videos." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      const useFal = provider !== "lovable-ai";
+
+      // Try fal.ai first (if requested and key exists)
+      if (useFal) {
+        const FAL_API_KEY = Deno.env.get("FAL_API_KEY");
+        if (FAL_API_KEY) {
+          const videoPrompt = `UGC-style product review video. A content creator presents and reviews "${productName}". Script: ${script?.slice(0, 500)}. Style: authentic, casual, well-lit, vertical format suitable for social media.`;
+
+          const falResponse = await fetch("https://queue.fal.run/fal-ai/veo2", {
+            method: "POST",
+            headers: {
+              Authorization: `Key ${FAL_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              prompt: videoPrompt,
+              aspect_ratio: "9:16",
+              duration: "8s",
+            }),
+          });
+
+          if (falResponse.ok) {
+            const falData = await falResponse.json();
+            const videoUrl = falData.video?.url || falData.request_id;
+            return new Response(
+              JSON.stringify({ success: true, videoUrl, requestId: falData.request_id, provider: "fal" }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          const errText = await falResponse.text();
+          console.error("fal.ai error:", falResponse.status, errText);
+
+          if (falResponse.status === 401) {
+            return new Response(
+              JSON.stringify({ error: "fal.ai API key is invalid. Please update FAL_API_KEY." }),
+              { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // For billing/balance issues, fall through to Lovable AI fallback
+          console.log("fal.ai unavailable, falling back to Lovable AI storyboard generation");
+        }
       }
 
-      // Submit video generation to fal.ai (Veo 3.1 or similar)
-      const videoPrompt = `UGC-style product review video. A content creator presents and reviews "${productName}". Script: ${script?.slice(0, 500)}. Style: authentic, casual, well-lit, vertical format suitable for social media.`;
+      // Lovable AI fallback: Generate a cinematic storyboard frame
+      const storyboardPrompt = `Create a cinematic, high-quality UGC-style product marketing image for "${productName}". 
+The image should look like a professional video thumbnail or key frame from a product review video.
+Show a stylish content creator holding or presenting the product in a well-lit setting.
+The composition should feel like a paused moment from a premium social media video ad.
+Include text overlay effect that says "${productName}" in elegant typography.
+Style: vertical 9:16 ratio, cinematic lighting, shallow depth of field, Instagram-worthy.
+On a clean background.`;
 
-      const falResponse = await fetch("https://queue.fal.run/fal-ai/veo2", {
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Key ${FAL_API_KEY}`,
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt: videoPrompt,
-          aspect_ratio: "9:16",
-          duration: "8s",
+          model: "google/gemini-3.1-flash-image-preview",
+          messages: [{ role: "user", content: storyboardPrompt }],
+          modalities: ["image", "text"],
         }),
       });
 
-      if (!falResponse.ok) {
-        const errText = await falResponse.text();
-        console.error("fal.ai error:", falResponse.status, errText);
-        const lower = errText.toLowerCase();
-
-        if (falResponse.status === 401) {
-          return new Response(
-            JSON.stringify({ error: "fal.ai API key is invalid. Please update FAL_API_KEY." }),
-            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+      if (!aiResponse.ok) {
+        const t = await aiResponse.text();
+        console.error("Lovable AI storyboard error:", aiResponse.status, t);
+        if (aiResponse.status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limited. Please try again shortly." }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
-
-        if (falResponse.status === 403 && (lower.includes("exhausted balance") || lower.includes("user is locked"))) {
-          return new Response(
-            JSON.stringify({ error: "fal.ai balance is exhausted. Please top up billing to generate videos." }),
-            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+        if (aiResponse.status === 402) {
+          return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds in Settings → Workspace → Usage." }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
-
-        return new Response(
-          JSON.stringify({ error: `Video generation failed on fal.ai (${falResponse.status}).` }),
-          { status: falResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        throw new Error("AI storyboard generation failed");
       }
 
-      const falData = await falResponse.json();
-      const videoUrl = falData.video?.url || falData.request_id;
+      const aiData = await aiResponse.json();
+      const storyboardUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!storyboardUrl) {
+        throw new Error("AI did not return a storyboard image");
+      }
 
       return new Response(
-        JSON.stringify({ success: true, videoUrl, requestId: falData.request_id }),
+        JSON.stringify({
+          success: true,
+          storyboardUrl,
+          provider: "lovable-ai",
+          message: "Generated an AI storyboard frame. For full video generation, top up your fal.ai balance.",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
