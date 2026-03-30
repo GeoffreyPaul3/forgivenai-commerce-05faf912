@@ -1,19 +1,32 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Plus, Copy, DollarSign, TrendingUp } from "lucide-react";
+import { Users, Plus, Copy, DollarSign, TrendingUp, Search } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Agent = Tables<"agents">;
+const PAGE_SIZE = 8;
 
 const AgentsPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const { data: agents, isLoading } = useQuery({
     queryKey: ["agents"],
@@ -46,6 +59,25 @@ const AgentsPage = () => {
   const totalSales = agents?.reduce((s, a) => s + (a.total_sales || 0), 0) || 0;
   const totalCommission = agents?.reduce((s, a) => s + (a.total_commission || 0), 0) || 0;
 
+  const filteredAgents = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return agents || [];
+    return (agents || []).filter((agent) =>
+      [agent.name, agent.phone, agent.email, agent.referral_code]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term)
+    );
+  }, [agents, search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAgents.length / PAGE_SIZE));
+  const paginatedAgents = filteredAgents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -73,49 +105,126 @@ const AgentsPage = () => {
         ))}
       </div>
 
-      {/* Agent List */}
-      {isLoading ? (
-        <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl border animate-pulse bg-card" />)}</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {agents?.map(agent => (
-            <div key={agent.id} className="rounded-xl border border-border bg-card p-5 hover:border-gold/20 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h4 className="font-heading font-semibold text-foreground">{agent.name}</h4>
-                  <p className="text-xs text-muted-foreground font-body">{agent.phone || agent.email}</p>
-                </div>
-                <span className={`px-2 py-0.5 text-xs rounded-full ${agent.status === "active" ? "bg-green-100 text-green-800" : "bg-muted text-muted-foreground"}`}>{agent.status}</span>
-              </div>
-              <div className="flex items-center gap-2 mb-3">
-                <code className="px-2 py-1 rounded bg-muted text-sm font-mono text-foreground">{agent.referral_code}</code>
-                <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(agent.referral_code); toast({ title: "Code copied!" }); }}>
-                  <Copy className="w-3 h-3" />
-                </Button>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <p className="text-xs text-muted-foreground">Sales</p>
-                  <p className="text-sm font-semibold">MWK {(agent.total_sales || 0).toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Commission</p>
-                  <p className="text-sm font-semibold">MWK {(agent.total_commission || 0).toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Rate</p>
-                  <p className="text-sm font-semibold">{agent.commission_rate}%</p>
-                </div>
-              </div>
-            </div>
-          ))}
-          {(!agents || agents.length === 0) && (
-            <div className="col-span-2 text-center py-12 text-muted-foreground font-body">
-              <Users className="w-8 h-8 mx-auto mb-3" />
-              No agents registered yet. Add your first sales agent.
-            </div>
-          )}
+      {/* Agent Table */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="p-4 border-b border-border">
+          <div className="relative max-w-sm">
+            <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search agents by name, phone, email, or referral code"
+              className="pl-9"
+            />
+          </div>
         </div>
+
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead>Agent</TableHead>
+              <TableHead>Referral Code</TableHead>
+              <TableHead>Rate</TableHead>
+              <TableHead>Total Sales</TableHead>
+              <TableHead>Total Commission</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 6 }).map((__, j) => (
+                    <TableCell key={j}>
+                      <div className="h-4 rounded bg-muted animate-pulse" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : paginatedAgents.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground font-body">
+                  <Users className="w-8 h-8 mx-auto mb-3" />
+                  No agents found. Add a new agent or adjust your search.
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedAgents.map((agent) => (
+                <TableRow key={agent.id}>
+                  <TableCell>
+                    <div>
+                      <p className="font-heading font-semibold text-foreground">{agent.name}</p>
+                      <p className="text-xs text-muted-foreground font-body">{agent.phone || agent.email || "No contact"}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1">
+                      <code className="text-sm font-mono text-foreground">{agent.referral_code}</code>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={() => {
+                          navigator.clipboard.writeText(agent.referral_code);
+                          toast({ title: "Code copied!" });
+                        }}
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                  <TableCell>{agent.commission_rate || 0}%</TableCell>
+                  <TableCell>MWK {(agent.total_sales || 0).toLocaleString()}</TableCell>
+                  <TableCell>MWK {(agent.total_commission || 0).toLocaleString()}</TableCell>
+                  <TableCell>
+                    <Badge variant={agent.status === "active" ? "default" : "secondary"} className="capitalize">
+                      {agent.status || "inactive"}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setPage((current) => Math.max(1, current - 1));
+                }}
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <PaginationItem key={p}>
+                <PaginationLink
+                  href="#"
+                  isActive={p === page}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPage(p);
+                  }}
+                >
+                  {p}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setPage((current) => Math.min(totalPages, current + 1));
+                }}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       )}
 
       {/* Add Agent Dialog */}
