@@ -142,6 +142,54 @@ export type Database = {
         }
         Relationships: []
       }
+      influencers: {
+        Row: {
+          avatar_url: string | null
+          catchphrases: string[] | null
+          created_at: string
+          ethnicity: string | null
+          gender: string | null
+          id: string
+          metadata: Json | null
+          name: string
+          niche: string | null
+          setting: string | null
+          tone: string | null
+          updated_at: string
+          voice_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          catchphrases?: string[] | null
+          created_at?: string
+          ethnicity?: string | null
+          gender?: string | null
+          id?: string
+          metadata?: Json | null
+          name: string
+          niche?: string | null
+          setting?: string | null
+          tone?: string | null
+          updated_at?: string
+          voice_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          catchphrases?: string[] | null
+          created_at?: string
+          ethnicity?: string | null
+          gender?: string | null
+          id?: string
+          metadata?: Json | null
+          name?: string
+          niche?: string | null
+          setting?: string | null
+          tone?: string | null
+          updated_at?: string
+          voice_id?: string | null
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
@@ -289,6 +337,109 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      ugc_frames: {
+        Row: {
+          camera: string | null
+          created_at: string
+          dialogue: string | null
+          expression: string | null
+          frame_index: number
+          id: string
+          image_url: string | null
+          metadata: Json | null
+          project_id: string
+          scene: string | null
+        }
+        Insert: {
+          camera?: string | null
+          created_at?: string
+          dialogue?: string | null
+          expression?: string | null
+          frame_index?: number
+          id?: string
+          image_url?: string | null
+          metadata?: Json | null
+          project_id: string
+          scene?: string | null
+        }
+        Update: {
+          camera?: string | null
+          created_at?: string
+          dialogue?: string | null
+          expression?: string | null
+          frame_index?: number
+          id?: string
+          image_url?: string | null
+          metadata?: Json | null
+          project_id?: string
+          scene?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ugc_frames_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "ugc_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ugc_projects: {
+        Row: {
+          avatar_settings: Json | null
+          avatar_url: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          product_id: string | null
+          provider: string | null
+          script: string | null
+          status: string | null
+          storyboard: Json | null
+          updated_at: string
+          video_url: string | null
+          voice_url: string | null
+        }
+        Insert: {
+          avatar_settings?: Json | null
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          product_id?: string | null
+          provider?: string | null
+          script?: string | null
+          status?: string | null
+          storyboard?: Json | null
+          updated_at?: string
+          video_url?: string | null
+          voice_url?: string | null
+        }
+        Update: {
+          avatar_settings?: Json | null
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          product_id?: string | null
+          provider?: string | null
+          script?: string | null
+          status?: string | null
+          storyboard?: Json | null
+          updated_at?: string
+          video_url?: string | null
+          voice_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ugc_projects_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
