@@ -31,11 +31,12 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Sparkles, Loader2, Video, FileText, Share2, Pencil, Trash2, Eye, Download,
   User, Wand2, Play, Upload, X, MoreHorizontal, Image, RefreshCw, ChevronRight,
-  Clapperboard, Film, Layers,
+  Clapperboard, Film, Layers, Volume2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import type { Tables } from "@/integrations/supabase/types";
 import { motion, AnimatePresence } from "framer-motion";
+import { assembleVideo, type VideoFrame } from "@/lib/videoAssembler";
 
 type Content = Tables<"content">;
 const PAGE_SIZE = 8;
@@ -66,7 +67,7 @@ const ContentPage = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   CONTENT MANAGER (preserved from previous version)
+   CONTENT MANAGER
    ═══════════════════════════════════════════════════════════ */
 function ContentManager() {
   const { toast } = useToast();
@@ -252,6 +253,9 @@ function ContentManager() {
               <Badge variant="secondary" className="capitalize">{viewItem?.type.replace("_", " ")}</Badge>
               <Badge variant="secondary">{viewItem?.status}</Badge>
             </div>
+            {viewItem?.media_url && (
+              <img src={viewItem.media_url} alt="" className="w-full rounded-lg" />
+            )}
             <div className="prose prose-sm max-w-none font-body prose-headings:font-heading prose-headings:text-foreground prose-p:text-foreground">
               <ReactMarkdown>{viewItem?.body || ""}</ReactMarkdown>
             </div>
@@ -300,10 +304,19 @@ function ContentEditDialog({ item, open, onClose, onSave }: { item: Content | nu
 }
 
 /* ═══════════════════════════════════════════════════════════
-   UGC STUDIO — Full Pipeline
+   UGC STUDIO — Full Video Pipeline
    ═══════════════════════════════════════════════════════════ */
 
-type StoryboardFrame = { frame: number; imageUrl: string; scene: string };
+type StoryboardFrame = { frame: number; imageUrl: string; scene: string; dialogue?: string };
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 function UGCStudio() {
   const { toast } = useToast();
@@ -323,6 +336,13 @@ function UGCStudio() {
   const [frames, setFrames] = useState<StoryboardFrame[]>([]);
   const [frameCount, setFrameCount] = useState(4);
   const [projectId, setProjectId] = useState<string | null>(null);
+
+  // Video state
+  const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [generatingVideo, setGeneratingVideo] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [enableTTS, setEnableTTS] = useState(true);
 
   // Loading states
   const [generatingAvatar, setGeneratingAvatar] = useState(false);
@@ -350,7 +370,7 @@ function UGCStudio() {
     setUploadedFile(file);
     setUploadedPreview(URL.createObjectURL(file));
     setAvatarUrl("");
-    toast({ title: "File uploaded!", description: file.name });
+    toast({ title: "Avatar uploaded!", description: `Using ${file.name} as your avatar reference` });
   };
 
   const clearUpload = () => {
@@ -359,19 +379,31 @@ function UGCStudio() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // ── Generate Avatar (locked once) ──
+  // ── Generate Avatar ──
   const generateAvatar = async () => {
     setGeneratingAvatar(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ugc-generate", {
-        body: { action: "generate-avatar", gender: avatarGender, ethnicity: avatarEthnicity, setting: avatarSetting, productName: selectedProd?.name },
-      });
+      const body: any = {
+        action: "generate-avatar",
+        gender: avatarGender,
+        ethnicity: avatarEthnicity,
+        setting: avatarSetting,
+        productName: selectedProd?.name,
+        productImageUrl: selectedProd?.images?.[0] || null,
+      };
+
+      // If user uploaded their own photo, convert to base64 and send
+      if (uploadedFile && uploadedFile.type.startsWith("image/")) {
+        const base64 = await fileToBase64(uploadedFile);
+        body.avatarImageBase64 = base64;
+      }
+
+      const { data, error } = await supabase.functions.invoke("ugc-generate", { body });
       if (error) throw error;
       if (data?.imageUrl) {
         setAvatarUrl(data.imageUrl);
-        setUploadedPreview("");
-        setUploadedFile(null);
-        toast({ title: "Avatar generated & locked!" });
+        // Don't clear upload - keep it as reference
+        toast({ title: "Avatar generated with your product!" });
       }
     } catch (err: any) {
       toast({ title: "Avatar generation failed", description: err?.message, variant: "destructive" });
@@ -380,7 +412,7 @@ function UGCStudio() {
     }
   };
 
-  // ── Generate Script (structured) ──
+  // ── Generate Script ──
   const generateScript = async () => {
     if (!selectedProd) return;
     setGeneratingScript(true);
@@ -392,7 +424,6 @@ function UGCStudio() {
 
       if (data?.scriptData) {
         setScriptData(data.scriptData);
-        // Build readable script
         const sd = data.scriptData;
         const lines = [`## ${sd.title || "UGC Script"}`, "", `**Hook:** ${sd.hook || ""}`, ""];
         sd.scenes?.forEach((s: any) => {
@@ -417,7 +448,7 @@ function UGCStudio() {
     }
   };
 
-  // ── Generate Multi-Frame Storyboard ──
+  // ── Generate Storyboard Frames ──
   const generateStoryboard = async () => {
     if (!currentAvatar || !script || !selectedProd) {
       toast({ title: "Complete previous steps first", variant: "destructive" });
@@ -426,29 +457,37 @@ function UGCStudio() {
     setGeneratingStoryboard(true);
     setStoryboardProgress(0);
     setFrames([]);
+    setVideoBlob(null);
+    setVideoUrl("");
 
     const progressInterval = setInterval(() => {
       setStoryboardProgress(p => Math.min(p + (90 / (frameCount * 8)), 90));
     }, 1000);
 
     try {
-      const { data, error } = await supabase.functions.invoke("ugc-generate", {
-        body: {
-          action: "generate-storyboard",
-          productName: selectedProd.name,
-          productImage: selectedProd.images?.[0],
-          avatarDescription,
-          script,
-          frameCount,
-        },
-      });
+      const body: any = {
+        action: "generate-storyboard",
+        productName: selectedProd.name,
+        productImageUrl: selectedProd.images?.[0] || null,
+        avatarDescription,
+        avatarImageUrl: currentAvatar, // pass the avatar image (generated or uploaded)
+        script,
+        frameCount,
+      };
+
+      const { data, error } = await supabase.functions.invoke("ugc-generate", { body });
       if (error) throw error;
 
       clearInterval(progressInterval);
       setStoryboardProgress(100);
 
       if (data?.frames?.length) {
-        setFrames(data.frames);
+        // Enrich frames with dialogue from script
+        const enrichedFrames = data.frames.map((f: StoryboardFrame, i: number) => ({
+          ...f,
+          dialogue: scriptData?.scenes?.[i]?.dialogue || f.scene,
+        }));
+        setFrames(enrichedFrames);
 
         // Save project to DB
         const { data: project } = await supabase.from("ugc_projects").insert({
@@ -456,52 +495,104 @@ function UGCStudio() {
           avatar_url: currentAvatar,
           avatar_settings: { gender: avatarGender, ethnicity: avatarEthnicity, setting: avatarSetting } as any,
           script,
-          storyboard: data.frames as any,
+          storyboard: enrichedFrames as any,
           status: "storyboard",
           provider: "lovable-ai",
         }).select().single();
 
         if (project) {
           setProjectId(project.id);
-          // Save frames
-          const frameInserts = data.frames.map((f: StoryboardFrame) => ({
+          const frameInserts = enrichedFrames.map((f: StoryboardFrame) => ({
             project_id: project.id,
             frame_index: f.frame,
             image_url: f.imageUrl,
             scene: f.scene,
+            dialogue: f.dialogue,
           }));
           await supabase.from("ugc_frames").insert(frameInserts);
         }
 
-        // Save to content table
-        await supabase.from("content").insert({
-          type: "ugc",
-          title: `UGC Storyboard - ${selectedProd.name}`,
-          body: script,
-          media_url: data.frames[0]?.imageUrl,
-          product_id: selectedProduct,
-          status: "draft",
-          metadata: { provider: "lovable-ai", type: "storyboard", frameCount: data.frames.length } as any,
-        });
-        queryClient.invalidateQueries({ queryKey: ["content"] });
-
-        toast({ title: `${data.frames.length}-frame storyboard generated!` });
+        toast({ title: `${data.frames.length} frames generated! Now create your video.` });
+        // Auto-advance to video step
+        setTimeout(() => setStep(5), 500);
       }
     } catch (err: any) {
       clearInterval(progressInterval);
       setStoryboardProgress(0);
-      toast({ title: "Storyboard generation failed", description: err?.message, variant: "destructive" });
+      toast({ title: "Frame generation failed", description: err?.message, variant: "destructive" });
     } finally {
       setGeneratingStoryboard(false);
     }
   };
 
-  // Pipeline steps config
+  // ── Assemble Video from Frames ──
+  const assembleVideoFromFrames = async () => {
+    if (frames.length === 0) {
+      toast({ title: "Generate frames first", variant: "destructive" });
+      return;
+    }
+    setGeneratingVideo(true);
+    setVideoProgress(0);
+
+    try {
+      const videoFrames: VideoFrame[] = frames.map(f => ({
+        imageUrl: f.imageUrl,
+        scene: f.scene,
+        dialogue: f.dialogue || f.scene,
+      }));
+
+      const blob = await assembleVideo(videoFrames, {
+        frameDuration: 3500,
+        width: 720,
+        height: 1280,
+        enableTTS,
+        onProgress: (pct) => setVideoProgress(pct),
+      });
+
+      const url = URL.createObjectURL(blob);
+      setVideoBlob(blob);
+      setVideoUrl(url);
+
+      // Save to content table
+      await supabase.from("content").insert({
+        type: "ugc",
+        title: `UGC Video - ${selectedProd?.name}`,
+        body: script,
+        media_url: frames[0]?.imageUrl,
+        product_id: selectedProduct,
+        status: "draft",
+        metadata: { provider: "lovable-ai", type: "video", frameCount: frames.length, hasTTS: enableTTS } as any,
+      });
+      queryClient.invalidateQueries({ queryKey: ["content"] });
+
+      // Update project status
+      if (projectId) {
+        await supabase.from("ugc_projects").update({ status: "completed" }).eq("id", projectId);
+      }
+
+      toast({ title: "🎬 Video created!", description: "Your UGC video is ready to download and share." });
+    } catch (err: any) {
+      toast({ title: "Video assembly failed", description: err?.message, variant: "destructive" });
+    } finally {
+      setGeneratingVideo(false);
+    }
+  };
+
+  const downloadVideo = () => {
+    if (!videoBlob) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(videoBlob);
+    a.download = `ugc-${selectedProd?.name?.replace(/\s+/g, "-") || "video"}-${Date.now()}.webm`;
+    a.click();
+  };
+
+  // Pipeline steps
   const steps = [
     { n: 1, label: "Product", icon: <Layers className="w-4 h-4" />, done: !!selectedProduct },
     { n: 2, label: "Avatar", icon: <User className="w-4 h-4" />, done: !!currentAvatar },
     { n: 3, label: "Script", icon: <FileText className="w-4 h-4" />, done: !!script },
-    { n: 4, label: "Storyboard", icon: <Film className="w-4 h-4" />, done: frames.length > 0 },
+    { n: 4, label: "Frames", icon: <Film className="w-4 h-4" />, done: frames.length > 0 },
+    { n: 5, label: "Video", icon: <Video className="w-4 h-4" />, done: !!videoUrl },
   ];
 
   return (
@@ -512,7 +603,7 @@ function UGCStudio() {
           <div key={s.n} className="flex items-center flex-1">
             <button
               onClick={() => setStep(s.n)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-body transition-all w-full justify-center ${
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-body transition-all w-full justify-center ${
                 step === s.n
                   ? "bg-primary text-primary-foreground shadow-md"
                   : s.done
@@ -538,7 +629,7 @@ function UGCStudio() {
           <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
             <div className="rounded-xl border border-border bg-card p-6 space-y-4">
               <h3 className="font-heading text-lg font-semibold">🔒 Lock Product</h3>
-              <p className="text-sm text-muted-foreground font-body">Select a product — its exact data and images will be locked for the entire pipeline.</p>
+              <p className="text-sm text-muted-foreground font-body">Select a product — its exact images will be used in every frame for consistency.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {products?.map(p => (
                   <button
@@ -566,20 +657,52 @@ function UGCStudio() {
           </motion.div>
         )}
 
-        {/* ── Step 2: Avatar Generation ── */}
+        {/* ── Step 2: Avatar ── */}
         {step === 2 && (
           <motion.div key="step2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="rounded-xl border border-border bg-card p-6 space-y-4">
                 <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
-                  <User className="w-5 h-5" /> 🔒 Avatar (Generated Once)
+                  <User className="w-5 h-5" /> 🔒 Avatar Lock
                 </h3>
-                <p className="text-xs text-muted-foreground font-body">This avatar will be reused across ALL frames for consistency.</p>
+                <p className="text-xs text-muted-foreground font-body">
+                  Upload YOUR photo to use as the creator, or generate an AI avatar. The avatar will hold/wear your actual product.
+                </p>
+
+                {/* Upload first - primary option */}
+                <div className="rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 p-4 space-y-3">
+                  <p className="text-sm font-semibold font-heading text-primary">📸 Use Your Own Photo (Recommended)</p>
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                  <Button variant="outline" className="w-full gap-2 border-primary/30 hover:bg-primary/10" onClick={() => fileInputRef.current?.click()}>
+                    <Upload className="w-4 h-4" /> Choose Your Photo
+                  </Button>
+                  {uploadedPreview && (
+                    <div className="flex items-center gap-3 p-2 bg-card rounded-lg border">
+                      <img src={uploadedPreview} alt="Uploaded" className="w-12 h-12 rounded-lg object-cover" />
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-emerald-700">✓ Photo uploaded</p>
+                        <p className="text-[10px] text-muted-foreground">{uploadedFile?.name}</p>
+                      </div>
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={clearUpload}><X className="w-3 h-3" /></Button>
+                    </div>
+                  )}
+                  {uploadedPreview && (
+                    <Button onClick={generateAvatar} disabled={generatingAvatar} className="w-full gap-2">
+                      {generatingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                      Generate Avatar with Your Photo + Product
+                    </Button>
+                  )}
+                </div>
+
+                <div className="relative py-2">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t" /></div>
+                  <div className="relative flex justify-center"><span className="bg-card px-3 text-xs text-muted-foreground">or generate AI avatar</span></div>
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-body text-muted-foreground mb-1 block">Gender</label>
-                    <Select value={avatarGender} onValueChange={setAvatarGender} disabled={!!currentAvatar}>
+                    <Select value={avatarGender} onValueChange={setAvatarGender} disabled={!!avatarUrl}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="female">Female</SelectItem>
@@ -589,7 +712,7 @@ function UGCStudio() {
                   </div>
                   <div>
                     <label className="text-xs font-body text-muted-foreground mb-1 block">Ethnicity</label>
-                    <Select value={avatarEthnicity} onValueChange={setAvatarEthnicity} disabled={!!currentAvatar}>
+                    <Select value={avatarEthnicity} onValueChange={setAvatarEthnicity} disabled={!!avatarUrl}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="african">African</SelectItem>
@@ -603,7 +726,7 @@ function UGCStudio() {
 
                 <div>
                   <label className="text-xs font-body text-muted-foreground mb-1 block">Setting</label>
-                  <Select value={avatarSetting} onValueChange={setAvatarSetting} disabled={!!currentAvatar}>
+                  <Select value={avatarSetting} onValueChange={setAvatarSetting} disabled={!!avatarUrl}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="studio">Studio</SelectItem>
@@ -615,24 +738,17 @@ function UGCStudio() {
                   </Select>
                 </div>
 
-                {!currentAvatar ? (
-                  <>
-                    <Button onClick={generateAvatar} disabled={generatingAvatar} className="w-full gap-2">
-                      {generatingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                      Generate & Lock Avatar
-                    </Button>
-                    <div className="border-t border-border pt-4">
-                      <p className="text-xs text-muted-foreground mb-2 font-body">Or upload your own</p>
-                      <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileUpload} className="hidden" />
-                      <Button variant="outline" className="w-full gap-2" onClick={() => fileInputRef.current?.click()}>
-                        <Upload className="w-4 h-4" /> Choose File
-                      </Button>
-                    </div>
-                  </>
-                ) : (
+                {!avatarUrl && !uploadedPreview && (
+                  <Button onClick={generateAvatar} disabled={generatingAvatar} className="w-full gap-2">
+                    {generatingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                    Generate AI Avatar with Product
+                  </Button>
+                )}
+
+                {(avatarUrl) && (
                   <div className="space-y-2">
                     <Badge className="bg-emerald-500/10 text-emerald-700 text-xs">🔒 Avatar Locked</Badge>
-                    <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => { setAvatarUrl(""); clearUpload(); setFrames([]); }}>
+                    <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => { setAvatarUrl(""); clearUpload(); setFrames([]); setVideoBlob(null); setVideoUrl(""); }}>
                       <RefreshCw className="w-3 h-3" /> Reset Avatar
                     </Button>
                   </div>
@@ -644,17 +760,13 @@ function UGCStudio() {
                 <h3 className="font-heading text-lg font-semibold">Preview</h3>
                 {currentAvatar ? (
                   <div className="aspect-[9/16] max-h-[400px] rounded-xl overflow-hidden border border-border bg-charcoal mx-auto">
-                    {uploadedFile?.type?.startsWith("video/") ? (
-                      <video src={currentAvatar} controls className="w-full h-full object-cover" />
-                    ) : (
-                      <img src={currentAvatar} alt="Avatar" className="w-full h-full object-cover" />
-                    )}
+                    <img src={currentAvatar} alt="Avatar" className="w-full h-full object-cover" />
                   </div>
                 ) : (
                   <div className="aspect-[9/16] max-h-[400px] rounded-xl border border-dashed border-border bg-muted/20 flex items-center justify-center">
                     <div className="text-center">
                       <User className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
-                      <p className="text-sm text-muted-foreground">Generate or upload an avatar</p>
+                      <p className="text-sm text-muted-foreground">Upload your photo or generate an avatar</p>
                     </div>
                   </div>
                 )}
@@ -676,7 +788,6 @@ function UGCStudio() {
                 <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
                   <FileText className="w-5 h-5" /> Video Script
                 </h3>
-
                 {selectedProd && (
                   <div className="rounded-lg bg-muted/50 p-3 flex items-center gap-3">
                     {selectedProd.images?.[0] && <img src={selectedProd.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />}
@@ -686,12 +797,10 @@ function UGCStudio() {
                     </div>
                   </div>
                 )}
-
                 <Button onClick={generateScript} disabled={generatingScript || !selectedProd} className="w-full gap-2">
                   {generatingScript ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                   Generate AI Script
                 </Button>
-
                 <Textarea
                   placeholder="Script will appear here... You can also write your own."
                   value={script}
@@ -699,7 +808,6 @@ function UGCStudio() {
                   className="min-h-[200px] font-body text-sm"
                 />
               </div>
-
               <div className="rounded-xl border border-border bg-card p-6 space-y-4">
                 <h3 className="font-heading text-lg font-semibold">Script Preview</h3>
                 {script ? (
@@ -711,12 +819,12 @@ function UGCStudio() {
                 ) : (
                   <div className="rounded-lg border border-dashed border-border bg-muted/20 p-8 text-center">
                     <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
-                    <p className="text-xs text-muted-foreground">Generate or write a script to preview</p>
+                    <p className="text-xs text-muted-foreground">Generate or write a script</p>
                   </div>
                 )}
                 {script && (
                   <Button onClick={() => setStep(4)} className="w-full gap-2">
-                    Continue to Storyboard <ChevronRight className="w-4 h-4" />
+                    Continue to Frames <ChevronRight className="w-4 h-4" />
                   </Button>
                 )}
               </div>
@@ -724,17 +832,16 @@ function UGCStudio() {
           </motion.div>
         )}
 
-        {/* ── Step 4: Storyboard Generation ── */}
+        {/* ── Step 4: Frame Generation ── */}
         {step === 4 && (
           <motion.div key="step4" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
             <div className="space-y-6">
-              {/* Controls */}
               <div className="rounded-xl border border-border bg-card p-6 space-y-4">
                 <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
-                  <Film className="w-5 h-5" /> Multi-Frame Storyboard
+                  <Film className="w-5 h-5" /> Generate Video Frames
                 </h3>
                 <p className="text-sm text-muted-foreground font-body">
-                  Generate {frameCount} consistent frames using the locked avatar and product.
+                  AI will generate {frameCount} cinematic frames with your avatar holding your actual product.
                 </p>
 
                 <div className="flex items-center gap-4">
@@ -757,14 +864,14 @@ function UGCStudio() {
 
                 <Button onClick={generateStoryboard} disabled={generatingStoryboard || !currentAvatar || !script} className="w-full gap-2" size="lg">
                   {generatingStoryboard ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clapperboard className="w-4 h-4" />}
-                  {generatingStoryboard ? "Generating frames..." : `Generate ${frameCount}-Frame Storyboard`}
+                  {generatingStoryboard ? "Generating frames..." : `Generate ${frameCount} Video Frames`}
                 </Button>
 
                 {generatingStoryboard && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
                     <Progress value={storyboardProgress} className="h-2" />
                     <p className="text-xs text-muted-foreground text-center font-body">
-                      {Math.round(storyboardProgress)}% — Generating frames with AI (this may take a minute)...
+                      {Math.round(storyboardProgress)}% — Generating cinematic frames with your product...
                     </p>
                   </motion.div>
                 )}
@@ -790,10 +897,10 @@ function UGCStudio() {
                 </div>
               </div>
 
-              {/* Frames Grid */}
+              {/* Frames preview */}
               {frames.length > 0 && (
                 <div className="space-y-4">
-                  <h4 className="font-heading text-md font-semibold">🎬 Storyboard Frames</h4>
+                  <h4 className="font-heading text-md font-semibold">🎬 Generated Frames</h4>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {frames.map((f, i) => (
                       <motion.div
@@ -809,21 +916,104 @@ function UGCStudio() {
                             <Badge className="bg-charcoal/80 text-white text-[10px]">Frame {f.frame}</Badge>
                           </div>
                           <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
-                            <p className="text-white text-[10px] font-body line-clamp-2">{f.scene}</p>
+                            <p className="text-white text-[10px] font-body line-clamp-2">{f.dialogue || f.scene}</p>
                           </div>
                         </div>
                       </motion.div>
                     ))}
                   </div>
+                  <Button onClick={() => setStep(5)} className="w-full gap-2" size="lg">
+                    <Video className="w-4 h-4" /> Continue to Video Assembly <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
 
-                  {/* Actions */}
-                  <div className="flex gap-3 flex-wrap">
-                    <a href={frames[0]?.imageUrl} download className="flex-1">
-                      <Button className="w-full gap-2"><Download className="w-4 h-4" /> Download Frames</Button>
-                    </a>
-                    <Button variant="outline" onClick={() => { navigator.clipboard.writeText(JSON.stringify(frames, null, 2)); toast({ title: "Storyboard data copied!" }); }}>
+        {/* ── Step 5: Video Assembly ── */}
+        {step === 5 && (
+          <motion.div key="step5" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+            <div className="space-y-6">
+              <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+                <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
+                  <Video className="w-5 h-5" /> 🎥 Create UGC Video
+                </h3>
+                <p className="text-sm text-muted-foreground font-body">
+                  Assemble your {frames.length} frames into a cinematic video with zoom/pan effects and voiceover.
+                </p>
+
+                <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <Volume2 className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-body">Voice Narration</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={enableTTS ? "default" : "outline"}
+                    onClick={() => setEnableTTS(!enableTTS)}
+                    className="text-xs"
+                  >
+                    {enableTTS ? "On" : "Off"}
+                  </Button>
+                </div>
+
+                {!videoUrl ? (
+                  <Button
+                    onClick={assembleVideoFromFrames}
+                    disabled={generatingVideo || frames.length === 0}
+                    className="w-full gap-2"
+                    size="lg"
+                  >
+                    {generatingVideo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                    {generatingVideo ? "Creating video..." : "🎬 Generate Video"}
+                  </Button>
+                ) : (
+                  <Badge className="bg-emerald-500/10 text-emerald-700 text-sm py-1.5 px-3">✓ Video Ready</Badge>
+                )}
+
+                {generatingVideo && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
+                    <Progress value={videoProgress} className="h-2" />
+                    <p className="text-xs text-muted-foreground text-center font-body">
+                      {videoProgress}% — Assembling video with effects{enableTTS ? " and voiceover" : ""}...
+                    </p>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Video Player */}
+              {videoUrl && (
+                <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+                  <h4 className="font-heading text-lg font-semibold">📺 Video Preview</h4>
+                  <div className="aspect-[9/16] max-h-[500px] rounded-xl overflow-hidden border border-border bg-charcoal mx-auto">
+                    <video src={videoUrl} controls className="w-full h-full object-contain" />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button onClick={downloadVideo} className="flex-1 gap-2" size="lg">
+                      <Download className="w-4 h-4" /> Download Video
+                    </Button>
+                    <Button variant="outline" onClick={() => { setVideoBlob(null); setVideoUrl(""); }} className="gap-2">
+                      <RefreshCw className="w-4 h-4" /> Regenerate
+                    </Button>
+                    <Button variant="outline" onClick={() => { navigator.clipboard.writeText(JSON.stringify({ frames, script }, null, 2)); toast({ title: "Project data copied!" }); }}>
                       <Share2 className="w-4 h-4" />
                     </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Frames strip */}
+              {frames.length > 0 && (
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wider font-body">Frame Strip</p>
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {frames.map((f, i) => (
+                      <div key={i} className="flex-shrink-0 w-20">
+                        <img src={f.imageUrl} alt={`Frame ${f.frame}`} className="w-20 h-36 object-cover rounded-lg border border-border" />
+                        <p className="text-[9px] text-muted-foreground mt-1 text-center">Frame {f.frame}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -849,17 +1039,9 @@ function InfluencerManager() {
   const { data: influencers, isLoading } = useQuery({
     queryKey: ["influencers"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("ugc_projects").select("*").order("created_at", { ascending: false }).limit(20);
-      // Use ugc_projects as proxy until influencers table types are generated
-      // For now, query influencers directly via raw
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/influencers?order=created_at.desc`, {
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-      });
-      if (!res.ok) return [];
-      return await res.json();
+      const { data, error } = await supabase.from("influencers").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
     },
   });
 
@@ -884,17 +1066,8 @@ function InfluencerManager() {
   const createInfluencer = async () => {
     if (!form.name) { toast({ title: "Name is required", variant: "destructive" }); return; }
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/influencers`, {
-        method: "POST",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          "Content-Type": "application/json",
-          Prefer: "return=minimal",
-        },
-        body: JSON.stringify({ ...form, avatar_url: newAvatarUrl || null }),
-      });
-      if (!res.ok) throw new Error("Failed to create");
+      const { error } = await supabase.from("influencers").insert({ ...form, avatar_url: newAvatarUrl || null } as any);
+      if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["influencers"] });
       setShowCreate(false);
       setForm({ name: "", tone: "friendly", niche: "fashion", gender: "female", ethnicity: "african", setting: "studio" });
@@ -917,9 +1090,8 @@ function InfluencerManager() {
         </Button>
       </div>
 
-      {/* Influencer Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {influencers?.map((inf: any) => (
+        {influencers?.map((inf) => (
           <motion.div
             key={inf.id}
             initial={{ opacity: 0, y: 10 }}
@@ -955,7 +1127,6 @@ function InfluencerManager() {
         )}
       </div>
 
-      {/* Create Dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="font-heading">Create AI Influencer</DialogTitle></DialogHeader>
