@@ -9,7 +9,17 @@ function aiHeaders(apiKey: string) {
   return { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 }
 
-async function callAI(apiKey: string, prompt: string, model = "google/gemini-3.1-flash-image-preview", wantImage = true) {
+// Build multimodal content array with optional images
+function buildContent(text: string, imageUrls: string[] = []): any {
+  if (imageUrls.length === 0) return text;
+  const parts: any[] = [{ type: "text", text }];
+  for (const url of imageUrls) {
+    if (url) parts.push({ type: "image_url", image_url: { url } });
+  }
+  return parts;
+}
+
+async function callAI(apiKey: string, prompt: string | any[], model = "google/gemini-3.1-flash-image-preview", wantImage = true) {
   const body: Record<string, unknown> = {
     model,
     messages: [{ role: "user", content: prompt }],
@@ -44,7 +54,7 @@ serve(async (req) => {
 
     // ─── GENERATE AVATAR ───
     if (action === "generate-avatar") {
-      const { gender, ethnicity, setting, productName, productImage } = body;
+      const { gender, ethnicity, setting, productName, productImageUrl, avatarImageBase64 } = body;
 
       const settingDescriptions: Record<string, string> = {
         studio: "in a clean, well-lit photography studio with soft lighting",
@@ -54,14 +64,27 @@ serve(async (req) => {
         fashion_store: "in a trendy fashion boutique with clothing displays",
       };
 
-      let prompt = `Generate a photorealistic portrait of a ${ethnicity} ${gender} fashion influencer/content creator ${settingDescriptions[setting] || "in a studio"}. The person should look approachable, stylish, and authentic. They should be wearing trendy casual clothing. The image should look like a high-quality UGC video thumbnail. On a clean background suitable for video content.`;
+      let prompt = `Generate a photorealistic portrait of a ${ethnicity} ${gender} fashion influencer/content creator ${settingDescriptions[setting] || "in a studio"}.`;
 
-      // If product context provided, include it for consistency
       if (productName) {
-        prompt += ` They are presenting a product called "${productName}".`;
+        prompt += ` They are actively holding, wearing, or showcasing a product called "${productName}". The product MUST be clearly visible in the image — this is critical.`;
       }
 
-      const data = await callAI(LOVABLE_API_KEY, prompt);
+      prompt += ` The person should look approachable, stylish, and authentic. The image should look like a high-quality UGC video thumbnail. Vertical 9:16 framing.`;
+
+      // Include product image for visual reference
+      const images: string[] = [];
+      if (productImageUrl) images.push(productImageUrl);
+      if (avatarImageBase64) {
+        // If user uploaded their own face, instruct AI to use it as reference
+        prompt = `CRITICAL: Use the provided reference photo as the EXACT person/face for this image. Generate the SAME person ${settingDescriptions[setting] || "in a studio"}.`;
+        if (productName) prompt += ` They are holding/wearing/showcasing "${productName}" — the product MUST be clearly visible.`;
+        prompt += ` Photorealistic, UGC-style, vertical 9:16.`;
+        images.push(avatarImageBase64);
+      }
+
+      const content = buildContent(prompt, images);
+      const data = await callAI(LOVABLE_API_KEY, content);
       const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
       return new Response(
@@ -72,79 +95,78 @@ serve(async (req) => {
 
     // ─── GENERATE MULTI-FRAME STORYBOARD ───
     if (action === "generate-storyboard") {
-      const { productName, productImage, avatarDescription, script, frameCount = 4 } = body;
+      const { productName, productImageUrl, avatarDescription, avatarImageUrl, script, frameCount = 4 } = body;
 
-      // Generate frames sequentially with locked consistency
       const frames: Array<{ frame: number; imageUrl: string; scene: string }> = [];
 
-      // Parse script into scenes
       const scenes = [
-        { scene: "Hook - Content creator holds up the product excitedly, looking directly at camera", camera: "close-up", expression: "excited" },
-        { scene: "Showcase - Creator shows the product details, turning it to show different angles", camera: "medium shot", expression: "confident" },
-        { scene: "Benefits - Creator demonstrates the product, showing how it looks/works", camera: "wide shot", expression: "happy" },
-        { scene: "CTA - Creator holds product close, gives a persuasive call to action", camera: "close-up", expression: "friendly" },
+        { scene: "Hook - Creator holds up the product excitedly, showing it to camera", camera: "close-up", expression: "excited" },
+        { scene: "Showcase - Creator shows product details, turning it to show different angles", camera: "medium shot", expression: "confident" },
+        { scene: "Benefits - Creator demonstrates the product, showing how it looks/works when worn or used", camera: "wide shot", expression: "happy" },
+        { scene: "CTA - Creator holds product close, persuasive call to action", camera: "close-up", expression: "friendly" },
       ];
-
-      // Add extra frames if requested
-      if (frameCount >= 5) scenes.push({ scene: "Lifestyle - Product in use in a real-life setting", camera: "wide shot", expression: "natural" });
-      if (frameCount >= 6) scenes.push({ scene: "Final - Creator with product, brand overlay space", camera: "medium close-up", expression: "smiling" });
+      if (frameCount >= 5) scenes.push({ scene: "Lifestyle - Product in use in a real-life setting, styled outfit or ensemble", camera: "wide shot", expression: "natural" });
+      if (frameCount >= 6) scenes.push({ scene: "Final - Creator with product, confident pose, brand energy", camera: "medium close-up", expression: "smiling" });
 
       const actualFrames = scenes.slice(0, frameCount);
 
       for (let i = 0; i < actualFrames.length; i++) {
         const s = actualFrames[i];
-        const framePrompt = `CRITICAL CONSISTENCY RULES:
-- Use the EXACT SAME person throughout: ${avatarDescription}
-- The product is "${productName}" - show the EXACT same product in every frame
-${productImage ? `- Reference product appearance from this context` : ""}
 
-Create frame ${i + 1} of a ${actualFrames.length}-frame UGC product video storyboard.
+        let framePrompt = `CRITICAL CONSISTENCY RULES:
+- Use the EXACT SAME person throughout: ${avatarDescription}
+- The product is "${productName}" — show the EXACT SAME product in every frame
+- The product MUST be clearly visible — the creator is holding, wearing, or showcasing it
+- Do NOT invent new products or change the product appearance
+
+Create frame ${i + 1} of a ${actualFrames.length}-frame UGC product video.
 
 Scene: ${s.scene}
 Camera: ${s.camera}
 Expression: ${s.expression}
 
-Style: Cinematic, vertical 9:16, Instagram-quality, natural lighting, shallow depth of field.
-The creator should be ${avatarDescription}.
-On a clean background.`;
+Style: Cinematic, vertical 9:16, Instagram/TikTok quality, natural lighting, shallow depth of field.`;
+
+        // Build multimodal content with reference images
+        const images: string[] = [];
+        if (productImageUrl) images.push(productImageUrl);
+        if (avatarImageUrl) {
+          framePrompt += `\n\nCRITICAL: The person in this frame MUST look exactly like the reference avatar photo provided. Same face, same features.`;
+          images.push(avatarImageUrl);
+        }
+
+        const content = buildContent(framePrompt, images);
 
         try {
-          const data = await callAI(LOVABLE_API_KEY, framePrompt);
+          const data = await callAI(LOVABLE_API_KEY, content);
           const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
           if (imageUrl) {
             frames.push({ frame: i + 1, imageUrl, scene: s.scene });
           }
         } catch (err) {
           console.error(`Frame ${i + 1} failed:`, err);
-          // Continue with remaining frames
         }
 
-        // Small delay between frames to avoid rate limiting
         if (i < actualFrames.length - 1) {
-          await new Promise(r => setTimeout(r, 1500));
+          await new Promise(r => setTimeout(r, 2000));
         }
       }
 
       if (frames.length === 0) {
-        throw { status: 500, message: "Failed to generate any storyboard frames" };
+        throw { status: 500, message: "Failed to generate any frames" };
       }
 
       return new Response(
-        JSON.stringify({
-          success: true,
-          frames,
-          provider: "lovable-ai",
-          message: `Generated ${frames.length} storyboard frames`,
-        }),
+        JSON.stringify({ success: true, frames, message: `Generated ${frames.length} frames` }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // ─── GENERATE SCRIPT (structured) ───
+    // ─── GENERATE SCRIPT ───
     if (action === "generate-script") {
       const { productName, productCategory, productPrice, currency, context } = body;
 
-      const prompt = `You are a UGC content strategist. Create a 15-30 second short-form video script for "${productName}" (${productCategory}, ${currency} ${productPrice}).
+      const prompt = `You are a UGC content strategist for a fashion brand. Create a compelling 15-30 second short-form video script for "${productName}" (${productCategory}, ${currency} ${productPrice}).
 
 ${context ? `Additional context: ${context}` : ""}
 
@@ -169,7 +191,6 @@ Return ONLY valid JSON (no markdown, no code blocks) in this exact format:
       const data = await callAI(LOVABLE_API_KEY, prompt, "google/gemini-3-flash-preview", false);
       const content = data.choices?.[0]?.message?.content || "";
 
-      // Try to parse as JSON
       let scriptData;
       try {
         const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -186,69 +207,29 @@ Return ONLY valid JSON (no markdown, no code blocks) in this exact format:
 
     // ─── GENERATE SINGLE FRAME (for regeneration) ───
     if (action === "generate-frame") {
-      const { avatarDescription, productName, scene, camera, expression } = body;
+      const { avatarDescription, avatarImageUrl, productName, productImageUrl, scene, camera, expression } = body;
 
-      const prompt = `CONSISTENCY: Use EXACT person: ${avatarDescription}. Product: "${productName}".
+      let prompt = `CONSISTENCY: Use EXACT person: ${avatarDescription}. Product: "${productName}" — MUST be clearly visible, held/worn by creator.
 
 Scene: ${scene}
 Camera: ${camera}
 Expression: ${expression}
 
-Style: Cinematic UGC, vertical 9:16, Instagram-quality, natural lighting.
-On a clean background.`;
+Style: Cinematic UGC, vertical 9:16, Instagram-quality, natural lighting.`;
 
-      const data = await callAI(LOVABLE_API_KEY, prompt);
+      const images: string[] = [];
+      if (productImageUrl) images.push(productImageUrl);
+      if (avatarImageUrl) {
+        prompt += `\nCRITICAL: Use the reference avatar photo — same face/features.`;
+        images.push(avatarImageUrl);
+      }
+
+      const content = buildContent(prompt, images);
+      const data = await callAI(LOVABLE_API_KEY, content);
       const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
       return new Response(
         JSON.stringify({ success: true, imageUrl }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // ─── LEGACY: GENERATE VIDEO (kept for backward compat) ───
-    if (action === "generate-video") {
-      const { script, avatarUrl, productName, productImages, provider } = body;
-
-      // Try fal.ai if requested
-      if (provider !== "lovable-ai") {
-        const FAL_API_KEY = Deno.env.get("FAL_API_KEY");
-        if (FAL_API_KEY) {
-          const videoPrompt = `UGC-style product review. Creator presents "${productName}". Script: ${script?.slice(0, 500)}. Authentic, casual, well-lit, vertical.`;
-          const falRes = await fetch("https://queue.fal.run/fal-ai/veo2", {
-            method: "POST",
-            headers: { Authorization: `Key ${FAL_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: videoPrompt, aspect_ratio: "9:16", duration: "8s" }),
-          });
-
-          if (falRes.ok) {
-            const falData = await falRes.json();
-            return new Response(
-              JSON.stringify({ success: true, videoUrl: falData.video?.url, requestId: falData.request_id, provider: "fal" }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-
-          const errText = await falRes.text();
-          console.error("fal.ai error:", falRes.status, errText);
-          if (falRes.status === 401) {
-            return new Response(JSON.stringify({ error: "fal.ai API key is invalid." }), {
-              status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-          console.log("fal.ai unavailable, falling back to storyboard");
-        }
-      }
-
-      // Fallback: generate single storyboard frame
-      const prompt = `Create a cinematic UGC-style product marketing image for "${productName}". Show a stylish content creator presenting the product. Vertical 9:16, cinematic lighting, Instagram-worthy. Include text overlay "${productName}". On a clean background.`;
-      const data = await callAI(LOVABLE_API_KEY, prompt);
-      const storyboardUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-      if (!storyboardUrl) throw { status: 500, message: "AI did not return an image" };
-
-      return new Response(
-        JSON.stringify({ success: true, storyboardUrl, provider: "lovable-ai", message: "Generated AI storyboard frame." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
