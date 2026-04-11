@@ -1,110 +1,110 @@
 import { motion } from "framer-motion";
-import {
-  ShoppingBag,
-  MessageSquare,
-  Video,
-  CreditCard,
-  Users,
+import { 
+  ShoppingBag, 
+  Video, 
+  MessageSquare, 
+  CreditCard, 
+  Users, 
+  Bot, 
+  Zap, 
   BarChart3,
-  Bot,
-  Zap,
+  Check
 } from "lucide-react";
 
 const features = [
   {
     icon: ShoppingBag,
-    title: "Product Management",
-    description: "AI-powered product onboarding with auto-generated descriptions and smart categorization.",
+    title: "Product Hub",
+    description: "AI-driven onboarding that extracts 200+ fabric, fit, and style attributes into sophisticated brand-aligned descriptors.",
+    benefit: "Precision Cataloging"
   },
   {
     icon: Video,
-    title: "UGC Content Engine",
-    description: "Generate marketing videos, social posts, and campaign creatives from product data automatically.",
+    title: "UGC Studio",
+    description: "Convert flat imagery into cinematic high-conversion short-form videos featuring AI avatars (fal.ai + Veo 3.1).",
+    benefit: "Zero Production Lag"
   },
   {
     icon: MessageSquare,
-    title: "WhatsApp Commerce",
-    description: "AI sales agent on WhatsApp that answers questions, recommends products, and captures orders.",
+    title: "WhatsApp Sales Agent",
+    description: "Multi-modal persistent AI agents that handle sales, support, and orders with the elegance of a personal shopper.",
+    benefit: "Twilio-Powered Concierge"
   },
   {
     icon: CreditCard,
-    title: "Payment Processing",
-    description: "Seamless checkout with PayChangu integration, automated payment tracking and reconciliation.",
+    title: "Order & Pay",
+    description: "Integrated global checkout with PayChangu. Automated order tracking and fulfillment synchronization.",
+    benefit: "Frictionless Settlement"
   },
   {
     icon: Users,
-    title: "Agent & Referral System",
-    description: "Manage sales agents with referral codes, commission tracking, and performance dashboards.",
-  },
-  {
-    icon: Bot,
-    title: "AI Business Assistant",
-    description: "Get restocking suggestions, trend analysis, and campaign recommendations powered by AI.",
+    title: "Agent Matrix",
+    description: "A high-performance multi-level referral and commission ecosystem for brand ambassadors and field agents.",
+    benefit: "Organic Growth Engine"
   },
   {
     icon: Zap,
-    title: "Workflow Automation",
-    description: "Event-driven workflows that trigger on product creation, orders, and payments automatically.",
-  },
-  {
-    icon: BarChart3,
-    title: "Analytics & Insights",
-    description: "Real-time sales, revenue, and product performance dashboards with actionable insights.",
-  },
+    title: "Event Architecture",
+    description: "A sophisticated event-driven backend that triggers marketing, inventory, and logistics in real-time.",
+    benefit: "Synchronized Operations"
+  }
 ];
-
-const container = {
-  hidden: {},
-  show: {
-    transition: { staggerChildren: 0.1 },
-  },
-};
-
-const item = {
-  hidden: { opacity: 0, y: 30 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6 } },
-};
 
 const FeaturesSection = () => {
   return (
-    <section className="py-24 px-6">
-      <div className="container mx-auto max-w-6xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center mb-16"
-        >
-          <span className="text-gold font-body text-sm tracking-widest uppercase">Capabilities</span>
-          <h2 className="font-heading text-4xl md:text-5xl font-bold text-foreground mt-3">
-            Everything You Need to Scale
-          </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto mt-4 font-body">
-            A complete operating system that handles every aspect of your fashion commerce business.
-          </p>
-        </motion.div>
+    <section id="capabilities" className="py-32 bg-white relative">
+      <div className="container mx-auto px-6">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-24 gap-8">
+          <motion.div 
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="max-w-2xl"
+          >
+            <h2 className="font-heading text-5xl md:text-6xl font-bold text-maroon-dark leading-[1.1]">
+              The Core <br />
+              <span className="italic">Systems of Success</span>
+            </h2>
+          </motion.div>
+          <motion.p 
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="text-maroon/60 text-lg max-w-md font-body"
+          >
+            Forgiven AI Commerce OS provides the essential infrastructure to automate every touchpoint of your fashion brand.
+          </motion.p>
+        </div>
 
-        <motion.div
-          variants={container}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: "-100px" }}
-          className="grid md:grid-cols-2 lg:grid-cols-4 gap-6"
-        >
-          {features.map((feature) => (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-12">
+          {features.map((feature, idx) => (
             <motion.div
               key={feature.title}
-              variants={item}
-              className="group p-6 rounded-xl border border-border bg-card hover:border-gold/30 hover:shadow-lg hover:shadow-gold/5 transition-all duration-500"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: idx * 0.1, duration: 0.8 }}
+              className="group"
             >
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                <feature.icon className="w-6 h-6 text-primary" />
+              <div className="relative mb-8 overflow-hidden rounded-2xl bg-cream p-10 transition-all duration-500 group-hover:bg-maroon-dark group-hover:shadow-[0_20px_40px_rgba(90,15,28,0.1)]">
+                <div className="mb-8 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-maroon/5 text-maroon transition-all duration-500 group-hover:bg-white/10 group-hover:text-gold group-hover:rotate-12">
+                  <feature.icon className="h-7 w-7" />
+                </div>
+                <h3 className="font-heading text-2xl font-bold text-maroon-dark transition-colors duration-500 group-hover:text-white">
+                  {feature.title}
+                </h3>
+                <p className="mt-4 text-maroon/60 transition-colors duration-500 group-hover:text-cream/70 font-body">
+                  {feature.description}
+                </p>
+                
+                <div className="mt-8 flex items-center gap-2 text-sm font-bold tracking-tight text-gold opacity-0 transition-all duration-500 group-hover:opacity-100 group-hover:translate-x-2">
+                  <Check className="h-4 w-4" />
+                  {feature.benefit}
+                </div>
               </div>
-              <h3 className="font-heading text-lg font-semibold text-foreground mb-2">{feature.title}</h3>
-              <p className="text-muted-foreground text-sm font-body leading-relaxed">{feature.description}</p>
             </motion.div>
           ))}
-        </motion.div>
+        </div>
       </div>
     </section>
   );

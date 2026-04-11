@@ -1,96 +1,158 @@
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles } from "lucide-react";
-import heroBg from "@/assets/hero-bg.jpg";
+import { ArrowRight, Sparkles, Play, ChevronDown } from "lucide-react";
+import { useRef } from "react";
+import { Link } from "react-router-dom";
 
 const HeroSection = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { scrollY } = useScroll();
+  const y1 = useTransform(scrollY, [0, 500], [0, 200]);
+  const opacity = useTransform(scrollY, [0, 300], [1, 0]);
+
+  const scrollToCapabilities = () => {
+    const element = document.getElementById("capabilities");
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0">
-        <img
-          src={heroBg}
-          alt="Luxury background"
-          className="w-full h-full object-cover"
-          width={1920}
-          height={1080}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-maroon-dark/60 via-maroon-dark/40 to-maroon-dark/80" />
+    <section 
+      ref={containerRef}
+      className="relative h-screen w-full flex items-center justify-center overflow-hidden bg-black"
+    >
+      {/* Cinematic Background Layering */}
+      <div className="absolute inset-0 z-0">
+        <motion.div 
+          style={{ y: y1 }}
+          className="absolute inset-0"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(90,15,28,0.4),rgba(0,0,0,0.9))] z-10" />
+          <motion.div 
+            initial={{ scale: 1.1, opacity: 0 }}
+            animate={{ scale: 1, opacity: 0.5 }}
+            transition={{ duration: 2.5, ease: "easeOut" }}
+            className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center mix-blend-overlay"
+          />
+        </motion.div>
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 container mx-auto px-6 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className="max-w-4xl mx-auto"
-        >
+      {/* Advanced Light Effects */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.2, 1],
+            opacity: [0.1, 0.2, 0.1] 
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gold rounded-full blur-[150px]" 
+        />
+        <motion.div 
+          animate={{ 
+            scale: [1.2, 1, 1.2],
+            opacity: [0.1, 0.15, 0.1] 
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] bg-maroon rounded-full blur-[200px]" 
+        />
+      </div>
+
+      {/* Content Container */}
+      <motion.div 
+        style={{ opacity }}
+        className="relative z-20 container mx-auto px-6 h-full flex items-center justify-center"
+      >
+        <div className="flex flex-col items-center text-center max-w-6xl">
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gold/30 bg-maroon-dark/40 backdrop-blur-sm mb-8"
+            transition={{ duration: 0.8, ease: "backOut" }}
+            className="inline-flex items-center gap-3 px-6 py-2 rounded-full border border-gold/20 bg-white/5 backdrop-blur-xl mb-10 shadow-[0_0_30px_rgba(234,179,8,0.1)]"
           >
             <Sparkles className="w-4 h-4 text-gold" />
-            <span className="text-cream/90 text-sm font-body tracking-wide">AI-Powered Commerce</span>
+            <span className="text-gold-light text-[10px] font-black tracking-[0.4em] uppercase">
+              Forgiven AI Commerce OS
+            </span>
           </motion.div>
 
-          <h1 className="font-heading text-5xl md:text-7xl lg:text-8xl font-bold text-cream leading-[0.95] mb-6">
-            Run Your Entire{" "}
-            <span className="text-gradient-gold">Business</span>
-            <br />
-            with AI
-          </h1>
+          <motion.h1
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.2, delay: 0.2, ease: [0.23, 1, 0.32, 1] }}
+            className="font-heading text-6xl md:text-8xl lg:text-[9rem] font-bold text-white mb-10 tracking-tighter leading-[0.85]"
+          >
+            Universal <br />
+            <span className="text-gradient-gold italic pr-4">Commerce</span>
+          </motion.h1>
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-            className="text-cream/70 text-lg md:text-xl max-w-2xl mx-auto mb-10 font-body"
+            transition={{ duration: 1, delay: 0.6 }}
+            className="text-cream/60 text-lg md:text-2xl max-w-3xl mx-auto mb-14 font-body font-extralight tracking-wide leading-relaxed"
           >
-            The complete AI commerce operating system for fashion & lifestyle brands.
-            Automate everything from product onboarding to customer delivery.
+            A high-end AI-powered commerce operating system for fashion brands. 
+            Automate product onboarding, cinematic UGC creation, and global sales end-to-end.
           </motion.p>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.6 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center"
+            transition={{ duration: 0.8, delay: 0.9 }}
+            className="flex flex-col sm:flex-row gap-8 items-center"
           >
-            <Button variant="hero" size="lg" className="text-base px-8 py-6">
-              Get Started Free
-              <ArrowRight className="w-5 h-5 ml-1" />
-            </Button>
-            <Button variant="heroOutline" size="lg" className="text-base px-8 py-6">
-              Watch Demo
-            </Button>
+            <Link to="/dashboard">
+              <Button 
+                size="lg" 
+                className="h-20 px-12 rounded-full bg-gold hover:bg-gold-light text-maroon-dark font-black text-xl transition-all duration-700 hover:scale-105 hover:shadow-[0_0_50px_rgba(234,179,8,0.5)] group relative overflow-hidden"
+              >
+                <span className="relative z-10 flex items-center gap-2">
+                  Get Started
+                  <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-2" />
+                </span>
+              </Button>
+            </Link>
+            <button 
+              onClick={scrollToCapabilities}
+              className="flex items-center gap-4 text-gold hover:text-gold-light transition-all duration-500 group"
+            >
+              <div className="w-14 h-14 rounded-full border border-gold/30 flex items-center justify-center group-hover:bg-gold/10 transition-colors">
+                <Play className="w-5 h-5 fill-current" />
+              </div>
+              <span className="font-bold text-sm tracking-[0.2em] uppercase">Explore OS</span>
+            </button>
           </motion.div>
-        </motion.div>
+        </div>
+      </motion.div>
 
-        {/* Stats bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1, duration: 0.8 }}
-          className="mt-20 grid grid-cols-3 gap-8 max-w-2xl mx-auto"
+      {/* Decorative Bottom Elements */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5, duration: 1 }}
+        className="absolute bottom-10 left-0 w-full px-12 flex items-end justify-between z-30 pointer-events-none"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="w-[1px] h-32 bg-gradient-to-t from-gold/50 to-transparent" />
+          <span className="text-[10px] text-gold/40 tracking-[0.5em] uppercase vertical-text">Bespoke Tech</span>
+        </div>
+        
+        <motion.div 
+          animate={{ y: [0, 10, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="flex flex-col items-center gap-4"
         >
-          {[
-            { value: "10x", label: "Faster Content" },
-            { value: "24/7", label: "AI Sales Agent" },
-            { value: "100%", label: "Automated" },
-          ].map((stat) => (
-            <div key={stat.label} className="text-center">
-              <div className="text-gold font-heading text-3xl md:text-4xl font-bold">{stat.value}</div>
-              <div className="text-cream/50 text-sm mt-1 font-body">{stat.label}</div>
-            </div>
-          ))}
+          <span className="text-[10px] text-gold/40 tracking-[0.5em] uppercase font-bold">Scroll</span>
+          <ChevronDown className="w-5 h-5 text-gold/40" />
         </motion.div>
-      </div>
 
-      {/* Bottom gradient fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
+        <div className="flex flex-col items-end gap-4 text-right">
+          <span className="text-[10px] text-gold/40 tracking-[0.5em] uppercase">Powered by</span>
+          <span className="font-heading text-lg text-cream/30 italic">Forgiven Shopping Centre</span>
+          <div className="w-[1px] h-32 bg-gradient-to-t from-gold/50 to-transparent" />
+        </div>
+      </motion.div>
     </section>
   );
 };

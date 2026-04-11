@@ -3,58 +3,69 @@ import { motion } from "framer-motion";
 const steps = [
   {
     number: "01",
-    title: "Add Products",
-    description: "Import from your website or add manually. AI generates descriptions, tags, and categories.",
+    title: "Product Synthesis",
+    description: "Our Firecrawl engine extracts product data from any source, while Gemini AI synthesizes high-end attributes and brand-aligned catalog descriptors.",
   },
   {
     number: "02",
-    title: "AI Creates Content",
-    description: "Automatically generate marketing videos, social posts, and campaign creatives.",
+    title: "Content Generation",
+    description: "fal.ai and Veo 3.1 automatically generate cinematic social media content and high-conversion marketings assets for your entire collection.",
   },
   {
     number: "03",
-    title: "Sell Everywhere",
-    description: "Customers find you on WhatsApp, web, or through agents. AI handles conversations.",
-  },
-  {
-    number: "04",
-    title: "Automate & Scale",
-    description: "Orders process, payments clear, and deliveries track — all on autopilot.",
+    title: "Sales Concierge",
+    description: "Launch your WhatsApp AI sales agent and commerce hub. Automate entire customer journeys from first inquiry to final payment.",
   },
 ];
 
 const HowItWorksSection = () => {
   return (
-    <section className="py-24 px-6 bg-card">
-      <div className="container mx-auto max-w-5xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center mb-16"
-        >
-          <span className="text-gold font-body text-sm tracking-widest uppercase">Process</span>
-          <h2 className="font-heading text-4xl md:text-5xl font-bold text-foreground mt-3">
-            How It Works
-          </h2>
-        </motion.div>
+    <section id="methodology" className="py-32 bg-cream relative overflow-hidden">
+      <div className="container mx-auto px-6">
+        <div className="text-center mb-24">
+          <motion.p
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            className="text-gold font-bold uppercase tracking-[0.3em] text-[10px] mb-4"
+          >
+            The Operating System
+          </motion.p>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="font-heading text-5xl md:text-6xl font-bold text-maroon-dark"
+          >
+            Bespoke <span className="italic underline decoration-gold/30 underline-offset-8">Automation</span>
+          </motion.h2>
+        </div>
 
-        <div className="space-y-0">
-          {steps.map((step, i) => (
+        <div className="grid md:grid-cols-3 gap-16 relative">
+          {/* Connector Line */}
+          <div className="absolute top-1/2 left-0 w-full h-[1px] bg-gold/10 hidden lg:block -translate-y-1/2" />
+          
+          {steps.map((step, idx) => (
             <motion.div
               key={step.number}
-              initial={{ opacity: 0, x: i % 2 === 0 ? -40 : 40 }}
-              whileInView={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: i * 0.15 }}
-              className="flex items-start gap-8 py-10 border-b border-border last:border-0"
+              transition={{ delay: idx * 0.2, duration: 0.8 }}
+              className="relative group"
             >
-              <span className="text-gold/30 font-heading text-6xl md:text-7xl font-bold leading-none select-none">
-                {step.number}
-              </span>
-              <div className="pt-2">
-                <h3 className="font-heading text-2xl font-semibold text-foreground mb-2">{step.title}</h3>
-                <p className="text-muted-foreground font-body max-w-lg">{step.description}</p>
+              <div className="flex flex-col items-center text-center">
+                <div className="w-20 h-20 rounded-full bg-white border border-gold/20 flex items-center justify-center mb-8 relative z-10 transition-all duration-500 group-hover:bg-maroon-dark group-hover:border-maroon-dark">
+                  <span className="font-heading text-2xl font-bold text-maroon-dark group-hover:text-gold transition-colors duration-500">
+                    {step.number}
+                  </span>
+                </div>
+                <h3 className="font-heading text-2xl font-bold text-maroon-dark mb-4">
+                  {step.title}
+                </h3>
+                <p className="text-maroon/60 font-body leading-relaxed max-w-xs">
+                  {step.description}
+                </p>
               </div>
             </motion.div>
           ))}
