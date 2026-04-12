@@ -5,11 +5,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+
 function aiHeaders(apiKey: string) {
   return { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 }
 
-// Build multimodal content array with optional images
 function buildContent(text: string, imageUrls: string[] = []): any {
   if (imageUrls.length === 0) return text;
   const parts: any[] = [{ type: "text", text }];
@@ -19,16 +20,33 @@ function buildContent(text: string, imageUrls: string[] = []): any {
   return parts;
 }
 
-async function callAI(apiKey: string, prompt: string | any[], model = "google/gemini-3.1-flash-image-preview", wantImage = true) {
+async function callAI(apiKey: string, prompt: string | any[], model = "qwen-plus", wantImage = false) {
+  // Use Qwen for text, fall back to Lovable AI for image generation
+  const isImageGen = wantImage;
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+  let url: string;
+  let headers: Record<string, string>;
   const body: Record<string, unknown> = {
-    model,
     messages: [{ role: "user", content: prompt }],
   };
-  if (wantImage) body.modalities = ["image", "text"];
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  if (isImageGen && LOVABLE_API_KEY) {
+    // Image generation uses Lovable AI gateway
+    url = "https://ai.gateway.lovable.dev/v1/chat/completions";
+    headers = aiHeaders(LOVABLE_API_KEY);
+    body.model = "google/gemini-3.1-flash-image-preview";
+    body.modalities = ["image", "text"];
+  } else {
+    // Text generation uses Qwen
+    url = `${QWEN_BASE_URL}/chat/completions`;
+    headers = aiHeaders(apiKey);
+    body.model = model;
+  }
+
+  const res = await fetch(url, {
     method: "POST",
-    headers: aiHeaders(apiKey),
+    headers,
     body: JSON.stringify(body),
   });
 
@@ -37,10 +55,25 @@ async function callAI(apiKey: string, prompt: string | any[], model = "google/ge
     console.error("AI error:", res.status, t);
     if (res.status === 429) throw { status: 429, message: "Rate limited. Please try again shortly." };
     if (res.status === 402) throw { status: 402, message: "AI credits exhausted. Please add funds." };
-    throw { status: 500, message: "AI generation failed" };
+    throw { status: 500, message: `AI generation failed (${res.status})` };
   }
 
   return await res.json();
+}
+
+// ─── Identity Lock Prompt Builder ───
+function buildIdentityLock(avatarDescription: string, productName: string): string {
+  return `STRICT IDENTITY LOCK — DO NOT DEVIATE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PERSON: ${avatarDescription}
+- SAME face, skin tone, hair style, hair color, body type in EVERY frame
+- Do NOT change ANY facial features or physical attributes
+
+PRODUCT: "${productName}"
+- The EXACT same product must appear in EVERY frame
+- The product MUST be clearly visible — held, worn, or showcased by the creator
+- Do NOT invent, substitute, or alter the product in any way
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 }
 
 serve(async (req) => {
@@ -49,8 +82,14 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const { action } = body;
+    const QWEN_API_KEY = Deno.env.get("QWEN_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw { status: 500, message: "LOVABLE_API_KEY is not configured" };
+
+    if (!QWEN_API_KEY && !LOVABLE_API_KEY) {
+      throw { status: 500, message: "No AI API key configured (QWEN_API_KEY or LOVABLE_API_KEY)" };
+    }
+
+    const textApiKey = QWEN_API_KEY || LOVABLE_API_KEY!;
 
     // ─── GENERATE AVATAR ───
     if (action === "generate-avatar") {
@@ -72,11 +111,9 @@ serve(async (req) => {
 
       prompt += ` The person should look approachable, stylish, and authentic. The image should look like a high-quality UGC video thumbnail. Vertical 9:16 framing.`;
 
-      // Include product image for visual reference
       const images: string[] = [];
       if (productImageUrl) images.push(productImageUrl);
       if (avatarImageBase64) {
-        // If user uploaded their own face, instruct AI to use it as reference
         prompt = `CRITICAL: Use the provided reference photo as the EXACT person/face for this image. Generate the SAME person ${settingDescriptions[setting] || "in a studio"}.`;
         if (productName) prompt += ` They are holding/wearing/showcasing "${productName}" — the product MUST be clearly visible.`;
         prompt += ` Photorealistic, UGC-style, vertical 9:16.`;
@@ -84,7 +121,8 @@ serve(async (req) => {
       }
 
       const content = buildContent(prompt, images);
-      const data = await callAI(LOVABLE_API_KEY, content);
+      // Avatar gen needs image output - use Lovable AI
+      const data = await callAI(textApiKey, content, "qwen-plus", true);
       const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
       return new Response(
@@ -98,6 +136,7 @@ serve(async (req) => {
       const { productName, productImageUrl, avatarDescription, avatarImageUrl, script, frameCount = 4 } = body;
 
       const frames: Array<{ frame: number; imageUrl: string; scene: string }> = [];
+      const identityLock = buildIdentityLock(avatarDescription, productName);
 
       const scenes = [
         { scene: "Hook - Creator holds up the product excitedly, showing it to camera", camera: "close-up", expression: "excited" },
@@ -109,39 +148,43 @@ serve(async (req) => {
       if (frameCount >= 6) scenes.push({ scene: "Final - Creator with product, confident pose, brand energy", camera: "medium close-up", expression: "smiling" });
 
       const actualFrames = scenes.slice(0, frameCount);
+      let previousFrameUrl: string | null = null;
 
       for (let i = 0; i < actualFrames.length; i++) {
         const s = actualFrames[i];
 
-        let framePrompt = `CRITICAL CONSISTENCY RULES:
-- Use the EXACT SAME person throughout: ${avatarDescription}
-- The product is "${productName}" — show the EXACT SAME product in every frame
-- The product MUST be clearly visible — the creator is holding, wearing, or showcasing it
-- Do NOT invent new products or change the product appearance
+        let framePrompt = `${identityLock}
 
-Create frame ${i + 1} of a ${actualFrames.length}-frame UGC product video.
+Frame ${i + 1} of ${actualFrames.length} — UGC product video storyboard.
 
 Scene: ${s.scene}
 Camera: ${s.camera}
 Expression: ${s.expression}
 
-Style: Cinematic, vertical 9:16, Instagram/TikTok quality, natural lighting, shallow depth of field.`;
+Style: Cinematic, vertical 9:16, Instagram/TikTok quality, natural lighting, shallow depth of field.
+${i > 0 ? `\nCONTINUITY: This frame MUST show the EXACT SAME person as the previous frames. Same outfit, same environment continuity.` : ""}`;
 
-        // Build multimodal content with reference images
+        // Build multimodal content with reference images for consistency
         const images: string[] = [];
         if (productImageUrl) images.push(productImageUrl);
         if (avatarImageUrl) {
-          framePrompt += `\n\nCRITICAL: The person in this frame MUST look exactly like the reference avatar photo provided. Same face, same features.`;
+          framePrompt += `\n\nCRITICAL: The person MUST look exactly like the reference avatar photo. Same face, same features, same skin tone.`;
           images.push(avatarImageUrl);
+        }
+        // Pass previous frame as continuity reference
+        if (previousFrameUrl) {
+          framePrompt += `\nREFERENCE: The attached previous frame shows how the person looked — maintain exact visual consistency.`;
+          images.push(previousFrameUrl);
         }
 
         const content = buildContent(framePrompt, images);
 
         try {
-          const data = await callAI(LOVABLE_API_KEY, content);
+          const data = await callAI(textApiKey, content, "qwen-plus", true);
           const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
           if (imageUrl) {
             frames.push({ frame: i + 1, imageUrl, scene: s.scene });
+            previousFrameUrl = imageUrl; // chain for next frame
           }
         } catch (err) {
           console.error(`Frame ${i + 1} failed:`, err);
@@ -188,7 +231,7 @@ Return ONLY valid JSON (no markdown, no code blocks) in this exact format:
   "style": "clean_aesthetic|street_style|luxury_showcase|try_on"
 }`;
 
-      const data = await callAI(LOVABLE_API_KEY, prompt, "google/gemini-3-flash-preview", false);
+      const data = await callAI(textApiKey, prompt, "qwen-plus", false);
       const content = data.choices?.[0]?.message?.content || "";
 
       let scriptData;
@@ -207,25 +250,43 @@ Return ONLY valid JSON (no markdown, no code blocks) in this exact format:
 
     // ─── GENERATE SINGLE FRAME (for regeneration) ───
     if (action === "generate-frame") {
-      const { avatarDescription, avatarImageUrl, productName, productImageUrl, scene, camera, expression } = body;
+      const {
+        avatarDescription, avatarImageUrl, productName, productImageUrl,
+        scene, camera, expression,
+        previousFrameUrl, nextFrameUrl, frameIndex, totalFrames
+      } = body;
 
-      let prompt = `CONSISTENCY: Use EXACT person: ${avatarDescription}. Product: "${productName}" — MUST be clearly visible, held/worn by creator.
+      const identityLock = buildIdentityLock(avatarDescription, productName);
+
+      let prompt = `${identityLock}
+
+SINGLE FRAME REGENERATION — Frame ${frameIndex || "?"} of ${totalFrames || "?"}
 
 Scene: ${scene}
-Camera: ${camera}
-Expression: ${expression}
+Camera: ${camera || "medium shot"}
+Expression: ${expression || "confident"}
 
-Style: Cinematic UGC, vertical 9:16, Instagram-quality, natural lighting.`;
+Style: Cinematic UGC, vertical 9:16, Instagram-quality, natural lighting.
+CRITICAL: This is a REPLACEMENT frame. It must blend seamlessly with the surrounding frames — same person, same product, same visual style.`;
 
       const images: string[] = [];
       if (productImageUrl) images.push(productImageUrl);
       if (avatarImageUrl) {
-        prompt += `\nCRITICAL: Use the reference avatar photo — same face/features.`;
+        prompt += `\nUSE the reference avatar photo — exact same face/features.`;
         images.push(avatarImageUrl);
+      }
+      // Pass neighboring frames for consistency
+      if (previousFrameUrl) {
+        prompt += `\nThe PREVIOUS frame is attached — maintain visual continuity with it.`;
+        images.push(previousFrameUrl);
+      }
+      if (nextFrameUrl) {
+        prompt += `\nThe NEXT frame is attached — ensure smooth visual transition.`;
+        images.push(nextFrameUrl);
       }
 
       const content = buildContent(prompt, images);
-      const data = await callAI(LOVABLE_API_KEY, content);
+      const data = await callAI(textApiKey, content, "qwen-plus", true);
       const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
       return new Response(
