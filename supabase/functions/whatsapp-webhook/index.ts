@@ -15,19 +15,28 @@ function getSupabase() {
   );
 }
 
+const QWEN_API_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions";
+const QWEN_MODEL = "qwen-plus";
+
 async function callAI(apiKey: string, systemPrompt: string, userMessage: string): Promise<string> {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const res = await fetch(QWEN_API_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+      model: QWEN_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
+      temperature: 0.7,
+      max_tokens: 512,
     }),
   });
-  if (!res.ok) throw new Error(`AI error: ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(`Qwen AI error ${res.status}:`, errText);
+    throw new Error(`AI error: ${res.status}`);
+  }
   const data = await res.json();
   return data.choices?.[0]?.message?.content || "Sorry, I couldn't process that.";
 }
@@ -106,8 +115,11 @@ serve(async (req) => {
       const { data: history } = await supabase.from("messages").select("role, content").eq("conversation_id", convo.id).order("created_at", { ascending: true }).limit(10);
       const historyText = history?.map(m => `${m.role}: ${m.content}`).join("\n") || "";
 
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
+      const QWEN_API_KEY = Deno.env.get("QWEN_API_KEY");
+      if (!QWEN_API_KEY) {
+        console.error("QWEN_API_KEY not configured");
+        return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
+      }
 
       const systemPrompt = `You are the AI sales assistant for Forgiven Shopping Centre, a premium fashion brand.
 
@@ -128,7 +140,15 @@ RULES:
 - If asked about payment, mention M-Pesa/bank transfer options
 - End with a question or call to action`;
 
-      const aiResponse = await callAI(LOVABLE_API_KEY, systemPrompt, body);
+      let aiResponse: string;
+      try {
+        aiResponse = await callAI(QWEN_API_KEY, systemPrompt, body);
+      } catch (aiErr) {
+        console.error("AI call failed, sending fallback:", aiErr);
+        await sendWhatsApp(from, "Thank you for your message! 😊 Our team will get back to you shortly.");
+        await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: "Thank you for your message! Our team will get back to you shortly." });
+        return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
+      }
 
       // Check for order intent
       if (aiResponse.includes("ORDER_INTENT:")) {
