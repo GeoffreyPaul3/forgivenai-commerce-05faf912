@@ -578,6 +578,64 @@ function UGCStudio() {
     }
   };
 
+  const [regeneratingFrame, setRegeneratingFrame] = useState<number | null>(null);
+
+  // ── Regenerate Single Frame ──
+  const regenerateFrame = async (frameIndex: number) => {
+    const frame = frames[frameIndex];
+    if (!frame || !selectedProd) return;
+    setRegeneratingFrame(frameIndex);
+
+    try {
+      const scenes = [
+        { camera: "close-up", expression: "excited" },
+        { camera: "medium shot", expression: "confident" },
+        { camera: "wide shot", expression: "happy" },
+        { camera: "close-up", expression: "friendly" },
+        { camera: "wide shot", expression: "natural" },
+        { camera: "medium close-up", expression: "smiling" },
+      ];
+      const sceneInfo = scenes[frameIndex] || scenes[0];
+
+      const { data, error } = await supabase.functions.invoke("ugc-generate", {
+        body: {
+          action: "generate-frame",
+          avatarDescription,
+          avatarImageUrl: currentAvatar,
+          productName: selectedProd.name,
+          productImageUrl: selectedProd.images?.[0] || null,
+          scene: frame.scene,
+          camera: sceneInfo.camera,
+          expression: sceneInfo.expression,
+          previousFrameUrl: frameIndex > 0 ? frames[frameIndex - 1]?.imageUrl : null,
+          nextFrameUrl: frameIndex < frames.length - 1 ? frames[frameIndex + 1]?.imageUrl : null,
+          frameIndex: frameIndex + 1,
+          totalFrames: frames.length,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.imageUrl) {
+        setFrames(prev => prev.map((f, i) => i === frameIndex ? { ...f, imageUrl: data.imageUrl } : f));
+        // Update in DB
+        if (projectId) {
+          await supabase.from("ugc_frames")
+            .update({ image_url: data.imageUrl })
+            .eq("project_id", projectId)
+            .eq("frame_index", frame.frame);
+        }
+        // Clear existing video since frames changed
+        setVideoBlob(null);
+        setVideoUrl("");
+        toast({ title: `Frame ${frameIndex + 1} regenerated!` });
+      }
+    } catch (err: any) {
+      toast({ title: "Frame regeneration failed", description: err?.message, variant: "destructive" });
+    } finally {
+      setRegeneratingFrame(null);
+    }
+  };
+
   const downloadVideo = () => {
     if (!videoBlob) return;
     const a = document.createElement("a");
