@@ -578,6 +578,64 @@ function UGCStudio() {
     }
   };
 
+  const [regeneratingFrame, setRegeneratingFrame] = useState<number | null>(null);
+
+  // ── Regenerate Single Frame ──
+  const regenerateFrame = async (frameIndex: number) => {
+    const frame = frames[frameIndex];
+    if (!frame || !selectedProd) return;
+    setRegeneratingFrame(frameIndex);
+
+    try {
+      const scenes = [
+        { camera: "close-up", expression: "excited" },
+        { camera: "medium shot", expression: "confident" },
+        { camera: "wide shot", expression: "happy" },
+        { camera: "close-up", expression: "friendly" },
+        { camera: "wide shot", expression: "natural" },
+        { camera: "medium close-up", expression: "smiling" },
+      ];
+      const sceneInfo = scenes[frameIndex] || scenes[0];
+
+      const { data, error } = await supabase.functions.invoke("ugc-generate", {
+        body: {
+          action: "generate-frame",
+          avatarDescription,
+          avatarImageUrl: currentAvatar,
+          productName: selectedProd.name,
+          productImageUrl: selectedProd.images?.[0] || null,
+          scene: frame.scene,
+          camera: sceneInfo.camera,
+          expression: sceneInfo.expression,
+          previousFrameUrl: frameIndex > 0 ? frames[frameIndex - 1]?.imageUrl : null,
+          nextFrameUrl: frameIndex < frames.length - 1 ? frames[frameIndex + 1]?.imageUrl : null,
+          frameIndex: frameIndex + 1,
+          totalFrames: frames.length,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.imageUrl) {
+        setFrames(prev => prev.map((f, i) => i === frameIndex ? { ...f, imageUrl: data.imageUrl } : f));
+        // Update in DB
+        if (projectId) {
+          await supabase.from("ugc_frames")
+            .update({ image_url: data.imageUrl })
+            .eq("project_id", projectId)
+            .eq("frame_index", frame.frame);
+        }
+        // Clear existing video since frames changed
+        setVideoBlob(null);
+        setVideoUrl("");
+        toast({ title: `Frame ${frameIndex + 1} regenerated!` });
+      }
+    } catch (err: any) {
+      toast({ title: "Frame regeneration failed", description: err?.message, variant: "destructive" });
+    } finally {
+      setRegeneratingFrame(null);
+    }
+  };
+
   const downloadVideo = () => {
     if (!videoBlob) return;
     const a = document.createElement("a");
@@ -911,10 +969,35 @@ function UGCStudio() {
                         className="rounded-xl border border-border bg-card overflow-hidden group"
                       >
                         <div className="aspect-[9/16] relative">
-                          <img src={f.imageUrl} alt={`Frame ${f.frame}`} className="w-full h-full object-cover" />
+                          <img src={f.imageUrl} alt={`Frame ${f.frame}`} className={`w-full h-full object-cover ${regeneratingFrame === i ? "opacity-40 animate-pulse" : ""}`} />
                           <div className="absolute top-2 left-2">
                             <Badge className="bg-charcoal/80 text-white text-[10px]">Frame {f.frame}</Badge>
                           </div>
+                          {/* Regenerate button */}
+                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              size="icon"
+                              variant="secondary"
+                              className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-background"
+                              onClick={() => regenerateFrame(i)}
+                              disabled={regeneratingFrame !== null}
+                              title="Regenerate this frame"
+                            >
+                              {regeneratingFrame === i ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                          {regeneratingFrame === i && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="bg-background/90 backdrop-blur-sm rounded-lg p-3 text-center">
+                                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-1 text-primary" />
+                                <p className="text-[10px] text-foreground font-body">Regenerating...</p>
+                              </div>
+                            </div>
+                          )}
                           <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
                             <p className="text-white text-[10px] font-body line-clamp-2">{f.dialogue || f.scene}</p>
                           </div>
