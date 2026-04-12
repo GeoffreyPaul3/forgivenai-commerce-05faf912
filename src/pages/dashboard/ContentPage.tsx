@@ -969,10 +969,35 @@ function UGCStudio() {
                         className="rounded-xl border border-border bg-card overflow-hidden group"
                       >
                         <div className="aspect-[9/16] relative">
-                          <img src={f.imageUrl} alt={`Frame ${f.frame}`} className="w-full h-full object-cover" />
+                          <img src={f.imageUrl} alt={`Frame ${f.frame}`} className={`w-full h-full object-cover ${regeneratingFrame === i ? "opacity-40 animate-pulse" : ""}`} />
                           <div className="absolute top-2 left-2">
                             <Badge className="bg-charcoal/80 text-white text-[10px]">Frame {f.frame}</Badge>
                           </div>
+                          {/* Regenerate button */}
+                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              size="icon"
+                              variant="secondary"
+                              className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-background"
+                              onClick={() => regenerateFrame(i)}
+                              disabled={regeneratingFrame !== null}
+                              title="Regenerate this frame"
+                            >
+                              {regeneratingFrame === i ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                          {regeneratingFrame === i && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="bg-background/90 backdrop-blur-sm rounded-lg p-3 text-center">
+                                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-1 text-primary" />
+                                <p className="text-[10px] text-foreground font-body">Regenerating...</p>
+                              </div>
+                            </div>
+                          )}
                           <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
                             <p className="text-white text-[10px] font-body line-clamp-2">{f.dialogue || f.scene}</p>
                           </div>
