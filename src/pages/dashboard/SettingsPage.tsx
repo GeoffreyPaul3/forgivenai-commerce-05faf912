@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Settings, RefreshCw, Loader2, Store, Globe, Phone, Banknote } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const SettingsPage = () => {
   const { toast } = useToast();
@@ -16,12 +17,32 @@ const SettingsPage = () => {
   });
 
   const handleCrawl = async () => {
+    if (!crawlUrl) return;
     setCrawling(true);
-    toast({ title: "Crawl initiated", description: "This may take a moment..." });
-    setTimeout(() => {
+    toast({ title: "Crawl initiated", description: "This may take a minute as we discover and extract product data..." });
+
+    try {
+      const { data, error } = await supabase.functions.invoke("firecrawl-products", {
+        body: { action: "sync", url: crawlUrl, limit: 10 }
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || "Sync failed");
+
+      toast({ 
+        title: "Crawl complete", 
+        description: `Successfully imported/updated ${data.imported} products from your website.` 
+      });
+    } catch (err: any) {
+      console.error("Sync error:", err);
+      toast({ 
+        title: "Sync failed", 
+        description: err.message || "An unexpected error occurred during sync.", 
+        variant: "destructive" 
+      });
+    } finally {
       setCrawling(false);
-      toast({ title: "Crawl complete", description: "Product data refreshed" });
-    }, 3000);
+    }
   };
 
   return (

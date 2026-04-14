@@ -10,7 +10,7 @@ CREATE TABLE public.ugc_projects (
   video_url TEXT,
   voice_url TEXT,
   status TEXT DEFAULT 'draft',
-  provider TEXT DEFAULT 'lovable-ai',
+  provider TEXT DEFAULT 'independent-ai',
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()

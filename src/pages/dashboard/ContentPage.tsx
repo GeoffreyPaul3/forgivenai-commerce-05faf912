@@ -470,10 +470,16 @@ function UGCStudio() {
         productName: selectedProd.name,
         productImageUrl: selectedProd.images?.[0] || null,
         avatarDescription,
-        avatarImageUrl: currentAvatar, // pass the avatar image (generated or uploaded)
+        avatarImageUrl: avatarUrl, // pass the generated avatar URL if exists
         script,
         frameCount,
       };
+
+      // If user uploaded their own photo, send as base64
+      if (uploadedFile && uploadedFile.type.startsWith("image/")) {
+        const base64 = await fileToBase64(uploadedFile);
+        body.avatarImageBase64 = base64;
+      }
 
       const { data, error } = await supabase.functions.invoke("ugc-generate", { body });
       if (error) throw error;
@@ -497,7 +503,7 @@ function UGCStudio() {
           script,
           storyboard: enrichedFrames as any,
           status: "storyboard",
-          provider: "lovable-ai",
+          provider: "independent-ai",
         }).select().single();
 
         if (project) {
@@ -561,7 +567,7 @@ function UGCStudio() {
         media_url: frames[0]?.imageUrl,
         product_id: selectedProduct,
         status: "draft",
-        metadata: { provider: "lovable-ai", type: "video", frameCount: frames.length, hasTTS: enableTTS } as any,
+        metadata: { provider: "independent-ai", type: "video", frameCount: frames.length, hasTTS: enableTTS } as any,
       });
       queryClient.invalidateQueries({ queryKey: ["content"] });
 
@@ -597,22 +603,27 @@ function UGCStudio() {
       ];
       const sceneInfo = scenes[frameIndex] || scenes[0];
 
-      const { data, error } = await supabase.functions.invoke("ugc-generate", {
-        body: {
-          action: "generate-frame",
-          avatarDescription,
-          avatarImageUrl: currentAvatar,
-          productName: selectedProd.name,
-          productImageUrl: selectedProd.images?.[0] || null,
-          scene: frame.scene,
-          camera: sceneInfo.camera,
-          expression: sceneInfo.expression,
-          previousFrameUrl: frameIndex > 0 ? frames[frameIndex - 1]?.imageUrl : null,
-          nextFrameUrl: frameIndex < frames.length - 1 ? frames[frameIndex + 1]?.imageUrl : null,
-          frameIndex: frameIndex + 1,
-          totalFrames: frames.length,
-        },
-      });
+      const body: any = {
+        action: "generate-frame",
+        avatarDescription,
+        avatarImageUrl: avatarUrl,
+        productName: selectedProd.name,
+        productImageUrl: selectedProd.images?.[0] || null,
+        scene: frame.scene,
+        camera: sceneInfo.camera,
+        expression: sceneInfo.expression,
+        previousFrameUrl: frameIndex > 0 ? frames[frameIndex - 1]?.imageUrl : null,
+        nextFrameUrl: frameIndex < frames.length - 1 ? frames[frameIndex + 1]?.imageUrl : null,
+        frameIndex: frameIndex + 1,
+        totalFrames: frames.length,
+      };
+
+      if (uploadedFile && uploadedFile.type.startsWith("image/")) {
+        const base64 = await fileToBase64(uploadedFile);
+        body.avatarImageBase64 = base64;
+      }
+
+      const { data, error } = await supabase.functions.invoke("ugc-generate", { body });
 
       if (error) throw error;
       if (data?.imageUrl) {
@@ -630,7 +641,10 @@ function UGCStudio() {
         toast({ title: `Frame ${frameIndex + 1} regenerated!` });
       }
     } catch (err: any) {
-      toast({ title: "Frame regeneration failed", description: err?.message, variant: "destructive" });
+      console.error("Frame regeneration failed:", err);
+      // Try to extract error message from response if possible
+      const msg = err?.context?.message || err?.message || "Unknown error";
+      toast({ title: "Frame regeneration failed", description: msg, variant: "destructive" });
     } finally {
       setRegeneratingFrame(null);
     }

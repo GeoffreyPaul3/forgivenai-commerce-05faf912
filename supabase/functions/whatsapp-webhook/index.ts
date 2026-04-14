@@ -6,7 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/twilio';
+const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID") || "";
+const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
 
 function getSupabase() {
   return createClient(
@@ -18,7 +19,7 @@ function getSupabase() {
 const QWEN_API_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions";
 const QWEN_MODEL = "qwen-plus";
 
-async function callAI(apiKey: string, systemPrompt: string, userMessage: string): Promise<string> {
+async function callAI(apiKey: string, systemPrompt: string, history: any[], userMessage: string): Promise<string> {
   const res = await fetch(QWEN_API_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -26,10 +27,11 @@ async function callAI(apiKey: string, systemPrompt: string, userMessage: string)
       model: QWEN_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
+        ...history,
         { role: "user", content: userMessage },
       ],
       temperature: 0.7,
-      max_tokens: 512,
+      max_tokens: 1024,
     }),
   });
   if (!res.ok) {
@@ -41,29 +43,89 @@ async function callAI(apiKey: string, systemPrompt: string, userMessage: string)
   return data.choices?.[0]?.message?.content || "Sorry, I couldn't process that.";
 }
 
-async function sendWhatsApp(to: string, body: string) {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  const TWILIO_API_KEY = Deno.env.get("TWILIO_API_KEY");
-  if (!LOVABLE_API_KEY || !TWILIO_API_KEY) throw new Error("Twilio not configured");
+async function validateTwilioRequest(req: Request, bodyText: string): Promise<boolean> {
+  const signature = req.headers.get("x-twilio-signature");
+  if (!signature) {
+    console.error("Missing X-Twilio-Signature header");
+    return false;
+  }
 
-  const whatsappNumber = Deno.env.get("TWILIO_WHATSAPP_NUMBER") || "";
+  // Supabase Edge Functions often report internal URLs or HTTP instead of HTTPS.
+  // Twilio signs the EXACT public URL it calls. 
+  // We need to reconstruct the public URL: https://<project-ref>.supabase.co/functions/v1/whatsapp-webhook
+  const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
+  const forwardedHost = req.headers.get("x-forwarded-host") || new URL(req.url).host;
+  
+  // Twilio signs the URL including query parameters.
+  const urlObj = new URL(req.url);
+  const publicUrl = `${forwardedProto}://${forwardedHost}/functions/v1/whatsapp-webhook${urlObj.search}`;
 
-  const response = await fetch(`${GATEWAY_URL}/Messages.json`, {
+  const params = new URLSearchParams(bodyText);
+  const data = Array.from(params.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .reduce((acc, [key, val]) => acc + key + val, publicUrl);
+
+  console.log("Validating Twilio Request:", {
+    publicUrl,
+    headerSignature: signature,
+    paramsCount: Array.from(params.keys()).length
+  });
+
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(TWILIO_AUTH_TOKEN),
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"]
+  );
+  const hmac = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
+  const digest = btoa(String.fromCharCode(...new Uint8Array(hmac)));
+
+  const matched = digest === signature;
+  if (!matched) {
+    console.error("Signature mismatch!");
+    // Avoid logging authentication secrets like TWILIO_AUTH_TOKEN, but we can log the data string
+    console.log("Expected data string was:", data);
+    console.log("Calculated signature was:", digest);
+  }
+
+  return matched;
+}
+
+async function sendWhatsApp(to: string, body: string, mediaUrl?: string, fromOverride?: string) {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+    throw new Error("Twilio credentials not configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)");
+  }
+
+  const defaultWhatsappNumber = Deno.env.get("TWILIO_WHATSAPP_NUMBER") || "";
+  const whatsappNumber = fromOverride || defaultWhatsappNumber;
+
+  const params: Record<string, string> = {
+    To: to.startsWith("whatsapp:") ? to : `whatsapp:${to}`,
+    From: whatsappNumber.startsWith("whatsapp:") ? whatsappNumber : `whatsapp:${whatsappNumber}`,
+    Body: body,
+  };
+
+  if (mediaUrl) {
+    params.MediaUrl = mediaUrl;
+  }
+
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+  const response = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "X-Connection-Api-Key": TWILIO_API_KEY,
+      Authorization: "Basic " + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`),
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({
-      To: to.startsWith("whatsapp:") ? to : `whatsapp:${to}`,
-      From: whatsappNumber.startsWith("whatsapp:") ? whatsappNumber : `whatsapp:${whatsappNumber}`,
-      Body: body,
-    }),
+    body: new URLSearchParams(params),
   });
 
   const data = await response.json();
-  if (!response.ok) throw new Error(`Twilio error: ${JSON.stringify(data)}`);
+  if (!response.ok) {
+    console.error("Twilio send error:", data);
+    throw new Error(`Twilio error: ${data.message || JSON.stringify(data)}`);
+  }
   return data;
 }
 
@@ -73,12 +135,23 @@ serve(async (req) => {
   try {
     const supabase = getSupabase();
     const contentType = req.headers.get("content-type") || "";
+    let bodyText = "";
 
     // ── Twilio Webhook (incoming WhatsApp message) ──
     if (contentType.includes("application/x-www-form-urlencoded")) {
-      const formData = await req.formData();
-      const from = formData.get("From")?.toString() || "";
-      const body = formData.get("Body")?.toString() || "";
+      bodyText = await req.text();
+      
+      // Verify signature
+      const isValid = await validateTwilioRequest(req, bodyText);
+      if (!isValid) {
+        console.error("Invalid Twilio signature");
+        return new Response("Forbidden", { status: 403 });
+      }
+
+      const formData = new URLSearchParams(bodyText);
+      const from = formData.get("From") || "";
+      const to = formData.get("To") || "";
+      const body = formData.get("Body") || "";
       const customerPhone = from.replace("whatsapp:", "");
 
       // Find or create conversation
@@ -108,12 +181,15 @@ serve(async (req) => {
       await supabase.from("messages").insert({ conversation_id: convo.id, role: "customer", content: body });
 
       // Get products for AI context
-      const { data: products } = await supabase.from("products").select("name, category, price, currency, description").eq("status", "active").limit(30);
+      const { data: products } = await supabase.from("products").select("name, category, price, currency, description, images").eq("status", "active").limit(100);
       const productList = products?.map(p => `- ${p.name} (${p.category}) — ${p.currency} ${p.price}`).join("\n") || "No products available";
 
       // Get conversation history
-      const { data: history } = await supabase.from("messages").select("role, content").eq("conversation_id", convo.id).order("created_at", { ascending: true }).limit(10);
-      const historyText = history?.map(m => `${m.role}: ${m.content}`).join("\n") || "";
+      const { data: historyData } = await supabase.from("messages").select("role, content").eq("conversation_id", convo.id).order("created_at", { ascending: true }).limit(15);
+      const history = (historyData ?? []).map(m => ({
+        role: m.role === "customer" ? "user" : "assistant",
+        content: m.content,
+      }));
 
       const QWEN_API_KEY = Deno.env.get("QWEN_API_KEY");
       if (!QWEN_API_KEY) {
@@ -121,28 +197,50 @@ serve(async (req) => {
         return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
       }
 
-      const systemPrompt = `You are the AI sales assistant for Forgiven Shopping Centre, a premium fashion brand.
+      const systemPrompt = `You are the AI sales assistant for Forgiven Shopping Centre, Malawi's premium fashion & lifestyle brand.
+Your goal is to provide a world-class shopping experience, guiding customers toward the perfect purchase.
+
+STYLE RULES:
+- Be friendly, helpful, professional, and elegant.
+- Use emojis naturally to feel warm but premium.
+- Keep responses concise and natural for WhatsApp.
+- Always mention prices in MWK.
+
+ORDER CAPTURE PROCESS:
+1. Understand the customer's needs and recommend products from the catalog.
+2. If they want to order, you MUST collect the following details BEFORE confirming:
+   - Full Name
+   - Email Address
+   - Delivery Address (Lilongwe, Blantyre, Mzuzu, or other area in Malawi)
+   - Preferred Contact Number
+3. Summarize the details:
+   *Product: X*
+   *Quantity: X*
+   *Total: MWK X*
+   *Name: X*
+   *Email: X*
+   *Address: X*
+   *Phone: X*
+   Ask: "Reply YES to confirm your order details and generate your secure payment link."
+
+4. CRITICAL: ONLY AFTER the customer replies with "YES" or explicit confirmation of the summary, respond with EXACTLY this JSON block:
+###ORDER_JSON###
+{"product_name":"exact product name","quantity":1,"price":25000,"customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number"}
+###END_ORDER_JSON###
+
+Followed by: "Perfect! I'm generating your PayChangu secure payment link right now... 🚀"
+
+MEDIA CAPABILITIES:
+- You are integrated with an automatic image delivery system.
+- When you mention an exact product name from the catalog, the system will automatically send its photo.
+- Always inform the customer: "I'm sending you the product image now..."
 
 AVAILABLE PRODUCTS:
-${productList}
-
-CONVERSATION HISTORY:
-${historyText}
-
-RULES:
-- Be friendly, helpful, and professional
-- Recommend products based on customer needs
-- If customer wants to order, extract: product name, quantity, delivery details
-- When order intent is detected, respond with ORDER_INTENT: followed by JSON: {"product":"name","quantity":1,"notes":"any details"}
-- Use emojis sparingly for a warm feel
-- Keep responses concise (under 200 words)
-- Always mention prices in MWK
-- If asked about payment, mention M-Pesa/bank transfer options
-- End with a question or call to action`;
+${productList}`;
 
       let aiResponse: string;
       try {
-        aiResponse = await callAI(QWEN_API_KEY, systemPrompt, body);
+        aiResponse = await callAI(QWEN_API_KEY, systemPrompt, history, body);
       } catch (aiErr) {
         console.error("AI call failed, sending fallback:", aiErr);
         await sendWhatsApp(from, "Thank you for your message! 😊 Our team will get back to you shortly.");
@@ -150,36 +248,83 @@ RULES:
         return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
       }
 
-      // Check for order intent
-      if (aiResponse.includes("ORDER_INTENT:")) {
-        const parts = aiResponse.split("ORDER_INTENT:");
-        const reply = parts[0].trim();
+      // Check for order JSON intent
+      const orderJsonMatch = aiResponse.match(/###ORDER_JSON###\s*([\s\S]*?)\s*###END_ORDER_JSON###/);
+      if (orderJsonMatch) {
         try {
-          const orderJson = JSON.parse(parts[1].trim());
-          const product = products?.find(p => p.name.toLowerCase().includes(orderJson.product?.toLowerCase()));
-          if (product) {
-            await supabase.from("orders").insert({
-              customer_phone: customerPhone,
-              customer_name: convo.customer_name || customerPhone,
-              items: [{ product_id: product.name, quantity: orderJson.quantity || 1, price: product.price }] as any,
-              total: (product.price || 0) * (orderJson.quantity || 1),
-              currency: product.currency || "MWK",
-              channel: "whatsapp",
-              notes: orderJson.notes || "",
-              status: "pending",
+          const cleanText = aiResponse.replace(/###ORDER_JSON###[\s\S]*?###END_ORDER_JSON###/, "").trim();
+          await sendWhatsApp(from, cleanText);
+          await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: cleanText });
+
+          const orderData = JSON.parse(orderJsonMatch[1].trim());
+          const product = products?.find(p => p.name.toLowerCase() === orderData.product_name.toLowerCase());
+          
+          // 1. Create the order in DB
+          const { data: newOrder } = await supabase.from("orders").insert({
+            customer_phone: customerPhone,
+            customer_name: orderData.customer_name,
+            customer_email: orderData.customer_email,
+            items: [{ product_id: product?.id || orderData.product_name, name: orderData.product_name, quantity: orderData.quantity, price: orderData.price }] as any,
+            total: orderData.price * orderData.quantity,
+            channel: "whatsapp",
+            notes: `Delivery Address: ${orderData.address} | Contact: ${orderData.phone}`,
+            status: "pending",
+          }).select().single();
+
+          if (newOrder) {
+            // 2. Invoke create-payment function
+            const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+            const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+            
+            const payRes = await fetch(`${SUPABASE_URL}/functions/v1/create-payment`, {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                action: "create_payment",
+                order_id: newOrder.id,
+                amount: newOrder.total,
+                currency: "MWK",
+                email: orderData.customer_email,
+                first_name: orderData.customer_name,
+                title: `Forgiven: ${orderData.product_name}`,
+              }),
             });
+
+            const payData = await payRes.json();
+            if (payData.success && payData.checkout_url) {
+              await sendWhatsApp(from, `💳 Here is your secure payment link:\n${payData.checkout_url}\n\nYou can pay via M-Pesa, Airtel Money, or Card. We'll start processing your order as soon as payment is confirmed! ✨`);
+            } else {
+              await sendWhatsApp(from, "⚠️ I encountered an issue generating the payment link. Our support team will contact you shortly to assist with your payment!");
+            }
           }
-          // Send the human-readable part only
-          await sendWhatsApp(from, reply || `Your order for ${orderJson.product} has been placed! We'll confirm shortly. 🎉`);
-        } catch {
-          await sendWhatsApp(from, aiResponse.replace(/ORDER_INTENT:.*/, "").trim());
+        } catch (e) {
+          console.error("Order processing error:", e);
+          await sendWhatsApp(from, aiResponse.replace(/###ORDER_JSON###[\s\S]*?###END_ORDER_JSON###/, "").trim());
         }
       } else {
-        await sendWhatsApp(from, aiResponse);
-      }
+        // Normal response
+        await sendWhatsApp(from, aiResponse, undefined, to);
+        await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: aiResponse });
 
-      // Store AI response
-      await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: aiResponse.replace(/ORDER_INTENT:.*/, "").trim() });
+        // --- Automatic Image Dispatcher ---
+        if (products) {
+          for (const product of products) {
+            // Check if exact product name is mentioned in the NEW response
+            if (aiResponse.includes(product.name)) {
+              const imageUrl = product.images?.[0];
+              if (imageUrl) {
+                console.log(`Sending auto-image for ${product.name}: ${imageUrl}`);
+                // Small delay for better UX
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                await sendWhatsApp(from, `Photo of ${product.name}:`, imageUrl);
+              }
+            }
+          }
+        }
+      }
 
       return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
     }
@@ -189,33 +334,15 @@ RULES:
     const { action } = jsonBody;
 
     if (action === "send-message") {
-      const { conversationId, phone, message } = jsonBody;
+      const { conversationId, phone, message, mediaUrl } = jsonBody;
       if (!phone || !message) throw { status: 400, message: "Phone and message required" };
 
-      await sendWhatsApp(phone, message);
+      await sendWhatsApp(phone, message, mediaUrl);
 
       if (conversationId) {
-        await supabase.from("messages").insert({ conversation_id: conversationId, role: "agent", content: message });
+        await supabase.from("messages").insert({ conversation_id: conversationId, role: "admin", content: message });
         await supabase.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", conversationId);
       }
-
-      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    if (action === "send-order-update") {
-      const { phone, orderId, status } = jsonBody;
-      if (!phone || !orderId) throw { status: 400, message: "Phone and orderId required" };
-
-      const statusMessages: Record<string, string> = {
-        confirmed: "✅ Your order has been confirmed! We're preparing it now.",
-        paid: "💳 Payment received! Thank you.",
-        processing: "📦 Your order is being processed.",
-        shipped: "🚚 Your order has been shipped! Track it with us.",
-        delivered: "🎉 Your order has been delivered! Enjoy your purchase.",
-      };
-
-      const msg = `Forgiven Shopping Centre\n\nOrder #${orderId.slice(0, 8)}\n${statusMessages[status] || `Status updated: ${status}`}\n\nQuestions? Reply here!`;
-      await sendWhatsApp(phone, msg);
 
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
