@@ -344,6 +344,8 @@ function UGCStudio() {
   const [videoProgress, setVideoProgress] = useState(0);
   const [enableTTS, setEnableTTS] = useState(true);
   const [selectedVoice, setSelectedVoice] = useState("sambert-camila-v1");
+  const [videoResolution, setVideoResolution] = useState<'sd' | 'hd' | '4k'>('hd');
+  const [videoFormat, setVideoFormat] = useState<'mp4' | 'webm'>('mp4');
 
   // Loading states
   const [generatingAvatar, setGeneratingAvatar] = useState(false);
@@ -572,8 +574,8 @@ function UGCStudio() {
 
       const blob = await assembleVideo(videoFrames, {
         frameDuration: 3500,
-        width: 720,
-        height: 1280,
+        resolution: videoResolution,
+        format: videoFormat,
         enableTTS,
         onProgress: (pct) => setVideoProgress(90 + (pct * 0.1)),
       });
@@ -675,9 +677,10 @@ function UGCStudio() {
 
   const downloadVideo = () => {
     if (!videoBlob) return;
+    const ext = videoBlob.type.includes("mp4") ? "mp4" : "webm";
     const a = document.createElement("a");
     a.href = URL.createObjectURL(videoBlob);
-    a.download = `ugc-${selectedProd?.name?.replace(/\s+/g, "-") || "video"}-${Date.now()}.webm`;
+    a.download = `ugc-${selectedProd?.name?.replace(/\s+/g, "-") || "video"}-${Date.now()}.${ext}`;
     a.click();
   };
 
@@ -1060,8 +1063,36 @@ function UGCStudio() {
                   <Video className="w-5 h-5" /> 🎥 Create UGC Video
                 </h3>
                 <p className="text-sm text-muted-foreground font-body">
-                  Assemble your {frames.length} frames into a cinematic video with zoom/pan effects and voiceover.
+                  Assemble your {frames.length} frames into a cinematic video with zoom/pan effects and voiceover in your preferred format.
                 </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-heading font-medium text-muted-foreground">Resolution</label>
+                    <Select value={videoResolution} onValueChange={(v: any) => setVideoResolution(v)}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sd">SD - 720p (Fast)</SelectItem>
+                        <SelectItem value="hd">HD - 1080p (Standard)</SelectItem>
+                        <SelectItem value="4k">4K - Ultra HD (Premium)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-heading font-medium text-muted-foreground">Format</label>
+                    <Select value={videoFormat} onValueChange={(v: any) => setVideoFormat(v)}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mp4">MP4 (Best Compatibility)</SelectItem>
+                        <SelectItem value="webm">WebM (Optimized for Web)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
                 <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
                   <div className="flex items-center gap-2">

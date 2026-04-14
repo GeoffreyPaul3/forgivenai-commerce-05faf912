@@ -12,8 +12,8 @@ export interface VideoFrame {
 
 export interface AssemblyOptions {
   frameDuration?: number; // ms per frame, default 3500
-  width?: number; // default 720
-  height?: number; // default 1280
+  resolution?: 'sd' | 'hd' | '4k'; // 720p, 1080p, 4k
+  format?: 'mp4' | 'webm';
   enableTTS?: boolean;
   showSubtitles?: boolean; // default true
   onProgress?: (pct: number) => void;
@@ -72,7 +72,7 @@ function drawSubtitle(
   );
   const boxHeight = totalTextHeight + padding.y * 2;
   const boxX = (w - boxWidth) / 2;
-  const boxY = h - boxHeight - 60;
+  const boxY = h - boxHeight - (h * 0.06);
 
   // Frosted glass background
   ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
@@ -182,12 +182,20 @@ export async function assembleVideo(
 ): Promise<Blob> {
   const {
     frameDuration = 3500,
-    width = 720,
-    height = 1280,
+    resolution = 'hd',
+    format = 'mp4',
     enableTTS = false,
     showSubtitles = true,
     onProgress,
   } = options;
+
+  // Resolution mapping (Vertical 9:16)
+  const resMap = {
+    sd: { w: 720, h: 1280, bitrate: 2500000 },
+    hd: { w: 1080, h: 1920, bitrate: 8000000 },
+    '4k': { w: 2160, h: 3840, bitrate: 30000000 }
+  };
+  const { w: width, h: height, bitrate } = resMap[resolution];
 
   const images = await Promise.all(frames.map((f) => loadImage(f.imageUrl)));
 
@@ -196,15 +204,25 @@ export async function assembleVideo(
   canvas.height = height;
   const ctx = canvas.getContext("2d")!;
 
-  const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-    ? "video/webm;codecs=vp9"
-    : "video/webm";
+  // Determine MIME type based on requested format and browser support
+  let mimeType = "video/webm;codecs=vp9";
+  if (format === 'mp4') {
+    if (MediaRecorder.isTypeSupported('video/mp4;codecs=avc1')) {
+      mimeType = 'video/mp4;codecs=avc1';
+    } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+      mimeType = 'video/mp4';
+    }
+  } else {
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = "video/webm";
+    }
+  }
 
   const stream = canvas.captureStream(30);
 
   const recorder = new MediaRecorder(stream, { 
     mimeType,
-    videoBitsPerSecond: 8000000
+    videoBitsPerSecond: bitrate
   });
 
   const chunks: Blob[] = [];
@@ -214,7 +232,8 @@ export async function assembleVideo(
 
   return new Promise((resolve, reject) => {
     recorder.onstop = () => {
-      resolve(new Blob(chunks, { type: "video/webm" }));
+      const type = mimeType.includes("mp4") ? "video/mp4" : "video/webm";
+      resolve(new Blob(chunks, { type }));
     };
     recorder.onerror = () => reject(new Error("MediaRecorder error"));
     recorder.start(100);
