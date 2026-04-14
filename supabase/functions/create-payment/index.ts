@@ -238,27 +238,127 @@ function withQueryParams(target: string, params: Record<string, string>) {
 }
 
 function htmlResponse(title: string, message: string, tone: "success" | "pending" | "error") {
-  const accent = tone === "success" ? "152 60% 42%" : tone === "pending" ? "38 92% 50%" : "0 72% 51%";
+  const isSuccess = tone === "success";
+  const accentHsl = isSuccess ? "152, 60%, 42%" : tone === "pending" ? "38, 92%, 50%" : "0, 72%, 51%";
+  const redirectUrl = "https://forgiven-ai-commerce.vercel.app";
+  
   return new Response(`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${title}</title>
+    <title>${title} | Forgiven Shopping Centre</title>
     <style>
-      body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #f8fafc; color: #1e293b; }
-      .wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-      .card { width: 100%; max-width: 480px; background: white; border-radius: 24px; padding: 40px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); border-top: 8px solid hsl(${accent}); text-align: center; }
-      h1 { margin: 0 0 16px; font-size: 24px; font-weight: 700; color: #0f172a; }
-      p { margin: 0; line-height: 1.6; color: #64748b; font-size: 16px; }
+      :root {
+        --accent: ${accentHsl};
+        --bg: #f8fafc;
+        --card-bg: #ffffff;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+      }
+      * { box-sizing: border-box; }
+      body { 
+        margin: 0; 
+        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        background: radial-gradient(circle at top right, hsla(var(--accent), 0.05), transparent), var(--bg);
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+      }
+      .card { 
+        width: 100%; 
+        max-width: 440px; 
+        background: var(--card-bg); 
+        border-radius: 32px; 
+        padding: 48px 32px; 
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08); 
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 6px;
+        background: hsl(var(--accent));
+      }
+      .icon-box {
+        width: 80px;
+        height: 80px;
+        background: hsla(var(--accent), 0.1);
+        border-radius: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 32px;
+        color: hsl(var(--accent));
+      }
+      h1 { margin: 0 0 16px; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+      p { margin: 0 0 32px; line-height: 1.6; color: var(--text-muted); font-size: 17px; }
+      .btn {
+        display: inline-block;
+        background: hsl(var(--accent));
+        color: white;
+        text-decoration: none;
+        padding: 16px 32px;
+        border-radius: 16px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        box-shadow: 0 10px 15px -3px hsla(var(--accent), 0.3);
+      }
+      .btn:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px hsla(var(--accent), 0.4); }
+      .redirect-msg {
+        margin-top: 24px;
+        font-size: 14px;
+        color: var(--text-muted);
+      }
+      .dots::after {
+        content: '...';
+        animation: dots 1.5s infinite;
+      }
+      @keyframes dots {
+        0% { content: '.'; }
+        33% { content: '..'; }
+        66% { content: '...'; }
+      }
     </style>
+    ${isSuccess ? `<script>
+      setTimeout(() => {
+        window.location.href = "${redirectUrl}";
+      }, 5000);
+    </script>` : ""}
   </head>
   <body>
-    <div class="wrap">
-      <div class="card">
-        <h1>${title}</h1>
-        <p>${message}</p>
+    <div class="card">
+      <div class="icon-box">
+        ${isSuccess ? 
+          `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>` :
+          `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`
+        }
       </div>
+      <h1>${title}</h1>
+      <p>${message}</p>
+      <a href="${redirectUrl}" class="btn">Return to Store</a>
+      ${isSuccess ? `<div class="redirect-msg">Redirecting to store in <span id="timer">5</span>s<span class="dots"></span></div>
+      <script>
+        let timeLeft = 5;
+        const timerEl = document.getElementById('timer');
+        setInterval(() => {
+          if (timeLeft > 0) {
+            timeLeft--;
+            timerEl.textContent = timeLeft;
+          }
+        }, 1000);
+      </script>` : ""}
     </div>
   </body>
 </html>`, {

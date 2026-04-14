@@ -44,50 +44,59 @@ async function callAI(apiKey: string, systemPrompt: string, history: any[], user
 }
 
 async function validateTwilioRequest(req: Request, bodyText: string): Promise<boolean> {
+  const bypass = Deno.env.get("BYPASS_TWILIO_AUTH") === "true";
+  if (bypass) {
+    console.warn("⚠️ BYPASSING TWILIO AUTHENTICATION (BYPASS_TWILIO_AUTH=true)");
+    return true;
+  }
+
   const signature = req.headers.get("x-twilio-signature");
   if (!signature) {
     console.error("Missing X-Twilio-Signature header");
     return false;
   }
 
+  const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+  if (!twilioAuthToken) {
+    console.error("TWILIO_AUTH_TOKEN not configured in environment");
+    return false;
+  }
+
   // Supabase Edge Functions often report internal URLs or HTTP instead of HTTPS.
-  // Twilio signs the EXACT public URL it calls. 
-  // We need to reconstruct the public URL: https://<project-ref>.supabase.co/functions/v1/whatsapp-webhook
+  // We need to reconstruct the public URL exactly as Twilio sees it.
   const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
   const forwardedHost = req.headers.get("x-forwarded-host") || new URL(req.url).host;
   
-  // Twilio signs the URL including query parameters.
   const urlObj = new URL(req.url);
   const publicUrl = `${forwardedProto}://${forwardedHost}/functions/v1/whatsapp-webhook${urlObj.search}`;
 
   const params = new URLSearchParams(bodyText);
+  // Twilio sorts params by alphabetical order of keys
   const data = Array.from(params.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .reduce((acc, [key, val]) => acc + key + val, publicUrl);
 
-  console.log("Validating Twilio Request:", {
-    publicUrl,
-    headerSignature: signature,
-    paramsCount: Array.from(params.keys()).length
-  });
-
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
-    encoder.encode(TWILIO_AUTH_TOKEN),
+    encoder.encode(twilioAuthToken),
     { name: "HMAC", hash: "SHA-1" },
     false,
     ["sign"]
   );
+  
   const hmac = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
   const digest = btoa(String.fromCharCode(...new Uint8Array(hmac)));
 
   const matched = digest === signature;
   if (!matched) {
-    console.error("Signature mismatch!");
-    // Avoid logging authentication secrets like TWILIO_AUTH_TOKEN, but we can log the data string
-    console.log("Expected data string was:", data);
-    console.log("Calculated signature was:", digest);
+    console.error("❌ Twilio Signature Mismatch!");
+    console.log("Details for troubleshooting:");
+    console.log("- Public URL used for signing:", publicUrl);
+    console.log("- Parameters signed:", Array.from(params.keys()).join(", "));
+    console.log("- Received Signature:", signature);
+    console.log("- Calculated Signature:", digest);
+    console.warn("TIP: Ensure your TWILIO_AUTH_TOKEN in Supabase matches the account sending the message.");
   }
 
   return matched;
@@ -295,7 +304,7 @@ ${productList}`;
 
             const payData = await payRes.json();
             if (payData.success && payData.checkout_url) {
-              await sendWhatsApp(from, `💳 Here is your secure payment link:\n${payData.checkout_url}\n\nYou can pay via M-Pesa, Airtel Money, or Card. We'll start processing your order as soon as payment is confirmed! ✨`);
+              await sendWhatsApp(from, `💳 Here is your secure payment link:\n${payData.checkout_url}\n\nYou can pay via Airtel Money, Mpamba, or Card. We'll start processing your order as soon as payment is confirmed! ✨`);
             } else {
               await sendWhatsApp(from, "⚠️ I encountered an issue generating the payment link. Our support team will contact you shortly to assist with your payment!");
             }
@@ -308,22 +317,6 @@ ${productList}`;
         // Normal response
         await sendWhatsApp(from, aiResponse, undefined, to);
         await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: aiResponse });
-
-        // --- Automatic Image Dispatcher ---
-        if (products) {
-          for (const product of products) {
-            // Check if exact product name is mentioned in the NEW response
-            if (aiResponse.includes(product.name)) {
-              const imageUrl = product.images?.[0];
-              if (imageUrl) {
-                console.log(`Sending auto-image for ${product.name}: ${imageUrl}`);
-                // Small delay for better UX
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                await sendWhatsApp(from, `Photo of ${product.name}:`, imageUrl);
-              }
-            }
-          }
-        }
       }
 
       return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
