@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,7 +37,7 @@ async function callTextAI(apiKey: string, prompt: string, model = "qwen-plus") {
 async function callImageAI(apiKey: string, prompt: string, refImageUrl?: string) {
   // 1. Submit Image Generation Task (Wanx-v1)
   const body: any = {
-    model: "wanx-v1",
+    model: "qwen-image-plus",
     input: { prompt },
     parameters: { size: "720*1280", n: 1 }
   };
@@ -64,7 +65,8 @@ async function callImageAI(apiKey: string, prompt: string, refImageUrl?: string)
     let errorMessage = `Image generation submission failed (${res.status})`;
     try {
       const errorJson = JSON.parse(t);
-      errorMessage = errorJson.message || errorJson.error || errorMessage;
+      errorMessage = errorJson.message || errorJson.code || errorMessage;
+      console.error("Parsed Image AI Error:", errorJson);
     } catch { /* use default */ }
     
     if (res.status === 402) throw { status: 402, message: "AI credits exhausted. Please add funds to your Alibaba account." };
@@ -113,6 +115,30 @@ async function callImageAI(apiKey: string, prompt: string, refImageUrl?: string)
   throw new Error("Image generation timed out after polling.");
 }
 
+async function persistImage(supabaseClient: any, imageUrl: string, folder: string) {
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error(`Failed to fetch image from AI provider: ${response.statusText}`);
+    const blob = await response.blob();
+    const fileName = `${folder}/${crypto.randomUUID()}.png`;
+
+    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+      .from("ugc-assets")
+      .upload(fileName, blob, { contentType: "image/png", upsert: true });
+
+    if (uploadError) {
+      console.error("Storage upload error:", uploadError);
+      return imageUrl; // Fallback to original URL
+    }
+
+    const { data: { publicUrl } } = supabaseClient.storage.from("ugc-assets").getPublicUrl(fileName);
+    return publicUrl;
+  } catch (err) {
+    console.error("Persist image error:", err);
+    return imageUrl; // Fallback
+  }
+}
+
 // ─── Identity Lock Prompt Builder ───
 function buildIdentityLock(avatarDescription: string, productName: string): string {
   return `STRICT IDENTITY LOCK — USE CONTINUITY:
@@ -146,6 +172,10 @@ serve(async (req) => {
       throw { status: 500, message: "No AI API key configured (QWEN_API_KEY). Please set this in Supabase secrets." };
     }
 
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
     const referenceImage = body.avatarImageUrl || body.avatarImageBase64;
 
     // ─── GENERATE AVATAR ───
@@ -167,9 +197,10 @@ serve(async (req) => {
       prompt += ` Approachable, stylish, high-quality UGC video thumbnail style.`;
 
       const imageUrl = await callImageAI(QWEN_API_KEY, prompt, referenceImage);
+      const persistedUrl = await persistImage(supabase, imageUrl, "avatars");
 
       return new Response(
-        JSON.stringify({ success: true, imageUrl }),
+        JSON.stringify({ success: true, imageUrl: persistedUrl }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -201,7 +232,8 @@ Style: Cinematic UGC, vertical 9:16, natural lighting, consistent with previous 
           // If we have an avatar image, we use it as a reference
           const imageUrl = await callImageAI(QWEN_API_KEY, framePrompt, referenceImage);
           if (imageUrl) {
-            frames.push({ frame: i + 1, imageUrl, scene: s.scene });
+            const persistedUrl = await persistImage(supabase, imageUrl, "frames");
+            frames.push({ frame: i + 1, imageUrl: persistedUrl, scene: s.scene });
           }
         } catch (err) {
           console.error(`Frame ${i + 1} failed:`, err);
@@ -235,9 +267,10 @@ Expression: ${expression || "natural"}
 Style: Cinematic UGC, vertical 9:16, natural lighting.`;
 
       const imageUrl = await callImageAI(QWEN_API_KEY, framePrompt, referenceImage);
+      const persistedUrl = await persistImage(supabase, imageUrl, "frames");
 
       return new Response(
-        JSON.stringify({ success: true, imageUrl }),
+        JSON.stringify({ success: true, imageUrl: persistedUrl }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
