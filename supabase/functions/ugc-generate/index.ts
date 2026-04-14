@@ -139,6 +139,47 @@ async function persistImage(supabaseClient: any, imageUrl: string, folder: strin
   }
 }
 
+async function callTTS(apiKey: string, text: string, voice = "sambert-camila-v1") {
+  const url = "https://dashscope-intl.aliyuncs.com/api/v1/services/audio/tts/generation-sync";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      ...aiHeaders(apiKey),
+      "X-DashScope-Data-Type": "audio"
+    },
+    body: JSON.stringify({
+      model: voice,
+      input: { text },
+      parameters: { format: "mp3", sample_rate: 16000 }
+    }),
+  });
+
+  if (!res.ok) {
+    const t = await res.text();
+    console.error("TTS error:", res.status, t);
+    throw new Error(`TTS generation failed: ${res.status}`);
+  }
+
+  return await res.blob();
+}
+
+async function persistAudio(supabaseClient: any, audioBlob: Blob, folder: string) {
+  try {
+    const fileName = `${folder}/${crypto.randomUUID()}.mp3`;
+    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+      .from("ugc-assets")
+      .upload(fileName, audioBlob, { contentType: "audio/mpeg", upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabaseClient.storage.from("ugc-assets").getPublicUrl(fileName);
+    return publicUrl;
+  } catch (err) {
+    console.error("Persist audio error:", err);
+    throw err;
+  }
+}
+
 // ─── Identity Lock Prompt Builder ───
 function buildIdentityLock(avatarDescription: string, productName: string): string {
   return `STRICT IDENTITY LOCK — USE CONTINUITY:
@@ -313,6 +354,20 @@ Return ONLY valid JSON:
 
       return new Response(
         JSON.stringify({ success: true, scriptData, rawContent: content }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ─── GENERATE TTS ───
+    if (action === "generate-tts") {
+      const { text, voice } = body;
+      if (!text) throw { status: 400, message: "Text is required for TTS" };
+
+      const audioBlob = await callTTS(QWEN_API_KEY, text, voice);
+      const audioUrl = await persistAudio(supabase, audioBlob, "audio");
+
+      return new Response(
+        JSON.stringify({ success: true, audioUrl }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

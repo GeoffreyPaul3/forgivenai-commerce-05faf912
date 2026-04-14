@@ -7,6 +7,7 @@ export interface VideoFrame {
   imageUrl: string;
   scene: string;
   dialogue?: string;
+  audioUrl?: string;
 }
 
 export interface AssemblyOptions {
@@ -151,9 +152,17 @@ function drawFrame(
   }
 }
 
-/** Speak text using browser TTS */
-function speak(text: string): Promise<void> {
+/** Speak text using browser TTS or play audio URL */
+function playAudio(text: string, audioUrl?: string): Promise<void> {
   return new Promise((resolve) => {
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audio.onended = () => resolve();
+      audio.onerror = () => resolve();
+      audio.play().catch(() => resolve());
+      return;
+    }
+
     if (!("speechSynthesis" in window) || !text) {
       resolve();
       return;
@@ -193,18 +202,11 @@ export async function assembleVideo(
 
   const stream = canvas.captureStream(30);
 
-  let audioDestination: MediaStreamAudioDestinationNode | null = null;
-  if (enableTTS && "speechSynthesis" in window) {
-    try {
-      const audioCtx = new AudioContext();
-      audioDestination = audioCtx.createMediaStreamDestination();
-      audioDestination.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
-    } catch {
-      // TTS audio capture not supported
-    }
-  }
+  const recorder = new MediaRecorder(stream, { 
+    mimeType,
+    videoBitsPerSecond: 8000000
+  });
 
-  const recorder = new MediaRecorder(stream, { mimeType });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => {
     if (e.data.size > 0) chunks.push(e.data);
@@ -248,9 +250,9 @@ export async function assembleVideo(
         showSubtitles
       );
 
-      if (enableTTS && !ttsStarted.has(currentFrameIdx) && frame.dialogue) {
+      if (enableTTS && !ttsStarted.has(currentFrameIdx) && (frame.dialogue || frame.audioUrl)) {
         ttsStarted.add(currentFrameIdx);
-        speak(frame.dialogue);
+        playAudio(frame.dialogue || "", frame.audioUrl);
       }
 
       onProgress?.(Math.round((elapsed / totalDuration) * 100));

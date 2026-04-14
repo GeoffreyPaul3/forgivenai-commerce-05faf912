@@ -343,6 +343,7 @@ function UGCStudio() {
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [enableTTS, setEnableTTS] = useState(true);
+  const [selectedVoice, setSelectedVoice] = useState("sambert-camila-v1");
 
   // Loading states
   const [generatingAvatar, setGeneratingAvatar] = useState(false);
@@ -541,18 +542,40 @@ function UGCStudio() {
     setVideoProgress(0);
 
     try {
-      const videoFrames: VideoFrame[] = frames.map(f => ({
-        imageUrl: f.imageUrl,
-        scene: f.scene,
-        dialogue: f.dialogue || f.scene,
-      }));
+      const videoFrames: VideoFrame[] = [];
+      const totalSteps = frames.length;
+
+      // 1. Generate premium TTS for each frame if enabled
+      for (let i = 0; i < frames.length; i++) {
+        const f = frames[i];
+        let audioUrl = undefined;
+
+        if (enableTTS && f.dialogue) {
+          setVideoProgress(Math.round(((i + 0.1) / (totalSteps + 1)) * 100));
+          const { data, error } = await supabase.functions.invoke("ugc-generate", {
+            body: { action: "generate-tts", text: f.dialogue, voice: selectedVoice },
+          });
+          if (!error && data?.audioUrl) {
+            audioUrl = data.audioUrl;
+          }
+        }
+
+        videoFrames.push({
+          imageUrl: f.imageUrl,
+          scene: f.scene,
+          dialogue: f.dialogue || f.scene,
+          audioUrl,
+        });
+      }
+
+      setVideoProgress(90);
 
       const blob = await assembleVideo(videoFrames, {
         frameDuration: 3500,
         width: 720,
         height: 1280,
         enableTTS,
-        onProgress: (pct) => setVideoProgress(pct),
+        onProgress: (pct) => setVideoProgress(90 + (pct * 0.1)),
       });
 
       const url = URL.createObjectURL(blob);
@@ -1053,6 +1076,21 @@ function UGCStudio() {
                   >
                     {enableTTS ? "On" : "Off"}
                   </Button>
+                  
+                  {enableTTS && (
+                    <div className="flex-1 ml-2">
+                      <Select value={selectedVoice} onValueChange={setSelectedVoice}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sambert-camila-v1">Camila (Premium Female)</SelectItem>
+                          <SelectItem value="sambert-ray-v1">Ray (Premium Male)</SelectItem>
+                          <SelectItem value="sambert-zhichu-v1">Digital (Tech Multi)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
 
                 {!videoUrl ? (
