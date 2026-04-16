@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { useLandingActions } from "@/hooks/useLandingActions";
 
 const Navbar = () => {
+  const { openWhatsApp } = useLandingActions();
   return (
     <motion.nav 
       initial={{ y: -100 }}
@@ -35,8 +37,14 @@ const Navbar = () => {
         </div>
 
         <div className="flex items-center gap-6">
+          <Button 
+            onClick={() => openWhatsApp()}
+            className="rounded-full bg-gold hover:bg-gold-light text-maroon-dark font-bold px-6 border-none transition-all duration-300 hover:scale-105 active:scale-95"
+          >
+            Chat with Sales AI
+          </Button>
           <Link to="/dashboard">
-            <Button className="rounded-full bg-gold hover:bg-gold-light text-maroon-dark font-bold px-6 border-none transition-all duration-300 hover:scale-105 active:scale-95">
+            <Button variant="outline" className="rounded-full border-gold/20 text-gold hover:bg-gold/5 px-6 transition-all duration-300">
               Enter Platform
             </Button>
           </Link>

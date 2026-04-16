@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
+import { useLandingActions } from "@/hooks/useLandingActions";
 
 const Footer = () => {
+  const { openWhatsApp } = useLandingActions();
   return (
     <footer className="py-24 bg-black border-t border-white/5">
       <div className="container mx-auto px-6">
@@ -34,7 +36,12 @@ const Footer = () => {
             <ul className="space-y-4">
               {["Email", "WhatsApp", "Instagram", "LinkedIn"].map(item => (
                 <li key={item}>
-                  <a href="#" className="text-cream/40 hover:text-gold text-sm transition-colors">{item}</a>
+                  <button 
+                    onClick={() => item === "WhatsApp" ? openWhatsApp() : null}
+                    className="text-cream/40 hover:text-gold text-sm transition-colors text-left"
+                  >
+                    {item}
+                  </button>
                 </li>
               ))}
             </ul>

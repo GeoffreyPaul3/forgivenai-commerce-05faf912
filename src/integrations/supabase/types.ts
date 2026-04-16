@@ -59,6 +59,48 @@ export type Database = {
         }
         Relationships: []
       }
+      commissions: {
+        Row: {
+          agent_id: string
+          amount: number
+          created_at: string
+          id: string
+          order_id: string
+          status: string
+        }
+        Insert: {
+          agent_id: string
+          amount: number
+          created_at?: string
+          id?: string
+          order_id: string
+          status?: string
+        }
+        Update: {
+          agent_id?: string
+          amount?: number
+          created_at?: string
+          id?: string
+          order_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commissions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commissions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content: {
         Row: {
           body: string | null
@@ -141,6 +183,56 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      customers: {
+        Row: {
+          customer_status: string | null
+          created_at: string
+          email: string | null
+          first_agent_id: string | null
+          id: string
+          location: string | null
+          name: string | null
+          phone: string
+          total_orders: number
+          total_spent: number
+          updated_at: string
+        }
+        Insert: {
+          customer_status?: string | null
+          created_at?: string
+          email?: string | null
+          first_agent_id?: string | null
+          id?: string
+          location?: string | null
+          name?: string | null
+          phone: string
+          total_orders?: number
+          total_spent?: number
+          updated_at?: string
+        }
+        Update: {
+          customer_status?: string | null
+          created_at?: string
+          email?: string | null
+          first_agent_id?: string | null
+          id?: string
+          location?: string | null
+          name?: string | null
+          phone?: string
+          total_orders?: number
+          total_spent?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_first_agent_id_fkey"
+            columns: ["first_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       influencers: {
         Row: {
@@ -234,7 +326,9 @@ export type Database = {
           customer_email: string | null
           customer_name: string | null
           customer_phone: string | null
+          customer_id: string | null
           id: string
+          is_first_order: boolean
           items: Json
           notes: string | null
           payment_reference: string | null
@@ -250,7 +344,9 @@ export type Database = {
           customer_email?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          customer_id?: string | null
           id?: string
+          is_first_order?: boolean
           items?: Json
           notes?: string | null
           payment_reference?: string | null
@@ -266,7 +362,9 @@ export type Database = {
           customer_email?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          customer_id?: string | null
           id?: string
+          is_first_order?: boolean
           items?: Json
           notes?: string | null
           payment_reference?: string | null
@@ -275,6 +373,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_orders_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fk_orders_agent"
             columns: ["agent_id"]

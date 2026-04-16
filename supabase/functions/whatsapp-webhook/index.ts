@@ -163,6 +163,24 @@ serve(async (req) => {
       const body = formData.get("Body") || "";
       const customerPhone = from.replace("whatsapp:", "");
 
+      // ── Customer Identification ──
+      let { data: customer } = await supabase
+        .from("customers")
+        .select("*")
+        .eq("phone", customerPhone)
+        .single();
+      
+      // Referral detection: Scan body for FGV-XXXXXX pattern
+      const refMatch = body.match(/FGV-[A-Z0-9]{6}/i);
+      const referralCode = refMatch ? refMatch[0].toUpperCase() : null;
+      let agentId = null;
+
+      if (referralCode) {
+        const { data: agent } = await supabase.from("agents").select("id").eq("referral_code", referralCode).single();
+        if (agent) agentId = agent.id;
+      }
+
+      // ── Conversation Handling ──
       // Find or create conversation
       let { data: convo } = await supabase
         .from("conversations")
@@ -200,6 +218,13 @@ serve(async (req) => {
         content: m.content,
       }));
 
+      // ── AI Context Building ──
+      const customerStatus = customer?.customer_status || "new";
+      const customerName = customer?.name || "Guest";
+      const orderHistorySummary = customer 
+        ? `Customer: ${customerName} | Status: ${customerStatus} | Total Orders: ${customer.total_orders} | Total Spent: MWK ${customer.total_spent}`
+        : "New Customer - First Interaction";
+
       const QWEN_API_KEY = Deno.env.get("QWEN_API_KEY");
       if (!QWEN_API_KEY) {
         console.error("QWEN_API_KEY not configured");
@@ -214,6 +239,12 @@ STYLE RULES:
 - Use emojis naturally to feel warm but premium.
 - Keep responses concise and natural for WhatsApp.
 - Always mention prices in MWK.
+
+CUSTOMER CONTEXT:
+${orderHistorySummary}
+${customerStatus === 'returning' || customerStatus === 'high_value' 
+  ? `Welcome them back as a valued customer. Acknowledge their loyalty.` 
+  : `This is a new customer. Be inviting and showcase the best of Forgiven.`}
 
 ORDER CAPTURE PROCESS:
 1. Understand the customer's needs and recommend products from the catalog.
@@ -268,6 +299,12 @@ ${productList}`;
           const orderData = JSON.parse(orderJsonMatch[1].trim());
           const product = products?.find(p => p.name.toLowerCase() === orderData.product_name.toLowerCase());
           
+          // ── Update Name in Conversation & Customer ──
+          if (orderData.customer_name) {
+            await supabase.from("conversations").update({ customer_name: orderData.customer_name }).eq("id", convo.id);
+            await supabase.from("customers").update({ name: orderData.customer_name }).eq("phone", customerPhone);
+          }
+
           // 1. Create the order in DB
           const { data: newOrder } = await supabase.from("orders").insert({
             customer_phone: customerPhone,
@@ -276,6 +313,7 @@ ${productList}`;
             items: [{ product_id: product?.id || orderData.product_name, name: orderData.product_name, quantity: orderData.quantity, price: orderData.price }] as any,
             total: orderData.price * orderData.quantity,
             channel: "whatsapp",
+            agent_id: agentId, // Pass detected agent if available
             notes: `Delivery Address: ${orderData.address} | Contact: ${orderData.phone}`,
             status: "pending",
           }).select().single();

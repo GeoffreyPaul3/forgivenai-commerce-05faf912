@@ -6,8 +6,21 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
+
+const ReferralTracker = () => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      localStorage.setItem("referral_code", ref);
+      console.log("Captured referral code:", ref);
+    }
+  }, []);
+  return null;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -15,6 +28,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ReferralTracker />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/dashboard/*" element={<Dashboard />} />

@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Routes, Route, useLocation } from "react-router-dom";
 import {
   ShoppingBag, LayoutDashboard, MessageSquare, CreditCard,
-  Users, BarChart3, Video, Settings, Bot, Package, TrendingUp,
+  Users, BarChart3, Video, Settings, Bot, Package, TrendingUp, ShieldCheck
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -12,14 +12,17 @@ import {
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
 
-import ProductsPage from "@/pages/dashboard/ProductsPage";
-import ContentPage from "@/pages/dashboard/ContentPage";
-import OrdersPage from "@/pages/dashboard/OrdersPage";
-import ConversationsPage from "@/pages/dashboard/ConversationsPage";
-import AgentsPage from "@/pages/dashboard/AgentsPage";
-import AnalyticsPage from "@/pages/dashboard/AnalyticsPage";
 import AIAssistantPage from "@/pages/dashboard/AIAssistantPage";
 import SettingsPage from "@/pages/dashboard/SettingsPage";
+import CustomersPage from "@/pages/dashboard/CustomersPage";
+import AgentDashboard from "@/pages/dashboard/AgentDashboard";
+import { UserCheck } from "lucide-react";
+import ProductsPage from "./dashboard/ProductsPage";
+import ContentPage from "./dashboard/ContentPage";
+import OrdersPage from "./dashboard/OrdersPage";
+import ConversationsPage from "./dashboard/ConversationsPage";
+import AnalyticsPage from "./dashboard/AnalyticsPage";
+import AgentsPage from "./dashboard/AgentsPage";
 
 const menuItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
@@ -27,9 +30,11 @@ const menuItems = [
   { title: "Content & UGC", url: "/dashboard/content", icon: Video },
   { title: "Orders", url: "/dashboard/orders", icon: CreditCard },
   { title: "Conversations", url: "/dashboard/conversations", icon: MessageSquare },
-  { title: "Agents", url: "/dashboard/agents", icon: Users },
+  { title: "Customers", url: "/dashboard/customers", icon: Users },
+  { title: "Agents", url: "/dashboard/agents", icon: ShieldCheck },
   { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
   { title: "AI Assistant", url: "/dashboard/assistant", icon: Bot },
+  { title: "Agent Portal", url: "/dashboard/agent-portal", icon: UserCheck },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];
 
@@ -161,9 +166,11 @@ const pageTitles: Record<string, string> = {
   "/dashboard/content": "Content & UGC",
   "/dashboard/orders": "Orders",
   "/dashboard/conversations": "Conversations",
+  "/dashboard/customers": "Customers",
   "/dashboard/agents": "Agents",
   "/dashboard/analytics": "Analytics",
   "/dashboard/assistant": "AI Assistant",
+  "/dashboard/agent-portal": "Agent Portal",
   "/dashboard/settings": "Settings",
 };
 
@@ -187,9 +194,11 @@ const DashboardPage = () => {
               <Route path="content" element={<ContentPage />} />
               <Route path="orders" element={<OrdersPage />} />
               <Route path="conversations" element={<ConversationsPage />} />
+              <Route path="customers" element={<CustomersPage />} />
               <Route path="agents" element={<AgentsPage />} />
               <Route path="analytics" element={<AnalyticsPage />} />
               <Route path="assistant" element={<AIAssistantPage />} />
+              <Route path="agent-portal" element={<AgentDashboard />} />
               <Route path="settings" element={<SettingsPage />} />
             </Routes>
           </main>

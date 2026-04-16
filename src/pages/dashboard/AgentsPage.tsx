@@ -53,7 +53,23 @@ const AgentsPage = () => {
   const { data: orders } = useQuery({
     queryKey: ["agent-orders"],
     queryFn: async () => {
-      const { data } = await supabase.from("orders").select("agent_id, total, status");
+      const { data } = await supabase.from("orders").select("agent_id, total, status, is_first_order");
+      return data || [];
+    },
+  });
+
+  const { data: commissions } = useQuery({
+    queryKey: ["all-commissions"],
+    queryFn: async () => {
+      const { data } = await supabase.from("commissions").select("*");
+      return data || [];
+    },
+  });
+
+  const { data: customers } = useQuery({
+    queryKey: ["all-customers"],
+    queryFn: async () => {
+      const { data } = await supabase.from("customers").select("first_agent_id");
       return data || [];
     },
   });
@@ -101,20 +117,26 @@ const AgentsPage = () => {
     return code;
   };
 
-  // Calculate real commissions from orders
+  // Calculate real commissions and stats from DB
   const agentStats = useMemo(() => {
-    const stats: Record<string, { sales: number; commission: number; orderCount: number }> = {};
+    const stats: Record<string, { sales: number; commission: number; orderCount: number; customerCount: number }> = {};
     for (const agent of agents || []) {
       const agentOrders = orders?.filter(o => o.agent_id === agent.id && o.status !== "cancelled") || [];
+      const agentCommissions = commissions?.filter(c => c.agent_id === agent.id) || [];
+      const agentCustomers = customers?.filter(c => c.first_agent_id === agent.id) || [];
+      
       const totalSales = agentOrders.reduce((s, o) => s + (o.total || 0), 0);
+      const totalComm = agentCommissions.reduce((s, c) => s + (c.amount || 0), 0);
+
       stats[agent.id] = {
         sales: totalSales,
-        commission: totalSales * ((agent.commission_rate || 10) / 100),
+        commission: totalComm,
         orderCount: agentOrders.length,
+        customerCount: agentCustomers.length,
       };
     }
     return stats;
-  }, [agents, orders]);
+  }, [agents, orders, commissions, customers]);
 
   const totalSales = Object.values(agentStats).reduce((s, a) => s + a.sales, 0);
   const totalCommission = Object.values(agentStats).reduce((s, a) => s + a.commission, 0);
@@ -171,9 +193,10 @@ const AgentsPage = () => {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              <TableHead>Agent</TableHead>
+              <TableHead>Agents</TableHead>
               <TableHead>Referral Code</TableHead>
               <TableHead>Rate</TableHead>
+              <TableHead>Customers</TableHead>
               <TableHead>Orders</TableHead>
               <TableHead>Sales</TableHead>
               <TableHead>Commission</TableHead>
@@ -207,6 +230,7 @@ const AgentsPage = () => {
                     </div>
                   </TableCell>
                   <TableCell>{agent.commission_rate || 0}%</TableCell>
+                  <TableCell><Badge variant="outline" className="text-xs">{stats.customerCount}</Badge></TableCell>
                   <TableCell><Badge variant="secondary" className="text-xs">{stats.orderCount}</Badge></TableCell>
                   <TableCell className="font-semibold">MWK {stats.sales.toLocaleString()}</TableCell>
                   <TableCell className="text-gold font-semibold">MWK {Math.round(stats.commission).toLocaleString()}</TableCell>
