@@ -221,8 +221,22 @@ serve(async (req) => {
       // ── AI Context Building ──
       const customerStatus = customer?.customer_status || "new";
       const customerName = customer?.name || "Guest";
+      
+      // Fetch latest order for context
+      const { data: latestOrder } = await supabase
+        .from("orders")
+        .select("status, items, total, created_at")
+        .eq("customer_phone", customerPhone)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const latestOrderSummary = latestOrder 
+        ? `Latest Order Status: ${latestOrder.status} | Total: MWK ${latestOrder.total} | Date: ${new Date(latestOrder.created_at).toLocaleDateString()}`
+        : "No previous orders found.";
+
       const orderHistorySummary = customer 
-        ? `Customer: ${customerName} | Status: ${customerStatus} | Total Orders: ${customer.total_orders} | Total Spent: MWK ${customer.total_spent}`
+        ? `Customer: ${customerName} | Status: ${customerStatus} | Total Orders: ${customer.total_orders} | Total Spent: MWK ${customer.total_spent}\n${latestOrderSummary}`
         : "New Customer - First Interaction";
 
       const QWEN_API_KEY = Deno.env.get("QWEN_API_KEY");
@@ -246,22 +260,27 @@ ${customerStatus === 'returning' || customerStatus === 'high_value'
   ? `Welcome them back as a valued customer. Acknowledge their loyalty.` 
   : `This is a new customer. Be inviting and showcase the best of Forgiven.`}
 
+ACCURACY & MEMORY:
+- Pay extreme attention to the customer's delivery details.
+- Once details are shared, DO NOT ask for them again.
+- Ensure the delivery address is precise (e.g., Area, City).
+
 ORDER CAPTURE PROCESS:
 1. Understand the customer's needs and recommend products from the catalog.
 2. If they want to order, you MUST collect the following details BEFORE confirming:
    - Full Name
    - Email Address
-   - Delivery Address (Lilongwe, Blantyre, Mzuzu, or other area in Malawi)
+   - Delivery Address (e.g., Kanjedza, Blantyre or Area 47, Lilongwe)
    - Preferred Contact Number
-3. Summarize the details:
-   *Product: X*
-   *Quantity: X*
-   *Total: MWK X*
-   *Name: X*
-   *Email: X*
-   *Address: X*
-   *Phone: X*
-   Ask: "Reply YES to confirm your order details and generate your secure payment link."
+3. Summarize the details EXACTLY as provided to ensure accuracy:
+   *Product:* X
+   *Quantity:* X
+   *Total:* MWK X
+   *Name:* X
+   *Email:* X
+   *Address:* X
+   *Phone:* X
+   Ask: "Reply **YES** to confirm your order details and generate your secure payment link."
 
 4. CRITICAL: ONLY AFTER the customer replies with "YES" or explicit confirmation of the summary, respond with EXACTLY this JSON block:
 ###ORDER_JSON###
