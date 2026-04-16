@@ -46,7 +46,7 @@ const SettingsPage = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl mx-auto">
       <div>
         <h2 className="font-heading text-2xl font-bold text-foreground tracking-tight">Settings</h2>
         <p className="text-muted-foreground text-sm font-body">Manage your store configuration</p>
