@@ -27,14 +27,14 @@ import AgentsPage from "./dashboard/AgentsPage";
 const menuItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
   { title: "Products", url: "/dashboard/products", icon: ShoppingBag },
-  { title: "Content & UGC", url: "/dashboard/content", icon: Video },
   { title: "Orders", url: "/dashboard/orders", icon: CreditCard },
-  { title: "Conversations", url: "/dashboard/conversations", icon: MessageSquare },
   { title: "Customers", url: "/dashboard/customers", icon: Users },
+  { title: "Conversations", url: "/dashboard/conversations", icon: MessageSquare },
+  { title: "Content & UGC", url: "/dashboard/content", icon: Video },
   { title: "Agents", url: "/dashboard/agents", icon: ShieldCheck },
-  { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
-  { title: "AI Assistant", url: "/dashboard/assistant", icon: Bot },
   { title: "Agent Portal", url: "/dashboard/agent-portal", icon: UserCheck },
+  { title: "AI Assistant", url: "/dashboard/assistant", icon: Bot },
+  { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];
 
@@ -163,14 +163,14 @@ function OverviewPage() {
 const pageTitles: Record<string, string> = {
   "/dashboard": "Overview",
   "/dashboard/products": "Products",
-  "/dashboard/content": "Content & UGC",
   "/dashboard/orders": "Orders",
-  "/dashboard/conversations": "Conversations",
   "/dashboard/customers": "Customers",
+  "/dashboard/conversations": "Conversations",
+  "/dashboard/content": "Content & UGC",
   "/dashboard/agents": "Agents",
-  "/dashboard/analytics": "Analytics",
-  "/dashboard/assistant": "AI Assistant",
   "/dashboard/agent-portal": "Agent Portal",
+  "/dashboard/assistant": "AI Assistant",
+  "/dashboard/analytics": "Analytics",
   "/dashboard/settings": "Settings",
 };
 
@@ -191,14 +191,14 @@ const DashboardPage = () => {
             <Routes>
               <Route index element={<OverviewPage />} />
               <Route path="products" element={<ProductsPage />} />
-              <Route path="content" element={<ContentPage />} />
               <Route path="orders" element={<OrdersPage />} />
-              <Route path="conversations" element={<ConversationsPage />} />
               <Route path="customers" element={<CustomersPage />} />
+              <Route path="conversations" element={<ConversationsPage />} />
+              <Route path="content" element={<ContentPage />} />
               <Route path="agents" element={<AgentsPage />} />
-              <Route path="analytics" element={<AnalyticsPage />} />
-              <Route path="assistant" element={<AIAssistantPage />} />
               <Route path="agent-portal" element={<AgentDashboard />} />
+              <Route path="assistant" element={<AIAssistantPage />} />
+              <Route path="analytics" element={<AnalyticsPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Routes>
           </main>
