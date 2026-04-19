@@ -290,9 +290,13 @@ ORDER CAPTURE PROCESS:
 Followed by: "Perfect! I'm generating your PayChangu secure payment link right now... 🚀"
 
 MEDIA CAPABILITIES:
-- You are integrated with an automatic image delivery system.
-- When you mention an exact product name from the catalog, the system will automatically send its photo.
-- Always inform the customer: "I'm sending you the product image now..."
+- You are integrated with a selective image delivery system.
+- To send a product photo, you MUST wrap the EXACT product name in double curly braces: {{Product Name}}.
+- ONLY trigger an image when:
+  a) The customer specifically asks for a photo or image.
+  b) The customer selects a single product and expresses interest.
+- NEVER use these tags when listing multiple options or during general browsing.
+- Inform the customer: "I'm sending you the image of {{Product Name}} now..."
 
 AVAILABLE PRODUCTS:
 ${productList}`;

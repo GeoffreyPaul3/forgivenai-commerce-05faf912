@@ -65,24 +65,35 @@ serve(async (req) => {
       return new Response("No products found", { status: 200 });
     }
 
-    // --- 3. Detect product mentions ---
-    const detectedProducts: any[] = [];
-    const cleanMessage = message.replace(/\*\*/g, '').toLowerCase();
+    // --- 3. Detect requested images using {{Product Name}} tags ---
+    const imageTagRegex = /\{\{([^}]+)\}\}/g;
+    const requestedNames: string[] = [];
+    let match;
+    while ((match = imageTagRegex.exec(message)) !== null) {
+      requestedNames.push(match[1].trim().toLowerCase());
+    }
 
-    for (const product of products) {
-      const escapedName = product.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').toLowerCase();
-      const regex = new RegExp(`(^|[^a-z0-9])${escapedName}([^a-z0-9]|$)`, 'i');
-      
-      if (regex.test(cleanMessage)) {
-        detectedProducts.push(product);
+    if (requestedNames.length === 0) {
+      console.log("No {{Product Name}} tags detected in message.");
+      return new Response("No image tags detected", { status: 200 });
+    }
+
+    const detectedProducts: any[] = [];
+    for (const name of requestedNames) {
+      const product = products.find(p => p.name.toLowerCase() === name);
+      if (product) {
+        if (!detectedProducts.some(p => p.id === product.id)) {
+          detectedProducts.push(product);
+        }
+      } else {
+        console.warn(`AI requested image for "${name}" but it was not found in active products.`);
       }
-      
       if (detectedProducts.length >= 3) break;
     }
 
     if (detectedProducts.length === 0) {
-      console.log("No products detected in message.");
-      return new Response("No products detected", { status: 200 });
+      console.log("No valid products found for requested tags.");
+      return new Response("No valid products found", { status: 200 });
     }
 
     console.log(`Detected ${detectedProducts.length} products: ${detectedProducts.map(p => p.name).join(", ")}`);
