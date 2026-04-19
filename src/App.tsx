@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import AuthPage from "./pages/Auth.tsx";
+import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient();
@@ -21,7 +23,6 @@ const ReferralTracker = () => {
   }, []);
   return null;
 };
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -31,7 +32,15 @@ const App = () => (
         <ReferralTracker />
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/dashboard/*" element={<Dashboard />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route 
+            path="/dashboard/*" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

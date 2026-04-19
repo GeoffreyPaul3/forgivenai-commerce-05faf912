@@ -14,7 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Store, Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Star, MapPin, Phone, User } from "lucide-react";
+import { Store, Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Star, MapPin, Phone, User, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -45,15 +45,42 @@ const VendorsPage = () => {
     },
   });
 
+  const { data: eligibleUsers } = useQuery({
+    queryKey: ["eligible-users-vendor"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name, email").is("role", null);
+      return data || [];
+    },
+  });
+
   const createVendor = useMutation({
-    mutationFn: async (vendor: any) => {
-      const { error } = await supabase.from("vendors").insert(vendor);
-      if (error) throw error;
+    mutationFn: async (vendorForm: any) => {
+      const { user_id, ...vendorData } = vendorForm;
+      if (user_id && user_id !== "none") {
+        const { error: pError } = await supabase.from("profiles").update({ role: "vendor", status: "approved" }).eq("id", user_id);
+        if (pError) throw pError;
+        
+        // Wait briefly for DB trigger to apply the record.
+        await new Promise(r => setTimeout(r, 500));
+        
+        const { error: vError } = await supabase.from("vendors").update(vendorData).eq("user_id", user_id);
+        if (vError) throw vError;
+      } else {
+        const { error } = await supabase.from("vendors").insert(vendorData);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendors"] });
       setShowAdd(false);
       toast({ title: "Vendor created successfully!" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        variant: "destructive", 
+        title: "Failed to create vendor", 
+        description: error.message || "Please check your permissions and try again."
+      });
     },
   });
 
@@ -68,13 +95,20 @@ const VendorsPage = () => {
       setEditVendor(null);
       toast({ title: "Vendor updated!" });
     },
+    onError: (error: any) => {
+      toast({ 
+        variant: "destructive", 
+        title: "Failed to update vendor", 
+        description: error.message || "Please check your permissions and try again."
+      });
+    },
   });
 
   const filteredVendors = useMemo(() => {
     const term = search.toLowerCase();
     if (!term) return vendors || [];
     return (vendors || []).filter(v =>
-      [v.business_name, v.contact_person, v.phone, v.location, v.category].filter(Boolean).join(" ").toLowerCase().includes(term)
+      [v.business_name, v.contact_person, v.phone, v.address, v.category].filter(Boolean).join(" ").toLowerCase().includes(term)
     );
   }, [vendors, search]);
 
@@ -162,7 +196,7 @@ const VendorsPage = () => {
                       <p className="text-xs text-muted-foreground">{vendor.phone}</p>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm">{vendor.location || "—"}</TableCell>
+                  <TableCell className="text-sm">{vendor.address || "—"}</TableCell>
                   <TableCell><Badge variant="outline" className="font-body text-[10px] uppercase font-bold">{vendor.category || "General"}</Badge></TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
@@ -203,14 +237,26 @@ const VendorsPage = () => {
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="font-heading font-bold text-xl">Register New Vendor</DialogTitle></DialogHeader>
-          <VendorForm onSave={data => createVendor.mutate(data)} onCancel={() => setShowAdd(false)} />
+          <VendorForm 
+            onSave={data => createVendor.mutate(data)} 
+            onCancel={() => setShowAdd(false)} 
+            isLoading={createVendor.isPending}
+            eligibleUsers={eligibleUsers}
+          />
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!editVendor} onOpenChange={v => !v && setEditVendor(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="font-heading font-bold text-xl">Edit Vendor</DialogTitle></DialogHeader>
-          {editVendor && <VendorForm vendor={editVendor} onSave={data => updateVendor.mutate({ id: editVendor.id, ...data })} onCancel={() => setEditVendor(null)} />}
+          {editVendor && (
+            <VendorForm 
+              vendor={editVendor} 
+              onSave={data => updateVendor.mutate({ id: editVendor.id, ...data })} 
+              onCancel={() => setEditVendor(null)} 
+              isLoading={updateVendor.isPending}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -237,7 +283,7 @@ const VendorsPage = () => {
               </div>
               <div className="p-3 rounded-xl bg-muted/30 border border-border/50 col-span-2">
                 <div className="flex items-center gap-2 mb-1 text-muted-foreground"><MapPin className="w-3 h-3" /><span className="text-[10px] uppercase font-bold tracking-wider">Location</span></div>
-                <p className="font-bold text-sm tracking-tight">{viewVendor?.location || "Not specified"}</p>
+                <p className="font-bold text-sm tracking-tight">{viewVendor?.address || "Not specified"}</p>
               </div>
             </div>
             
@@ -261,12 +307,13 @@ const VendorsPage = () => {
   );
 };
 
-function VendorForm({ vendor, onSave, onCancel }: { vendor?: any; onSave: (data: any) => void; onCancel: () => void }) {
+function VendorForm({ vendor, onSave, onCancel, isLoading, eligibleUsers }: { vendor?: any; onSave: (data: any) => void; onCancel: () => void; isLoading?: boolean; eligibleUsers?: any[] }) {
   const [form, setForm] = useState({
+    user_id: vendor?.user_id || "none",
     business_name: vendor?.business_name || "",
     contact_person: vendor?.contact_person || "",
     phone: vendor?.phone || "",
-    location: vendor?.location || "",
+    address: vendor?.address || "",
     category: vendor?.category || "",
     payment_details: vendor?.payment_details || "",
     status: vendor?.status || "active",
@@ -280,6 +327,29 @@ function VendorForm({ vendor, onSave, onCancel }: { vendor?: any; onSave: (data:
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Associate Existing User Dropdown (Creation context only) */}
+      {!vendor && eligibleUsers && (
+        <div className="space-y-1 pb-2 border-b border-border/50">
+          <label className="text-[10px] font-bold text-muted-foreground uppercase px-1">Link Platform Account (Optional)</label>
+          <Select value={form.user_id} onValueChange={v => {
+            const user = eligibleUsers.find(u => u.id === v);
+            setForm(f => ({ 
+              ...f, 
+              user_id: v, 
+              contact_person: user?.full_name || f.contact_person 
+            }));
+          }}>
+            <SelectTrigger className="font-body"><SelectValue placeholder="Standalone Setup" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Standalone Setup (No Login)</SelectItem>
+              {eligibleUsers.map(u => (
+                <SelectItem key={u.id} value={u.id}>{u.full_name || "Unknown"} ({u.email})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="space-y-1">
         <label className="text-[10px] font-bold text-muted-foreground uppercase px-1">Business Name *</label>
         <Input placeholder="Forgiven Shoes Ltd" value={form.business_name} onChange={e => setForm(f => ({ ...f, business_name: e.target.value }))} required className="font-body" />
@@ -296,7 +366,7 @@ function VendorForm({ vendor, onSave, onCancel }: { vendor?: any; onSave: (data:
       </div>
       <div className="space-y-1">
         <label className="text-[10px] font-bold text-muted-foreground uppercase px-1">Location</label>
-        <Input placeholder="Blantyre, Malawi" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} className="font-body" />
+        <Input placeholder="Blantyre, Malawi" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} className="font-body" />
       </div>
       <div className="space-y-1">
         <label className="text-[10px] font-bold text-muted-foreground uppercase px-1">Category</label>
@@ -319,7 +389,10 @@ function VendorForm({ vendor, onSave, onCancel }: { vendor?: any; onSave: (data:
       </div>
       <div className="flex gap-2 pt-4">
         <Button type="button" variant="outline" onClick={onCancel} className="flex-1">Cancel</Button>
-        <Button type="submit" className="flex-1 bg-primary text-white hover:bg-primary/90">Save Vendor</Button>
+        <Button type="submit" disabled={isLoading} className="flex-1 bg-primary text-white hover:bg-primary/90">
+          {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          Save Vendor
+        </Button>
       </div>
     </form>
   );

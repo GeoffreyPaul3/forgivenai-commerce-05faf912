@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { User, Mail, Phone, MapPin, Shield, Save, Camera, Trash2, Upload } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
+
 const ProfilePage = () => {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -13,6 +14,7 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -21,7 +23,7 @@ const ProfilePage = () => {
   });
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (data.user) {
         setUser(data.user);
         setForm({
@@ -32,6 +34,15 @@ const ProfilePage = () => {
         });
         const existingAvatar = data.user.user_metadata?.avatar_url;
         if (existingAvatar) setAvatarUrl(existingAvatar);
+
+        // Fetch role from profiles table
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+        
+        setRole(profile?.role ?? null);
       }
     });
   }, []);
@@ -197,12 +208,15 @@ const ProfilePage = () => {
             {form.full_name || "Admin User"}
           </h2>
           <p className="text-sm text-muted-foreground font-body mb-2">{form.email}</p>
-          <span
-            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
-            style={{ background: "hsl(var(--primary)/0.1)", color: "hsl(var(--primary))" }}
-          >
-            <Shield className="w-3 h-3" /> Administrator
-          </span>
+          {role && (
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
+              style={{ background: "hsl(var(--primary)/0.1)", color: "hsl(var(--primary))" }}
+            >
+              <Shield className="w-3 h-3" />
+              {role === "admin" ? "Administrator" : role.charAt(0).toUpperCase() + role.slice(1)}
+            </span>
+          )}
         </div>
       </div>
 
@@ -295,7 +309,9 @@ const ProfilePage = () => {
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="text-xs text-muted-foreground uppercase tracking-wide">Role</span>
-            <span className="text-foreground">Administrator</span>
+            <span className="text-foreground capitalize">
+              {role === "admin" ? "Administrator" : role ? role.charAt(0).toUpperCase() + role.slice(1) : "Pending"}
+            </span>
           </div>
         </div>
       </div>
