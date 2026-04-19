@@ -61,50 +61,68 @@ serve(async (req) => {
   try {
     const { record, old_record, type } = await req.json();
 
-    // Only process updates where status has changed
+    // ── VENDOR NOTIFICATIONS (on INSERT) ──
+    if (type === 'INSERT') {
+      const items = record.items || [];
+      const productIds = items.map((i: any) => i.product_id).filter(Boolean);
+      
+      if (productIds.length > 0) {
+        // Fetch unique vendors for these products
+        const { data: products } = await supabase
+          .from("products")
+          .select("vendor_id, vendors(phone, business_name)")
+          .in("id", productIds);
+        
+        const vendorsToNotify = new Map();
+        products?.forEach(p => {
+          if (p.vendor_id && p.vendors?.phone) {
+            vendorsToNotify.set(p.vendor_id, {
+              phone: p.vendors.phone,
+              name: p.vendors.business_name,
+              items: items.filter((i: any) => i.product_id && products.find(prod => prod.vendor_id === p.vendor_id))
+            });
+          }
+        });
+
+        for (const [vendorId, vendor] of vendorsToNotify.entries()) {
+          const itemsText = vendor.items.map((i: any) => `• ${i.name} x${i.quantity}`).join("\n");
+          const vendorMessage = `🏪 *New Order Alert: ${vendor.name}*\n\nYou have a new order request!\n\n📝 *Items:*\n${itemsText}\n\n📍 *Status:* Pending your confirmation.\n\nPlease login to your Vendor Portal to accept this order: ${Deno.env.get("PUBLIC_URL") || 'https://forgiven.ai'}/dashboard/vendor-portal`;
+          
+          console.log(`Notifying vendor ${vendor.name} at ${vendor.phone}`);
+          await sendWhatsApp(vendor.phone, vendorMessage);
+        }
+      }
+    }
+
+    // ── CUSTOMER NOTIFICATIONS (on UPDATE) ──
     if (type === 'UPDATE' && record.status !== old_record.status) {
       const status = record.status;
       const config = statusConfig[status];
       
-      // If we don't have a config for this status, skip
-      if (!config) return new Response(JSON.stringify({ skipped: true, reason: 'unsupported status' }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (config) {
+        const phone = record.customer_phone;
+        const name = record.customer_name || 'Customer';
+        let itemsList = "";
+        let firstProductImage = null;
 
-      const phone = record.customer_phone;
-      const name = record.customer_name || 'Customer';
-      
-      // 1. Format Order Details
-      let itemsList = "";
-      let firstProductImage = null;
-
-      if (Array.isArray(record.items)) {
-        itemsList = record.items.map((item: any) => `• ${item.name} x${item.quantity}`).join("\n");
-        
-        // Try to fetch image for the first product if not provided in item record
-        if (record.items.length > 0) {
-          const firstItem = record.items[0];
-          const productId = firstItem.product_id;
-          
-          if (productId) {
-            const { data: product } = await supabase
-              .from("products")
-              .select("images")
-              .eq("id", productId)
-              .maybeSingle();
-            
-            if (product?.images && product.images.length > 0) {
-              firstProductImage = product.images[0];
+        if (Array.isArray(record.items)) {
+          itemsList = record.items.map((item: any) => `• ${item.name} x${item.quantity}`).join("\n");
+          if (record.items.length > 0) {
+            const productId = record.items[0].product_id;
+            if (productId) {
+              const { data: product } = await supabase.from("products").select("images").eq("id", productId).maybeSingle();
+              if (product?.images?.length > 0) firstProductImage = product.images[0];
             }
           }
         }
-      }
 
-      const totalFormatted = `MWK ${Number(record.total).toLocaleString()}`;
-      const address = record.notes || "Not specified";
-      
-      const message = `Hi ${name}! ${config.emoji}\n\n${config.message}\n\n📝 *Order Details:*\n${itemsList}\n\n💰 *Total:* ${totalFormatted}\n📍 *Delivery:* ${address}\n📦 *Status:* ${status}\n\nThank you for choosing Forgiven Shopping Centre! 💫`;
-      
-      console.log(`Sending ${status} update to ${phone}`);
-      await sendWhatsApp(phone, message, firstProductImage || undefined);
+        const totalFormatted = `MWK ${Number(record.total).toLocaleString()}`;
+        const address = record.notes || "Not specified";
+        const message = `Hi ${name}! ${config.emoji}\n\n${config.message}\n\n📝 *Order Details:*\n${itemsList}\n\n💰 *Total:* ${totalFormatted}\n📍 *Delivery:* ${address}\n📦 *Status:* ${status}\n\nThank you for choosing Forgiven Shopping Centre! 💫`;
+        
+        console.log(`Sending ${status} update to customer ${phone}`);
+        await sendWhatsApp(phone, message, firstProductImage || undefined);
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

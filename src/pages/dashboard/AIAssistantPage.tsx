@@ -37,21 +37,26 @@ const AIAssistantPage = () => {
     setLoading(true);
 
     try {
-      const { data: products } = await supabase.from("products").select("name, category, price, currency, status").limit(20);
-      const { data: orders } = await supabase.from("orders").select("status, total, channel").limit(20);
+      const { data: products } = await (supabase as any).from("products").select("name, category, price, vendor_cost, status").limit(20);
+      const { data: orders } = await (supabase as any).from("orders").select("status, total, gross_margin, base_profit, surplus_profit, surplus_type").limit(20);
+      const { data: vendors } = await (supabase as any).from("vendors").select("business_name, category, status, score").limit(10);
 
       const productSummary = products?.length
-        ? `Current products (${products.length}): ${products.map(p => `${p.name} (${p.category}, ${p.currency} ${p.price})`).join("; ")}`
-        : "No products in catalog.";
+        ? `Products: ${products.map(p => `${p.name} (Cost: ${p.vendor_cost}, Price: ${p.price})`).join("; ")}`
+        : "No products.";
 
       const orderSummary = orders?.length
-        ? `Recent orders (${orders.length}): ${orders.map(o => `${o.status} - ${o.total} via ${o.channel}`).join("; ")}`
-        : "No orders yet.";
+        ? `Recent Profits: ${orders.map(o => `${o.status}: Profit ${o.base_profit}, Surplus ${o.surplus_profit} (${o.surplus_type})`).join("; ")}`
+        : "No orders.";
+      
+      const vendorSummary = vendors?.length
+        ? `Vendors: ${vendors.map(v => `${v.business_name} (Score: ${v.score}, Status: ${v.status})`).join("; ")}`
+        : "No vendors.";
 
       const { data, error } = await supabase.functions.invoke("ai-generate", {
         body: {
           type: "chat",
-          context: `${msg}\n\nBusiness context:\n${productSummary}\n${orderSummary}\n\nIMPORTANT: Format your response using markdown. Use headers (##), bullet points, bold text, and numbered lists to make your response clear and well-structured. Include actionable recommendations.`,
+          context: `${msg}\n\nBI CONTEXT:\n${productSummary}\n${orderSummary}\n${vendorSummary}\n\nROLE: You are the Lead BI Advisor for Forgiven Shopping Centre. Analyze margins, vendor performance, and surplus profit sources. Provide actionable, high-level business advice.`,
         },
       });
 

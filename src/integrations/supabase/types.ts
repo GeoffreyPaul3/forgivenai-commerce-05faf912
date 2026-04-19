@@ -334,6 +334,12 @@ export type Database = {
           payment_reference: string | null
           status: string | null
           total: number
+          gross_margin: number | null
+          base_profit: number | null
+          surplus_profit: number | null
+          surplus_type: string | null
+          vendor_confirmation_status: string | null
+          vendor_confirmed_at: string | null
           updated_at: string
         }
         Insert: {
@@ -352,6 +358,12 @@ export type Database = {
           payment_reference?: string | null
           status?: string | null
           total?: number
+          gross_margin?: number | null
+          base_profit?: number | null
+          surplus_profit?: number | null
+          surplus_type?: string | null
+          vendor_confirmation_status?: string | null
+          vendor_confirmed_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -370,6 +382,12 @@ export type Database = {
           payment_reference?: string | null
           status?: string | null
           total?: number
+          gross_margin?: number | null
+          base_profit?: number | null
+          surplus_profit?: number | null
+          surplus_type?: string | null
+          vendor_confirmation_status?: string | null
+          vendor_confirmed_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -401,6 +419,12 @@ export type Database = {
           metadata: Json | null
           name: string
           price: number | null
+          vendor_id: string | null
+          vendor_cost: number | null
+          inventory_mode: string | null
+          stock_quantity: number | null
+          sizes: string[] | null
+          colors: string[] | null
           source_url: string | null
           status: string | null
           subcategory: string | null
@@ -418,6 +442,12 @@ export type Database = {
           metadata?: Json | null
           name: string
           price?: number | null
+          vendor_id?: string | null
+          vendor_cost?: number | null
+          inventory_mode?: string | null
+          stock_quantity?: number | null
+          sizes?: string[] | null
+          colors?: string[] | null
           source_url?: string | null
           status?: string | null
           subcategory?: string | null
@@ -435,13 +465,27 @@ export type Database = {
           metadata?: Json | null
           name?: string
           price?: number | null
+          vendor_id?: string | null
+          vendor_cost?: number | null
+          inventory_mode?: string | null
+          stock_quantity?: number | null
+          sizes?: string[] | null
+          colors?: string[] | null
           source_url?: string | null
           status?: string | null
           subcategory?: string | null
           tags?: string[] | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ugc_frames: {
         Row: {
@@ -542,6 +586,116 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settings: {
+        Row: {
+          key: string
+          value: string
+          description: string | null
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          value: string
+          description?: string | null
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          value?: string
+          description?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vendors: {
+        Row: {
+          id: string
+          user_id: string | null
+          business_name: string
+          category: string | null
+          contact_person: string | null
+          email: string | null
+          phone: string | null
+          address: string | null
+          status: string | null
+          score: number | null
+          metadata: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          business_name: string
+          category?: string | null
+          contact_person?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          status?: string | null
+          score?: number | null
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          business_name?: string
+          category?: string | null
+          contact_person?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          status?: string | null
+          score?: number | null
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vendor_payouts: {
+        Row: {
+          id: string
+          vendor_id: string
+          amount: number
+          status: string | null
+          period_start: string | null
+          period_end: string | null
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          vendor_id: string
+          amount: number
+          status?: string | null
+          period_start?: string | null
+          period_end?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          vendor_id?: string
+          amount?: number
+          status?: string | null
+          period_start?: string | null
+          period_end?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_payouts_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]

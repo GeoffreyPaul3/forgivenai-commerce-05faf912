@@ -4,7 +4,7 @@ import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import {
   ShoppingBag, LayoutDashboard, MessageSquare, CreditCard,
   Users, BarChart3, Video, Settings, Bot, Package, ShieldCheck,
-  User, LogOut, ChevronDown, TrendingUp,
+  User, LogOut, ChevronDown, TrendingUp, Store
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -31,6 +31,9 @@ import OrdersPage from "./dashboard/OrdersPage";
 import ConversationsPage from "./dashboard/ConversationsPage";
 import AnalyticsPage from "./dashboard/AnalyticsPage";
 import AgentsPage from "./dashboard/AgentsPage";
+import VendorsPage from "./dashboard/VendorsPage";
+import ProfitDashboard from "./dashboard/ProfitDashboard";
+import VendorPortal from "./dashboard/VendorPortal";
 
 const menuItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
@@ -40,6 +43,9 @@ const menuItems = [
   { title: "Conversations", url: "/dashboard/conversations", icon: MessageSquare },
   { title: "Content & UGC", url: "/dashboard/content", icon: Video },
   { title: "Agents", url: "/dashboard/agents", icon: ShieldCheck },
+  { title: "Vendors", url: "/dashboard/vendors", icon: Store },
+  { title: "Vendor Portal", url: "/dashboard/vendor-portal", icon: ShoppingBag },
+  { title: "Profit Intel", url: "/dashboard/profit-intel", icon: BarChart3 },
   { title: "Agent Portal", url: "/dashboard/agent-portal", icon: UserCheck },
   { title: "AI Assistant", url: "/dashboard/assistant", icon: Bot },
   { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
@@ -406,6 +412,9 @@ const pageTitles: Record<string, string> = {
   "/dashboard/conversations": "Conversations",
   "/dashboard/content": "Content & UGC",
   "/dashboard/agents": "Agents",
+  "/dashboard/vendors": "Vendors",
+  "/dashboard/vendor-portal": "Vendor Portal",
+  "/dashboard/profit-intel": "Profit Intelligence",
   "/dashboard/agent-portal": "Agent Portal",
   "/dashboard/assistant": "AI Assistant",
   "/dashboard/analytics": "Analytics",
@@ -508,6 +517,9 @@ const DashboardPage = () => {
               <Route path="conversations" element={<ConversationsPage />} />
               <Route path="content" element={<ContentPage />} />
               <Route path="agents" element={<AgentsPage />} />
+              <Route path="vendors" element={<VendorsPage />} />
+              <Route path="vendor-portal" element={<VendorPortal />} />
+              <Route path="profit-intel" element={<ProfitDashboard />} />
               <Route path="agent-portal" element={<AgentDashboard />} />
               <Route path="assistant" element={<AIAssistantPage />} />
               <Route path="analytics" element={<AnalyticsPage />} />
