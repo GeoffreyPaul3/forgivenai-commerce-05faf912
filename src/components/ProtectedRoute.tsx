@@ -79,11 +79,11 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     if (userRole === "vendor") {
       targetUrl = isLocalhost 
         ? `${protocol}//vendors.localhost:5173/dashboard` 
-        : `${protocol}//vendors.forgiven-ai-commerce.vercel.app/dashboard`;
+        : `${protocol}//vendors-forgiven-ai-commerce.vercel.app/dashboard`;
     } else if (userRole === "agent") {
       targetUrl = isLocalhost 
         ? `${protocol}//agents.localhost:5173/dashboard` 
-        : `${protocol}//agents.forgiven-ai-commerce.vercel.app/dashboard`;
+        : `${protocol}//agents-forgiven-ai-commerce.vercel.app/dashboard`;
     } else if (userRole === "admin") {
       targetUrl = isLocalhost 
         ? `${protocol}//localhost:5173/dashboard` 
