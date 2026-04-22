@@ -70,12 +70,12 @@ export default function AuthPage() {
         if (userRole === "vendor" && appMode !== "vendor") {
           window.location.href = isLocalhost 
             ? `${protocol}//vendors.localhost:5173/dashboard` 
-            : `${protocol}//vendors.forgiven-ai-commerce.vercel.app/dashboard`;
+            : `${protocol}//vendors-forgiven-ai-commerce.vercel.app/dashboard`;
           return;
         } else if (userRole === "agent" && appMode !== "agent") {
           window.location.href = isLocalhost 
             ? `${protocol}//agents.localhost:5173/dashboard` 
-            : `${protocol}//agents.forgiven-ai-commerce.vercel.app/dashboard`;
+            : `${protocol}//agents-forgiven-ai-commerce.vercel.app/dashboard`;
           return;
         } else if (userRole === "admin" && appMode !== "admin") {
           window.location.href = isLocalhost 

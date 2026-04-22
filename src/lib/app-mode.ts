@@ -6,9 +6,9 @@ export const getAppMode = (): AppMode => {
   
   const hostname = window.location.hostname;
   
-  if (hostname.includes("vendors.")) {
+  if (hostname.includes("vendors.") || hostname.includes("vendors-")) {
     return "vendor";
-  } else if (hostname.includes("agents.")) {
+  } else if (hostname.includes("agents.") || hostname.includes("agents-")) {
     return "agent";
   }
   
