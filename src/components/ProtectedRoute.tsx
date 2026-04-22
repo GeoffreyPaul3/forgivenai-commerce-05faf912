@@ -1,38 +1,47 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Lock, LogOut } from "lucide-react";
+import { Loader2, Lock, LogOut, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getAppMode } from "@/lib/app-mode";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const location = useLocation();
+  const appMode = getAppMode();
 
   useEffect(() => {
     // Step 1: Fast auth check — never hangs
     supabase.auth.getSession().then(({ data: { session } }) => {
       setAuthenticated(!!session);
-      setLoading(false);
-
-      // Step 2: Load profile status in background (non-blocking)
+      
+      // Step 2: Load profile details in background (non-blocking)
       if (session) {
         supabase
           .from("profiles")
-          .select("status")
+          .select("status, role")
           .eq("id", session.user.id)
           .single()
           .then(({ data }) => {
             if (data?.status) setProfileStatus(data.status);
+            if (data?.role) setUserRole(data.role);
+            setLoading(false);
           });
+      } else {
+        setLoading(false);
       }
     });
 
     // Keep session in sync but don't re-block the UI
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthenticated(!!session);
-      if (!session) setProfileStatus(null);
+      if (!session) {
+        setProfileStatus(null);
+        setUserRole(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -54,6 +63,43 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     await supabase.auth.signOut();
     window.location.href = "/";
   };
+
+  // HARD ENFORCEMENT: Check if role matches portal
+  const isUnauthorizedForPortal = 
+    (appMode === "vendor" && userRole !== "vendor") ||
+    (appMode === "agent" && userRole !== "agent") ||
+    (appMode === "admin" && userRole !== "admin");
+
+  if (isUnauthorizedForPortal && userRole) {
+    const hostname = window.location.hostname;
+    const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+    const protocol = window.location.protocol;
+
+    let targetUrl = "";
+    if (userRole === "vendor") {
+      targetUrl = isLocalhost 
+        ? `${protocol}//vendors.localhost:5173/dashboard` 
+        : `${protocol}//vendors.forgiven-ai-commerce.vercel.app/dashboard`;
+    } else if (userRole === "agent") {
+      targetUrl = isLocalhost 
+        ? `${protocol}//agents.localhost:5173/dashboard` 
+        : `${protocol}//agents.forgiven-ai-commerce.vercel.app/dashboard`;
+    } else if (userRole === "admin") {
+      targetUrl = isLocalhost 
+        ? `${protocol}//localhost:5173/dashboard` 
+        : `${protocol}//forgiven-ai-commerce.vercel.app/dashboard`;
+    }
+
+    if (targetUrl) {
+      window.location.href = targetUrl;
+      return (
+        <div className="min-h-screen bg-maroon-dark flex flex-col items-center justify-center p-6 text-center">
+          <Loader2 className="w-8 h-8 text-gold animate-spin mb-4" />
+          <p className="text-white font-body">Redirecting to your {userRole} portal...</p>
+        </div>
+      );
+    }
+  }
 
   if (profileStatus === "pending") {
     return (
@@ -93,3 +139,4 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   return <>{children}</>;
 }
+

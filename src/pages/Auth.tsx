@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import AuthLayout from "@/components/layout/AuthLayout";
 import { Mail, Lock, User, ArrowRight, Loader2, KeyRound, CheckCircle2, Store, Phone } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getAppMode } from "@/lib/app-mode";
 
 type AuthMode = "login" | "signup" | "forgot" | "reset";
 
@@ -18,11 +19,19 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<'vendor' | 'agent'>('vendor');
+  const [role, setRole] = useState<'admin' | 'vendor' | 'agent'>('vendor');
   const [phone, setPhone] = useState("");
   const [businessName, setBusinessName] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
+  const appMode = getAppMode();
+
+  // Sync role with appMode
+  useEffect(() => {
+    if (appMode === "admin") setRole("admin");
+    else if (appMode === "vendor") setRole("vendor");
+    else if (appMode === "agent") setRole("agent");
+  }, [appMode]);
 
   // Listen for PASSWORD_RECOVERY event — fires when user clicks the reset link in email
   useEffect(() => {
@@ -40,9 +49,41 @@ export default function AuthPage() {
 
     try {
       if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        
+        // Fetch user role for redirection
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+
+        const userRole = profile?.role;
+        const hostname = window.location.hostname;
+        const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+        const protocol = window.location.protocol;
+        
         toast({ title: "Welcome back!", description: "Successfully logged in." });
+
+        // Force redirect to correct portal if user is on the wrong one
+        if (userRole === "vendor" && appMode !== "vendor") {
+          window.location.href = isLocalhost 
+            ? `${protocol}//vendors.localhost:5173/dashboard` 
+            : `${protocol}//vendors.forgiven-ai-commerce.vercel.app/dashboard`;
+          return;
+        } else if (userRole === "agent" && appMode !== "agent") {
+          window.location.href = isLocalhost 
+            ? `${protocol}//agents.localhost:5173/dashboard` 
+            : `${protocol}//agents.forgiven-ai-commerce.vercel.app/dashboard`;
+          return;
+        } else if (userRole === "admin" && appMode !== "admin") {
+          window.location.href = isLocalhost 
+            ? `${protocol}//localhost:5173/dashboard` 
+            : `${protocol}//forgiven-ai-commerce.vercel.app/dashboard`;
+          return;
+        }
+
         navigate("/dashboard");
 
       } else if (mode === "signup") {
@@ -87,8 +128,14 @@ export default function AuthPage() {
   };
 
   const headings: Record<AuthMode, { title: string; sub: string }> = {
-    login:  { title: "Welcome Back",       sub: "Log in to manage your commerce empire." },
-    signup: { title: "Join the OS",         sub: "Register to start selling with AI." },
+    login:  { 
+      title: appMode === "admin" ? "Sign in to Dashboard" : "Welcome Back", 
+      sub: appMode === "admin" ? "Access the core commerce engine." : "Log in to manage your commerce empire." 
+    },
+    signup: { 
+      title: appMode === "vendor" ? "Start selling with FSC" : appMode === "agent" ? "Start earning with FSC" : "Join the OS", 
+      sub: appMode === "vendor" ? "Join as a vendor and manage your products and orders." : appMode === "agent" ? "Join as an agent and earn commissions by selling." : "Register to start selling with AI." 
+    },
     forgot: { title: "Reset Password",      sub: "Enter your email and we'll send a reset link." },
     reset:  { title: "New Password",        sub: "Choose a strong password for your account." },
   };
@@ -141,28 +188,10 @@ export default function AuthPage() {
                 exit={{ height: 0, opacity: 0 }}
                 className="space-y-4"
               >
-                {/* Role Switcher */}
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={role === 'vendor' ? "default" : "outline"}
-                    onClick={() => setRole('vendor')}
-                    className={`flex-1 ${role === 'vendor' ? 'bg-gold/10 text-gold border-gold/50' : 'border-white/10 text-white/60 bg-transparent hover:bg-white/5'}`}
-                  >
-                    Register as Vendor
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={role === 'agent' ? "default" : "outline"}
-                    onClick={() => setRole('agent')}
-                    className={`flex-1 ${role === 'agent' ? 'bg-primary/10 text-primary border-primary/50' : 'border-white/10 text-white/60 bg-transparent hover:bg-white/5'}`}
-                  >
-                    Register as Agent
-                  </Button>
-                </div>
-
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-gold/60 tracking-widest pl-1">Full Name</label>
+                  <label className="text-[10px] uppercase font-bold text-gold/60 tracking-widest pl-1">
+                    {appMode === "vendor" ? "Contact Person" : "Full Name"}
+                  </label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                     <Input
@@ -190,7 +219,7 @@ export default function AuthPage() {
                   </div>
                 </div>
 
-                {role === 'vendor' && (
+                {appMode === 'vendor' && (
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase font-bold text-gold/60 tracking-widest pl-1">Business Name</label>
                     <div className="relative">
@@ -200,7 +229,7 @@ export default function AuthPage() {
                         value={businessName}
                         onChange={(e) => setBusinessName(e.target.value)}
                         className="bg-white/5 border-white/10 text-white pl-10 h-12 focus:border-gold/50 transition-colors"
-                        required={role === 'vendor'}
+                        required={appMode === 'vendor'}
                       />
                     </div>
                   </div>
@@ -305,14 +334,31 @@ export default function AuthPage() {
           {(mode === "login" || mode === "signup") && (
             <div className="mt-8 pt-6 border-t border-white/5 text-center">
               <p className="text-cream/40 text-sm font-body">
-                {mode === "login" ? "New to Forgiven?" : "Already have an account?"}{" "}
-                <button
-                  type="button"
-                  onClick={() => setMode(mode === "login" ? "signup" : "login")}
-                  className="text-gold font-bold hover:text-gold-light transition-colors ml-1"
-                >
-                  {mode === "login" ? "Create Account" : "Sign In"}
-                </button>
+                {mode === "login" ? (
+                  appMode !== "admin" ? (
+                    <>
+                      New to Forgiven?{" "}
+                      <button
+                        type="button"
+                        onClick={() => setMode("signup")}
+                        className="text-gold font-bold hover:text-gold-light transition-colors ml-1"
+                      >
+                        Create Account
+                      </button>
+                    </>
+                  ) : "Admin Portal Access Only"
+                ) : (
+                  <>
+                    Already have an account?{" "}
+                    <button
+                      type="button"
+                      onClick={() => setMode("login")}
+                      className="text-gold font-bold hover:text-gold-light transition-colors ml-1"
+                    >
+                      Sign In
+                    </button>
+                  </>
+                )}
               </p>
             </div>
           )}

@@ -422,115 +422,46 @@ const pageTitles: Record<string, string> = {
   "/dashboard/profile": "My Profile",
 };
 
+import { getAppMode } from "@/lib/app-mode";
+import AdminLayout from "@/components/layout/AdminLayout";
+import VendorLayout from "@/components/layout/VendorLayout";
+import AgentLayout from "@/components/layout/AgentLayout";
+
 const DashboardPage = () => {
   const location = useLocation();
-  const navigate = useNavigate();
+  const appMode = getAppMode();
   const title = pageTitles[location.pathname] || "Dashboard";
 
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
-    // Re-sync when user updates their profile/avatar
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
-  };
-
-  const initials = user?.user_metadata?.full_name
-    ? user.user_metadata.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
-    : user?.email?.[0]?.toUpperCase() || "A";
-
-  return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
-        <DashboardSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center border-b border-border px-4 shrink-0">
-            <SidebarTrigger className="mr-4" />
-            <h1 className="font-heading text-xl font-semibold text-foreground flex-1">{title}</h1>
-
-            {/* Avatar Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  id="navbar-avatar-btn"
-                  className="flex items-center gap-2 rounded-full pl-2 pr-3 py-1.5 hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {user?.user_metadata?.avatar_url ? (
-                    <img
-                      src={user.user_metadata.avatar_url}
-                      alt="avatar"
-                      className="w-8 h-8 rounded-full object-cover shrink-0 border border-border"
-                    />
-                  ) : (
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center font-heading font-bold text-sm shrink-0"
-                      style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
-                    >
-                      {initials}
-                    </div>
-                  )}
-                  <span className="hidden sm:block text-sm font-medium text-foreground font-body max-w-[120px] truncate">
-                    {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Admin"}
-                  </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <div className="px-3 py-2">
-                  <p className="text-sm font-semibold text-foreground truncate">
-                    {user?.user_metadata?.full_name || "Admin"}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  id="navbar-profile-link"
-                  className="gap-2 cursor-pointer"
-                  onClick={() => navigate("/dashboard/profile")}
-                >
-                  <User className="w-4 h-4" /> Profile
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  id="navbar-signout-btn"
-                  className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-                  onClick={handleSignOut}
-                >
-                  <LogOut className="w-4 h-4" /> Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </header>
-          <main className="flex-1 p-6 overflow-y-auto">
-            <Routes>
-              <Route index element={<OverviewPage />} />
-              <Route path="products" element={<ProductsPage />} />
-              <Route path="orders" element={<OrdersPage />} />
-              <Route path="customers" element={<CustomersPage />} />
-              <Route path="conversations" element={<ConversationsPage />} />
-              <Route path="content" element={<ContentPage />} />
-              <Route path="agents" element={<AgentsPage />} />
-              <Route path="vendors" element={<VendorsPage />} />
-              <Route path="vendor-portal" element={<VendorPortal />} />
-              <Route path="profit-intel" element={<ProfitDashboard />} />
-              <Route path="agent-portal" element={<AgentDashboard />} />
-              <Route path="assistant" element={<AIAssistantPage />} />
-              <Route path="analytics" element={<AnalyticsPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="profile" element={<ProfilePage />} />
-            </Routes>
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
+  const mainContent = (
+    <Routes>
+      <Route index element={<OverviewPage />} />
+      <Route path="products" element={<ProductsPage />} />
+      <Route path="orders" element={<OrdersPage />} />
+      <Route path="customers" element={<CustomersPage />} />
+      <Route path="conversations" element={<ConversationsPage />} />
+      <Route path="content" element={<ContentPage />} />
+      <Route path="agents" element={<AgentsPage />} />
+      <Route path="vendors" element={<VendorsPage />} />
+      <Route path="vendor-portal" element={<VendorPortal />} />
+      <Route path="profit-intel" element={<ProfitDashboard />} />
+      <Route path="agent-portal" element={<AgentDashboard />} />
+      <Route path="assistant" element={<AIAssistantPage />} />
+      <Route path="analytics" element={<AnalyticsPage />} />
+      <Route path="settings" element={<SettingsPage />} />
+      <Route path="profile" element={<ProfilePage />} />
+    </Routes>
   );
+
+  if (appMode === "vendor") {
+    return <VendorLayout title={title}>{mainContent}</VendorLayout>;
+  }
+
+  if (appMode === "agent") {
+    return <AgentLayout title={title}>{mainContent}</AgentLayout>;
+  }
+
+  return <AdminLayout title={title}>{mainContent}</AdminLayout>;
 };
+
 
 export default DashboardPage;

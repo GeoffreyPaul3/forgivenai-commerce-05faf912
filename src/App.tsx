@@ -9,6 +9,8 @@ import NotFound from "./pages/NotFound.tsx";
 import AuthPage from "./pages/Auth.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import { useEffect } from "react";
+import { getAppMode } from "@/lib/app-mode";
+import { Navigate } from "react-router-dom";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +25,15 @@ const ReferralTracker = () => {
   }, []);
   return null;
 };
+
+const RootRedirect = () => {
+  const appMode = getAppMode();
+  if (appMode !== "admin") {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <Index />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -31,7 +42,7 @@ const App = () => (
       <BrowserRouter>
         <ReferralTracker />
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<RootRedirect />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route 
             path="/dashboard/*" 
