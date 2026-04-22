@@ -45,30 +45,10 @@ const VendorsPage = () => {
     },
   });
 
-  const { data: eligibleUsers } = useQuery({
-    queryKey: ["eligible-users-vendor"],
-    queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("id, full_name, email").is("role", null);
-      return data || [];
-    },
-  });
-
   const createVendor = useMutation({
-    mutationFn: async (vendorForm: any) => {
-      const { user_id, ...vendorData } = vendorForm;
-      if (user_id && user_id !== "none") {
-        const { error: pError } = await supabase.from("profiles").update({ role: "vendor", status: "approved" }).eq("id", user_id);
-        if (pError) throw pError;
-        
-        // Wait briefly for DB trigger to apply the record.
-        await new Promise(r => setTimeout(r, 500));
-        
-        const { error: vError } = await supabase.from("vendors").update(vendorData).eq("user_id", user_id);
-        if (vError) throw vError;
-      } else {
-        const { error } = await supabase.from("vendors").insert(vendorData);
-        if (error) throw error;
-      }
+    mutationFn: async (vendor: any) => {
+      const { error } = await supabase.from("vendors").insert(vendor);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendors"] });
@@ -241,7 +221,6 @@ const VendorsPage = () => {
             onSave={data => createVendor.mutate(data)} 
             onCancel={() => setShowAdd(false)} 
             isLoading={createVendor.isPending}
-            eligibleUsers={eligibleUsers}
           />
         </DialogContent>
       </Dialog>
@@ -307,9 +286,8 @@ const VendorsPage = () => {
   );
 };
 
-function VendorForm({ vendor, onSave, onCancel, isLoading, eligibleUsers }: { vendor?: any; onSave: (data: any) => void; onCancel: () => void; isLoading?: boolean; eligibleUsers?: any[] }) {
+function VendorForm({ vendor, onSave, onCancel, isLoading }: { vendor?: any; onSave: (data: any) => void; onCancel: () => void; isLoading?: boolean }) {
   const [form, setForm] = useState({
-    user_id: vendor?.user_id || "none",
     business_name: vendor?.business_name || "",
     contact_person: vendor?.contact_person || "",
     phone: vendor?.phone || "",
@@ -327,29 +305,6 @@ function VendorForm({ vendor, onSave, onCancel, isLoading, eligibleUsers }: { ve
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Associate Existing User Dropdown (Creation context only) */}
-      {!vendor && eligibleUsers && (
-        <div className="space-y-1 pb-2 border-b border-border/50">
-          <label className="text-[10px] font-bold text-muted-foreground uppercase px-1">Link Platform Account (Optional)</label>
-          <Select value={form.user_id} onValueChange={v => {
-            const user = eligibleUsers.find(u => u.id === v);
-            setForm(f => ({ 
-              ...f, 
-              user_id: v, 
-              contact_person: user?.full_name || f.contact_person 
-            }));
-          }}>
-            <SelectTrigger className="font-body"><SelectValue placeholder="Standalone Setup" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Standalone Setup (No Login)</SelectItem>
-              {eligibleUsers.map(u => (
-                <SelectItem key={u.id} value={u.id}>{u.full_name || "Unknown"} ({u.email})</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
       <div className="space-y-1">
         <label className="text-[10px] font-bold text-muted-foreground uppercase px-1">Business Name *</label>
         <Input placeholder="Forgiven Shoes Ltd" value={form.business_name} onChange={e => setForm(f => ({ ...f, business_name: e.target.value }))} required className="font-body" />

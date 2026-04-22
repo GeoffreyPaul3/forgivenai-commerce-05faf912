@@ -74,30 +74,10 @@ const AgentsPage = () => {
     },
   });
 
-  const { data: eligibleUsers } = useQuery({
-    queryKey: ["eligible-users-agent"],
-    queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("id, full_name, email").is("role", null);
-      return data || [];
-    },
-  });
-
   const createAgent = useMutation({
-    mutationFn: async (agentForm: any) => {
-      const { user_id, ...agentData } = agentForm;
-      if (user_id && user_id !== "none") {
-        const { error: pError } = await supabase.from("profiles").update({ role: "agent", status: "approved" }).eq("id", user_id);
-        if (pError) throw pError;
-        
-        // Wait briefly for DB trigger to apply the record.
-        await new Promise(r => setTimeout(r, 500));
-        
-        const { error: aError } = await supabase.from("agents").update(agentData).eq("user_id", user_id);
-        if (aError) throw aError;
-      } else {
-        const { error } = await supabase.from("agents").insert(agentData);
-        if (error) throw error;
-      }
+    mutationFn: async (agent: any) => {
+      const { error } = await supabase.from("agents").insert(agent);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agents"] });
@@ -232,7 +212,7 @@ const AgentsPage = () => {
                 <Users className="w-8 h-8 mx-auto mb-3 opacity-30" />No agents found.
               </TableCell></TableRow>
             ) : paginatedAgents.map(agent => {
-              const stats = agentStats[agent.id] || { sales: 0, commission: 0, orderCount: 0, customerCount: 0 };
+              const stats = agentStats[agent.id] || { sales: 0, commission: 0, orderCount: 0 };
               return (
                 <TableRow key={agent.id} className="group">
                   <TableCell>
@@ -298,7 +278,7 @@ const AgentsPage = () => {
         <DialogContent>
           <DialogHeader><DialogTitle className="font-heading">{viewAgent?.name}</DialogTitle></DialogHeader>
           {viewAgent && (() => {
-            const stats = agentStats[viewAgent.id] || { sales: 0, commission: 0, orderCount: 0, customerCount: 0 };
+            const stats = agentStats[viewAgent.id] || { sales: 0, commission: 0, orderCount: 0 };
             return (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -342,40 +322,17 @@ const AgentsPage = () => {
       <Dialog open={showAdd} onOpenChange={v => !v && setShowAdd(false)}>
         <DialogContent>
           <DialogHeader><DialogTitle className="font-heading">Register Agent</DialogTitle></DialogHeader>
-          <AddAgentForm onSave={a => createAgent.mutate(a)} generateCode={generateCode} eligibleUsers={eligibleUsers} />
+          <AddAgentForm onSave={a => createAgent.mutate(a)} generateCode={generateCode} />
         </DialogContent>
       </Dialog>
     </div>
   );
 };
 
-function AddAgentForm({ onSave, generateCode, eligibleUsers }: { onSave: (a: any) => void; generateCode: () => string; eligibleUsers?: any[] }) {
-  const [form, setForm] = useState({ user_id: "none", name: "", phone: "", email: "", referral_code: generateCode(), commission_rate: "10" });
+function AddAgentForm({ onSave, generateCode }: { onSave: (a: any) => void; generateCode: () => string }) {
+  const [form, setForm] = useState({ name: "", phone: "", email: "", referral_code: generateCode(), commission_rate: "10" });
   return (
     <div className="space-y-3">
-      {eligibleUsers && (
-        <div className="space-y-1 pb-2 border-b border-border/50">
-          <label className="text-[10px] font-bold text-muted-foreground uppercase px-1">Link Platform Account (Optional)</label>
-          <Select value={form.user_id} onValueChange={v => {
-            const user = eligibleUsers.find(u => u.id === v);
-            setForm(f => ({ 
-              ...f, 
-              user_id: v, 
-              name: user?.full_name || f.name,
-              email: user?.email || f.email
-            }));
-          }}>
-            <SelectTrigger className="font-body"><SelectValue placeholder="Standalone Setup" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Standalone Setup (No Login)</SelectItem>
-              {eligibleUsers.map(u => (
-                <SelectItem key={u.id} value={u.id}>{u.full_name || "Unknown"} ({u.email})</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-      
       <Input placeholder="Agent Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
       <Input placeholder="Phone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
       <Input placeholder="Email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
