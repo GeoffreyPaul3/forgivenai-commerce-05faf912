@@ -94,14 +94,6 @@ export default function VendorDashboard() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-  if (vendorLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
-      </div>
-    );
-  }
-
   const createVendorMutation = useMutation({
     mutationFn: async () => {
       if (!session?.user?.id) throw new Error("No session");
@@ -121,6 +113,14 @@ export default function VendorDashboard() {
     },
     onError: (e: any) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
+
+  if (vendorLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   if (!vendor) {
     return (
