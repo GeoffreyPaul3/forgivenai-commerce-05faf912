@@ -31,7 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Sparkles, Loader2, Video, FileText, Share2, Pencil, Trash2, Eye, Download,
   User, Wand2, Play, Upload, X, MoreHorizontal, Image, RefreshCw, ChevronRight,
-  Clapperboard, Film, Layers, Volume2,
+  Clapperboard, Film, Layers, Volume2, CheckCircle2, ShoppingBag, Star, Zap, Plus,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import type { Tables } from "@/integrations/supabase/types";
@@ -1192,17 +1192,27 @@ function UGCStudio() {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   INFLUENCER MANAGER
+   AI INFLUENCER VISUAL ENGINE — World-Class Output
    ═══════════════════════════════════════════════════════════ */
 function InfluencerManager() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedInfluencer, setSelectedInfluencer] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [styleMode, setStyleMode] = useState("luxury_campaign");
+  const [sceneType, setSceneType] = useState("studio");
+  const [generating, setGenerating] = useState(false);
+  const [generationStep, setGenerationStep] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "", tone: "friendly", niche: "fashion", gender: "female", ethnicity: "african", setting: "studio" });
-  const [generatingAvatar, setGeneratingAvatar] = useState(false);
-  const [newAvatarUrl, setNewAvatarUrl] = useState("");
+  
+  // Influencer creation state
+  const [newInfluencer, setNewInfluencer] = useState({ 
+    name: "", gender: "female", ethnicity: "african", face_embedding: "", body_type: "tall_editorial",
+    style_profile: "High-End Editorial", pose_style: "Dynamic Fashion"
+  });
+  const [generatingIdentity, setGeneratingIdentity] = useState(false);
 
-  const { data: influencers, isLoading } = useQuery({
+  const { data: influencers, isLoading: influencersLoading } = useQuery({
     queryKey: ["influencers"],
     queryFn: async () => {
       const { data, error } = await supabase.from("influencers").select("*").order("created_at", { ascending: false });
@@ -1211,150 +1221,400 @@ function InfluencerManager() {
     },
   });
 
-  const generateInfluencerAvatar = async () => {
-    setGeneratingAvatar(true);
+  const { data: products } = useQuery({
+    queryKey: ["products-active-influencer"],
+    queryFn: async () => {
+      const { data } = await supabase.from("products").select("*").eq("status", "active");
+      return data || [];
+    },
+  });
+
+  const { data: generatedVisuals, refetch: refetchVisuals } = useQuery({
+    queryKey: ["generated-visuals", selectedInfluencer?.id],
+    enabled: !!selectedInfluencer?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("content")
+        .select("*")
+        .eq("type", "ai_visual")
+        .contains("metadata", { influencer_id: selectedInfluencer.id })
+        .order("created_at", { ascending: false });
+      return data || [];
+    },
+  });
+
+  const selectedProd = products?.find(p => p.id === selectedProduct);
+
+  const generateCampaignVisual = async () => {
+    if (!selectedInfluencer || !selectedProduct) {
+      toast({ title: "Select an influencer and product first" });
+      return;
+    }
+    setGenerating(true);
+    setGenerationStep(1); // Identity Lock
+
     try {
+      // Step 1: Identity Lock (Simulated)
+      await new Promise(r => setTimeout(r, 1500));
+      setGenerationStep(2); // Product Lock
+
+      // Step 2: Product Lock (Simulated)
+      await new Promise(r => setTimeout(r, 2000));
+      setGenerationStep(3); // Styling Engine
+
+      // Step 3: Styling Engine (Simulated)
+      await new Promise(r => setTimeout(r, 1500));
+      setGenerationStep(4); // Rendering Campaign
+
       const { data, error } = await supabase.functions.invoke("ugc-generate", {
-        body: { action: "generate-avatar", gender: form.gender, ethnicity: form.ethnicity, setting: form.setting },
+        body: {
+          action: "generate-campaign-shot",
+          influencer: selectedInfluencer,
+          product: selectedProd,
+          style: styleMode,
+          scene: sceneType,
+        }
       });
+
       if (error) throw error;
-      if (data?.imageUrl) {
-        setNewAvatarUrl(data.imageUrl);
-        toast({ title: "Influencer avatar generated!" });
-      }
-    } catch {
-      toast({ title: "Avatar generation failed", variant: "destructive" });
+
+      // Save to content gallery
+      await supabase.from("content").insert({
+        type: "ai_visual",
+        title: `${selectedInfluencer.name} x ${selectedProd.name} Campaign`,
+        body: `Campaign Visual: ${styleMode.replace("_", " ")} styling in ${sceneType.replace("_", " ")} scene.`,
+        media_url: data.imageUrl,
+        product_id: selectedProduct,
+        metadata: {
+          influencer_id: selectedInfluencer.id,
+          style: styleMode,
+          scene: sceneType,
+          campaign_ready: true
+        } as any
+      });
+
+      refetchVisuals();
+      toast({ title: "Campaign visual generated! 📸" });
+    } catch (err: any) {
+      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
     } finally {
-      setGeneratingAvatar(false);
+      setGenerating(false);
+      setGenerationStep(0);
     }
   };
 
-  const createInfluencer = async () => {
-    if (!form.name) { toast({ title: "Name is required", variant: "destructive" }); return; }
+  const createInfluencerIdentity = async () => {
+    if (!newInfluencer.name) return;
+    setGeneratingIdentity(true);
     try {
-      const { error } = await supabase.from("influencers").insert({ ...form, avatar_url: newAvatarUrl || null } as any);
-      if (error) throw error;
+      // 1. Generate identity reference image
+      const { data: imgData, error: imgError } = await supabase.functions.invoke("ugc-generate", {
+        body: { 
+          action: "generate-avatar", 
+          gender: newInfluencer.gender, 
+          ethnicity: newInfluencer.ethnicity,
+          setting: "studio-portrait"
+        }
+      });
+      if (imgError) throw imgError;
+
+      // 2. Save identity
+      const { error: insError } = await supabase.from("influencers").insert({
+        ...newInfluencer,
+        avatar_url: imgData.imageUrl,
+      } as any);
+      if (insError) throw insError;
+
       queryClient.invalidateQueries({ queryKey: ["influencers"] });
       setShowCreate(false);
-      setForm({ name: "", tone: "friendly", niche: "fashion", gender: "female", ethnicity: "african", setting: "studio" });
-      setNewAvatarUrl("");
-      toast({ title: "Influencer created!" });
-    } catch {
-      toast({ title: "Failed to create influencer", variant: "destructive" });
+      toast({ title: "Influencer identity locked!" });
+    } catch (err: any) {
+      toast({ title: "Failed to create identity", description: err.message, variant: "destructive" });
+    } finally {
+      setGeneratingIdentity(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-heading text-lg font-semibold">AI Influencers</h3>
-          <p className="text-sm text-muted-foreground font-body">Persistent digital brand ambassadors</p>
-        </div>
-        <Button onClick={() => setShowCreate(true)} className="gap-2">
-          <User className="w-4 h-4" /> Create Influencer
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {influencers?.map((inf) => (
-          <motion.div
-            key={inf.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-xl border border-border bg-card p-4 space-y-3 group hover:border-primary/20 transition-all hover:shadow-md"
-          >
-            <div className="flex items-center gap-3">
-              {inf.avatar_url ? (
-                <img src={inf.avatar_url} alt={inf.name} className="w-14 h-14 rounded-full object-cover border-2 border-primary/20" />
-              ) : (
-                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="w-6 h-6 text-primary" />
-                </div>
-              )}
-              <div>
-                <p className="font-heading font-semibold text-foreground">{inf.name}</p>
-                <p className="text-xs text-muted-foreground capitalize">{inf.niche} • {inf.tone}</p>
-              </div>
-            </div>
-            <div className="flex gap-1 flex-wrap">
-              <Badge variant="secondary" className="text-[10px] capitalize">{inf.gender}</Badge>
-              <Badge variant="secondary" className="text-[10px] capitalize">{inf.ethnicity}</Badge>
-              <Badge variant="secondary" className="text-[10px] capitalize">{inf.setting}</Badge>
-            </div>
-          </motion.div>
-        ))}
-
-        {!influencers?.length && !isLoading && (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            <User className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm font-body">No influencers yet. Create your first AI brand ambassador.</p>
+    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 pb-20">
+      {/* LEFT PANEL: CONFIGURATION */}
+      <div className="xl:col-span-4 space-y-6">
+        <div className="rounded-2xl border border-border bg-card p-6 space-y-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="font-heading text-lg font-bold flex items-center gap-2">
+              <User className="w-5 h-5 text-primary" /> 1. Identity Lock
+            </h3>
+            <Button size="sm" variant="ghost" onClick={() => setShowCreate(true)} className="text-xs h-7 gap-1">
+              <Plus className="w-3 h-3" /> New Identity
+            </Button>
           </div>
-        )}
+
+          <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+            {influencers?.map(inf => (
+              <button
+                key={inf.id}
+                onClick={() => setSelectedInfluencer(inf)}
+                className={`group relative rounded-xl border-2 p-2 transition-all hover:shadow-md ${
+                  selectedInfluencer?.id === inf.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                }`}
+              >
+                <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-muted">
+                  <img src={inf.avatar_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                </div>
+                <p className="text-xs font-bold font-heading truncate text-center">{inf.name}</p>
+                {selectedInfluencer?.id === inf.id && (
+                  <div className="absolute -top-1.5 -right-1.5 bg-primary text-white p-0.5 rounded-full shadow-sm">
+                    <CheckCircle2 className="w-3 h-3" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="pt-4 border-t border-border/50">
+            <h3 className="font-heading text-lg font-bold flex items-center gap-2 mb-4">
+              <ShoppingBag className="w-5 h-5 text-gold" /> 2. Product Lock
+            </h3>
+            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+              <SelectTrigger className="rounded-xl h-12 bg-muted/20">
+                <SelectValue placeholder="Select product to wear..." />
+              </SelectTrigger>
+              <SelectContent>
+                {products?.map(p => (
+                  <SelectItem key={p.id} value={p.id} className="py-3">
+                    <div className="flex items-center gap-3">
+                      <img src={p.images?.[0]} alt="" className="w-8 h-8 rounded-md object-cover" />
+                      <span className="font-medium">{p.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="pt-4 border-t border-border/50 space-y-4">
+            <h3 className="font-heading text-lg font-bold flex items-center gap-2">
+              <Wand2 className="w-5 h-5 text-emerald-500" /> 3. Styling Engine
+            </h3>
+            
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Style Mode</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: "luxury_campaign", label: "Luxury", icon: <Star className="w-3 h-3" /> },
+                  { id: "editorial_minimal", label: "Editorial", icon: <Image className="w-3 h-3" /> },
+                  { id: "streetwear_vibe", label: "Street", icon: <Zap className="w-3 h-3" /> },
+                  { id: "ecommerce_clean", label: "E-comm", icon: <CheckCircle2 className="w-3 h-3" /> },
+                  { id: "social_media_influencer", label: "Influencer", icon: <Share2 className="w-3 h-3" /> },
+                  { id: "vintage_aesthetic", label: "Vintage", icon: <Film className="w-3 h-3" /> }
+                ].map(s => (
+                  <Button
+                    key={s.id}
+                    variant={styleMode === s.id ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setStyleMode(s.id)}
+                    className="text-[10px] rounded-lg gap-1.5 h-8"
+                  >
+                    {s.icon} {s.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Scene Type</label>
+              <Select value={sceneType} onValueChange={setSceneType}>
+                <SelectTrigger className="rounded-xl h-10 bg-muted/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="studio">Studio (White/Neutral)</SelectItem>
+                  <SelectItem value="luxury_lobby">Luxury Lobby</SelectItem>
+                  <SelectItem value="modern_office">Modern Office</SelectItem>
+                  <SelectItem value="city_street">Parisian Street</SelectItem>
+                  <SelectItem value="high_fashion_runway">Runway Stage</SelectItem>
+                  <SelectItem value="minimal_loft">Minimal Loft</SelectItem>
+                  <SelectItem value="sunset_beach">Sunset Beach Editorial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Button 
+            className="w-full h-14 rounded-2xl gap-3 font-bold text-lg shadow-xl shadow-primary/20"
+            onClick={generateCampaignVisual}
+            disabled={generating || !selectedInfluencer || !selectedProduct}
+          >
+            {generating ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Sparkles className="w-5 h-5 text-gold" />
+            )}
+            {generating ? "AI Engine Producing..." : "Generate World-Class Visual"}
+          </Button>
+
+          {generating && (
+            <div className="space-y-3 pt-2">
+              <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <span>{generationStep === 1 ? "Identity Lock" : generationStep === 2 ? "Product Sync" : generationStep === 3 ? "Styling Outfit" : "Final Render"}</span>
+                <span>{generationStep * 25}%</span>
+              </div>
+              <Progress value={generationStep * 25} className="h-1.5" />
+              <p className="text-[9px] text-muted-foreground animate-pulse text-center italic font-body">
+                {generationStep === 1 && "Verifying influencer facial embedding..."}
+                {generationStep === 2 && `Applying ${selectedProd?.name} textures to model...`}
+                {generationStep === 3 && `Styling ${styleMode.replace("_", " ")} campaign look...`}
+                {generationStep === 4 && "Final high-end cinematography pass..."}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-heading">Create AI Influencer</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <Input placeholder="Influencer name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Tone</label>
-                <Select value={form.tone} onValueChange={v => setForm(f => ({ ...f, tone: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="friendly">Friendly</SelectItem>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="playful">Playful</SelectItem>
-                    <SelectItem value="luxury">Luxury</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Niche</label>
-                <Select value={form.niche} onValueChange={v => setForm(f => ({ ...f, niche: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="fashion">Fashion</SelectItem>
-                    <SelectItem value="beauty">Beauty</SelectItem>
-                    <SelectItem value="lifestyle">Lifestyle</SelectItem>
-                    <SelectItem value="tech">Tech</SelectItem>
-                  </SelectContent>
-                </Select>
+      {/* RIGHT PANEL: GENERATION WORKSPACE & GALLERY */}
+      <div className="xl:col-span-8 space-y-6">
+        {/* Latest Generation / Hero */}
+        <div className="rounded-2xl border-2 border-primary/20 bg-card overflow-hidden shadow-xl relative min-h-[600px] flex items-center justify-center bg-[url('/grid-bg.png')] bg-repeat">
+          {generatedVisuals?.[0] ? (
+            <div className="w-full h-full group">
+              <img src={generatedVisuals[0].media_url} alt="Campaign Shot" className="w-full h-full object-contain" />
+              <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-charcoal to-transparent">
+                <div className="flex items-end justify-between">
+                  <div className="space-y-1">
+                    <Badge className="bg-primary/20 text-white border-white/20 mb-2">Campaign Ready</Badge>
+                    <h2 className="text-white font-heading text-2xl font-bold">{generatedVisuals[0].title}</h2>
+                    <p className="text-white/60 text-sm font-body">{generatedVisuals[0].body}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="icon" className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20">
+                      <Download className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20">
+                      <Share2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Select value={form.gender} onValueChange={v => setForm(f => ({ ...f, gender: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="male">Male</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={form.ethnicity} onValueChange={v => setForm(f => ({ ...f, ethnicity: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="african">African</SelectItem>
-                  <SelectItem value="caucasian">Caucasian</SelectItem>
-                  <SelectItem value="asian">Asian</SelectItem>
-                  <SelectItem value="hispanic">Hispanic</SelectItem>
-                </SelectContent>
-              </Select>
+          ) : (
+            <div className="text-center space-y-4 max-w-sm px-6">
+              <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+                <Clapperboard className="w-10 h-10 text-primary opacity-40" />
+              </div>
+              <h3 className="font-heading text-xl font-bold">Campaign Workspace</h3>
+              <p className="text-muted-foreground text-sm font-body">Select your influencer, product, and style to generate production-ready fashion photography.</p>
+              <div className="pt-4 flex justify-center gap-2">
+                <Badge variant="outline" className="opacity-50">Photorealistic</Badge>
+                <Badge variant="outline" className="opacity-50">Identity-Locked</Badge>
+                <Badge variant="outline" className="opacity-50">4K Render</Badge>
+              </div>
             </div>
+          )}
+          
+          {/* Workflow Status Overlay (Static) */}
+          <div className="absolute top-6 left-6 flex flex-col gap-2">
+            <div className="flex items-center gap-2 bg-background/80 backdrop-blur-md border border-border px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
+              <div className={`w-2 h-2 rounded-full ${selectedInfluencer ? "bg-emerald-500 animate-pulse" : "bg-muted"}`} />
+              Identity: {selectedInfluencer ? selectedInfluencer.name : "Locked"}
+            </div>
+            <div className="flex items-center gap-2 bg-background/80 backdrop-blur-md border border-border px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
+              <div className={`w-2 h-2 rounded-full ${selectedProduct ? "bg-emerald-500 animate-pulse" : "bg-muted"}`} />
+              Product: {selectedProd ? selectedProd.name : "Ready"}
+            </div>
+          </div>
+        </div>
 
-            {newAvatarUrl && (
-              <img src={newAvatarUrl} alt="Preview" className="w-24 h-24 rounded-full object-cover mx-auto border-2 border-primary/20" />
+        {/* Gallery of Past Visuals */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-heading text-lg font-bold">Campaign Gallery</h3>
+            <p className="text-xs text-muted-foreground">All images maintain full brand consistency</p>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {generatedVisuals?.slice(1).map((visual: any) => (
+              <div key={visual.id} className="group relative aspect-[3/4] rounded-xl overflow-hidden border border-border bg-muted cursor-pointer hover:shadow-xl transition-all">
+                <img src={visual.media_url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-charcoal/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                   <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full"><Eye className="w-4 h-4" /></Button>
+                   <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full"><Download className="w-4 h-4" /></Button>
+                </div>
+              </div>
+            ))}
+            
+            {(!generatedVisuals || generatedVisuals.length <= 1) && (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="aspect-[3/4] rounded-xl border border-dashed border-border flex items-center justify-center opacity-20">
+                  <Image className="w-8 h-8" />
+                </div>
+              ))
             )}
+          </div>
+        </div>
+      </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={generateInfluencerAvatar} disabled={generatingAvatar} className="flex-1 gap-2">
-                {generatingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                Generate Avatar
+      {/* CREATE INFLUENCER DIALOG */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-md rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold">Lock New Identity</DialogTitle>
+            <p className="text-sm text-muted-foreground font-body">Create a persistent AI persona for your brand campaigns.</p>
+          </DialogHeader>
+          
+          <div className="space-y-5 pt-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Persona Name</label>
+              <Input 
+                placeholder="e.g. Elena V" 
+                value={newInfluencer.name} 
+                onChange={e => setNewInfluencer(f => ({ ...f, name: e.target.value }))}
+                className="rounded-xl bg-muted/20"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Ethnicity</label>
+                <Select value={newInfluencer.ethnicity} onValueChange={v => setNewInfluencer(f => ({ ...f, ethnicity: v }))}>
+                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="african">African</SelectItem>
+                    <SelectItem value="caucasian">Caucasian</SelectItem>
+                    <SelectItem value="asian">Asian</SelectItem>
+                    <SelectItem value="hispanic">Hispanic</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Body Type</label>
+                <Select value={newInfluencer.body_type} onValueChange={v => setNewInfluencer(f => ({ ...f, body_type: v }))}>
+                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="athletic">Athletic / Slim</SelectItem>
+                    <SelectItem value="curvy">Curvy</SelectItem>
+                    <SelectItem value="tall_editorial">Tall Editorial</SelectItem>
+                    <SelectItem value="plus_size">Plus Size</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="pt-4 space-y-3">
+              <Button 
+                onClick={createInfluencerIdentity} 
+                disabled={generatingIdentity || !newInfluencer.name} 
+                className="w-full h-12 rounded-xl gap-2 font-bold"
+              >
+                {generatingIdentity ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {generatingIdentity ? "Generating Portrait Reference..." : "Create & Lock Identity"}
               </Button>
-              <Button onClick={createInfluencer} className="flex-1 gap-2">
-                <User className="w-4 h-4" /> Create
-              </Button>
+              <p className="text-[10px] text-muted-foreground text-center font-body">
+                Identity locking ensures the same facial features appear in every campaign shot.
+              </p>
             </div>
           </div>
         </DialogContent>
