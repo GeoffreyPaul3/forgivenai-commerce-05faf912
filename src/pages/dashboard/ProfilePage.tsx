@@ -3,9 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, MapPin, Shield, Save, Camera, Trash2, Upload } from "lucide-react";
+import { User, Mail, Phone, MapPin, Shield, Save, Camera, Trash2, Upload, Store, Briefcase } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
-
 
 const ProfilePage = () => {
   const { toast } = useToast();
@@ -15,11 +14,18 @@ const ProfilePage = () => {
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [vendorProfile, setVendorProfile] = useState<any>(null);
+  
   const [form, setForm] = useState({
     full_name: "",
     email: "",
     phone: "",
     location: "",
+  });
+
+  const [businessForm, setBusinessForm] = useState({
+    business_name: "",
+    phone: "",
   });
 
   useEffect(() => {
@@ -43,6 +49,23 @@ const ProfilePage = () => {
           .single();
         
         setRole(profile?.role ?? null);
+
+        // If vendor, fetch vendor business details
+        if (profile?.role === "vendor") {
+          const { data: vendor } = await supabase
+            .from("vendors")
+            .select("*")
+            .eq("user_id", data.user.id)
+            .maybeSingle();
+          
+          if (vendor) {
+            setVendorProfile(vendor);
+            setBusinessForm({
+              business_name: vendor.business_name || "",
+              phone: vendor.phone || "",
+            });
+          }
+        }
       }
     });
   }, []);
@@ -110,19 +133,42 @@ const ProfilePage = () => {
 
   const handleSave = async () => {
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({
+    
+    // 1. Update Auth Metadata (Personal)
+    const { error: authError } = await supabase.auth.updateUser({
       data: {
         full_name: form.full_name,
         phone: form.phone,
         location: form.location,
+        business_name: businessForm.business_name, // Sync business name to metadata too
       },
     });
-    setLoading(false);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Profile saved!" });
+
+    if (authError) {
+      setLoading(false);
+      toast({ title: "Error saving personal info", description: authError.message, variant: "destructive" });
+      return;
     }
+
+    // 2. Update Vendor Table (Business) if role is vendor
+    if (role === "vendor" && vendorProfile) {
+      const { error: vendorError } = await supabase
+        .from("vendors")
+        .update({
+          business_name: businessForm.business_name,
+          phone: businessForm.phone,
+        })
+        .eq("id", vendorProfile.id);
+      
+      if (vendorError) {
+        setLoading(false);
+        toast({ title: "Error saving business info", description: vendorError.message, variant: "destructive" });
+        return;
+      }
+    }
+
+    setLoading(false);
+    toast({ title: "Profile saved!" });
   };
 
   const initials = form.full_name
@@ -130,11 +176,15 @@ const ProfilePage = () => {
     : form.email?.[0]?.toUpperCase() || "A";
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 pb-20">
       {/* Avatar + Header Card */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
-        {/* Maroon banner */}
-        <div className="h-24 bg-maroon-gradient" />
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+        {/* Maroon/Gold banner */}
+        <div className="h-24 bg-gradient-to-r from-maroon to-maroon-dark flex items-center justify-end px-6">
+          <Badge className="bg-gold/20 text-gold border-gold/30 hover:bg-gold/30 cursor-default">
+            {role === "admin" ? "System Administrator" : role === "vendor" ? "Business Partner" : role === "agent" ? "Sales Partner" : "Member"}
+          </Badge>
+        </div>
 
         <div className="px-6 pb-6">
           {/* Avatar row */}
@@ -183,7 +233,7 @@ const ProfilePage = () => {
                 variant="outline"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                className="gap-1.5 text-xs"
+                className="gap-1.5 text-xs rounded-xl"
               >
                 <Upload className="w-3.5 h-3.5" />
                 {uploading ? "Uploading..." : "Upload Photo"}
@@ -195,7 +245,7 @@ const ProfilePage = () => {
                   variant="outline"
                   onClick={handleAvatarDelete}
                   disabled={uploading}
-                  className="gap-1.5 text-xs text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/60"
+                  className="gap-1.5 text-xs text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/60 rounded-xl"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Remove
                 </Button>
@@ -204,95 +254,145 @@ const ProfilePage = () => {
           </div>
 
           {/* Name & role */}
-          <h2 className="font-heading text-xl font-bold text-foreground">
-            {form.full_name || "Admin User"}
+          <h2 className="font-heading text-2xl font-bold text-foreground">
+            {form.full_name || "Profile"}
           </h2>
           <p className="text-sm text-muted-foreground font-body mb-2">{form.email}</p>
-          {role && (
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
-              style={{ background: "hsl(var(--primary)/0.1)", color: "hsl(var(--primary))" }}
-            >
-              <Shield className="w-3 h-3" />
-              {role === "admin" ? "Administrator" : role.charAt(0).toUpperCase() + role.slice(1)}
-            </span>
-          )}
         </div>
       </div>
 
-      {/* Form Card */}
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
-        <h3 className="font-heading text-base font-semibold text-foreground">Personal Information</h3>
+      {/* Business Information (VENDORS ONLY) */}
+      {role === "vendor" && (
+        <div className="rounded-2xl border border-border bg-card p-6 space-y-5 shadow-sm border-orange-500/20">
+          <div className="flex items-center gap-2 text-orange-500">
+            <Store className="w-5 h-5" />
+            <h3 className="font-heading text-base font-bold">Business Information</h3>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                <Briefcase className="w-3.5 h-3.5" /> Business Name
+              </label>
+              <Input
+                id="profile-business-name"
+                value={businessForm.business_name}
+                onChange={(e) => setBusinessForm((f) => ({ ...f, business_name: e.target.value }))}
+                placeholder="Business name"
+                className="rounded-xl border-border/50 bg-muted/20"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5" /> Business Phone
+              </label>
+              <Input
+                id="profile-business-phone"
+                value={businessForm.phone}
+                onChange={(e) => setBusinessForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="Business phone"
+                className="rounded-xl border-border/50 bg-muted/20"
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground font-body bg-orange-500/5 p-2 rounded-lg border border-orange-500/10">
+            These details appear on your invoices and are visible to customers who purchase your products.
+          </p>
+        </div>
+      )}
+
+      {/* Personal Information */}
+      <div className="rounded-2xl border border-border bg-card p-6 space-y-5 shadow-sm">
+        <div className="flex items-center gap-2 text-primary">
+          <User className="w-5 h-5" />
+          <h3 className="font-heading text-base font-bold">Personal Information</h3>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5" /> Full Name
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+              Full Name
             </label>
             <Input
               id="profile-full-name"
               value={form.full_name}
               onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
               placeholder="Your full name"
+              className="rounded-xl border-border/50 bg-muted/20"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5" /> Email Address
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+              Email Address
             </label>
             <Input
               id="profile-email"
               value={form.email}
               disabled
-              className="text-muted-foreground cursor-not-allowed"
-              title="Email cannot be changed here"
+              className="text-muted-foreground cursor-not-allowed rounded-xl border-border/50 bg-muted/50"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5" /> Phone Number
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+              Phone Number
             </label>
             <Input
               id="profile-phone"
               value={form.phone}
               onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
               placeholder="+265 xxx xxx xxx"
+              className="rounded-xl border-border/50 bg-muted/20"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5" /> Location
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+              Location
             </label>
             <Input
               id="profile-location"
               value={form.location}
               onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-              placeholder="e.g. Blantyre, Malawi"
+              placeholder="Blantyre, Malawi"
+              className="rounded-xl border-border/50 bg-muted/20"
             />
           </div>
         </div>
 
-        <div className="pt-2 flex justify-end">
-          <Button id="profile-save-btn" onClick={handleSave} disabled={loading} className="gap-2">
+        <div className="pt-4 flex justify-end">
+          <Button 
+            id="profile-save-btn" 
+            onClick={handleSave} 
+            disabled={loading} 
+            className="gap-2 rounded-xl h-11 px-8 font-bold shadow-lg shadow-primary/20"
+          >
             <Save className="w-4 h-4" />
-            {loading ? "Saving..." : "Save Changes"}
+            {loading ? "Saving Changes..." : "Save All Changes"}
           </Button>
         </div>
       </div>
 
       {/* Account Info Card */}
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-3">
-        <h3 className="font-heading text-base font-semibold text-foreground">Account Details</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+      <div className="rounded-2xl border border-border bg-card p-6 space-y-4 shadow-sm opacity-80">
+        <h3 className="font-heading text-base font-semibold text-foreground flex items-center gap-2">
+          <Shield className="w-4 h-4" /> Account Security
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">User ID</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">User ID</span>
             <span className="font-mono text-xs text-foreground truncate">{user?.id || "—"}</span>
           </div>
           <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">Account Created</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Role</span>
+            <span className="text-foreground capitalize font-semibold">
+              {role === "admin" ? "Administrator" : role ? role.charAt(0).toUpperCase() + role.slice(1) : "Member"}
+            </span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Member Since</span>
             <span className="text-foreground">
               {user?.created_at
                 ? new Date(user.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
@@ -300,17 +400,11 @@ const ProfilePage = () => {
             </span>
           </div>
           <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">Last Sign In</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Last Sign In</span>
             <span className="text-foreground">
               {user?.last_sign_in_at
                 ? new Date(user.last_sign_in_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
                 : "—"}
-            </span>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">Role</span>
-            <span className="text-foreground capitalize">
-              {role === "admin" ? "Administrator" : role ? role.charAt(0).toUpperCase() + role.slice(1) : "Pending"}
             </span>
           </div>
         </div>
@@ -319,4 +413,11 @@ const ProfilePage = () => {
   );
 };
 
+const Badge = ({ children, className }: { children: React.ReactNode, className?: string }) => (
+  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}>
+    {children}
+  </span>
+);
+
 export default ProfilePage;
+

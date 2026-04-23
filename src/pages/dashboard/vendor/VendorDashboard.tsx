@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,9 @@ import { motion } from "framer-motion";
 import {
   DollarSign, ShoppingBag, Package, TrendingUp, Star, Clock,
   CheckCircle2, ArrowRight, AlertCircle, ArrowUpRight, Truck, Zap,
-  MessageSquare, MessageCircle, BarChart3, Video, Plus, Phone
+  MessageSquare, MessageCircle, BarChart3, Video, Plus, Phone, Store
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -31,6 +32,8 @@ export function useVendorProfile(sessionUserId?: string) {
 
 export default function VendorDashboard() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<any>(null);
 
   useQuery({
@@ -99,16 +102,61 @@ export default function VendorDashboard() {
     );
   }
 
+  const createVendorMutation = useMutation({
+    mutationFn: async () => {
+      if (!session?.user?.id) throw new Error("No session");
+      const { data, error } = await (supabase as any).from("vendors").insert({
+        user_id: session.user.id,
+        business_name: session.user.user_metadata?.business_name || "My Business",
+        phone: session.user.user_metadata?.phone || session.user.phone || "0000000000",
+        status: "active",
+        score: 5.0
+      }).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendor-profile"] });
+      toast({ title: "Vendor profile created! 🚀", description: "Welcome to your new dashboard." });
+    },
+    onError: (e: any) => toast({ variant: "destructive", title: "Error", description: e.message }),
+  });
+
   if (!vendor) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4 p-6">
-        <div className="w-16 h-16 rounded-3xl bg-amber-500/10 flex items-center justify-center">
-          <AlertCircle className="w-8 h-8 text-amber-500" />
+      <div className="flex flex-col items-center justify-center min-h-[70vh] text-center space-y-6 p-6">
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-20 h-20 rounded-[2.5rem] bg-orange-500/10 flex items-center justify-center relative"
+        >
+          <div className="absolute inset-0 rounded-[2.5rem] border-2 border-orange-500/20 animate-ping" style={{ animationDuration: '3s' }} />
+          <Store className="w-10 h-10 text-orange-500" />
+        </motion.div>
+        
+        <div className="space-y-2 max-w-sm">
+          <h2 className="font-heading text-3xl font-bold tracking-tight">No Vendor Profile Linked</h2>
+          <p className="text-muted-foreground font-body leading-relaxed">
+            Your account isn't connected to a business profile yet. Let's get you set up to start selling.
+          </p>
         </div>
-        <h2 className="font-heading text-2xl font-bold">No Vendor Profile Linked</h2>
-        <p className="text-muted-foreground font-body max-w-sm">
-          Your account is not linked to a vendor profile. Contact support to get set up.
-        </p>
+
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <Button 
+            size="lg" 
+            className="w-full bg-orange-500 hover:bg-orange-600 h-12 rounded-2xl font-bold shadow-lg shadow-orange-500/20"
+            onClick={() => createVendorMutation.mutate()}
+            disabled={createVendorMutation.isPending || !session?.user?.id}
+          >
+            {createVendorMutation.isPending ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+            ) : <Plus className="w-5 h-5 mr-2" />}
+            Initialize Vendor Profile
+          </Button>
+          <Button variant="ghost" className="text-muted-foreground" onClick={() => window.location.href = "mailto:support@forgivencommerce.com"}>
+            Contact Support
+          </Button>
+        </div>
       </div>
     );
   }
