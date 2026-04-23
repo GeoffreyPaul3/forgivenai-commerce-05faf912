@@ -1,8 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
-  ShoppingBag, LayoutDashboard, CreditCard,
-  User, LogOut, ChevronDown, Package, BarChart3
+  LayoutDashboard, CreditCard, User, LogOut,
+  ChevronDown, Package, BarChart3, DollarSign, ShoppingBag
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -18,11 +18,11 @@ import { useState, useEffect } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 const vendorMenuItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "My Products", url: "/dashboard/products", icon: Package },
-  { title: "Orders", url: "/dashboard/orders", icon: CreditCard },
-  { title: "Performance", url: "/dashboard/analytics", icon: BarChart3 },
-  { title: "Payouts", url: "/dashboard/vendor-portal", icon: ShoppingBag },
+  { title: "Dashboard",   url: "/dashboard",                      icon: LayoutDashboard },
+  { title: "My Products", url: "/dashboard/vendor/products",      icon: Package },
+  { title: "Orders",      url: "/dashboard/vendor/orders",        icon: ShoppingBag },
+  { title: "Performance", url: "/dashboard/vendor/performance",   icon: BarChart3 },
+  { title: "Payouts",     url: "/dashboard/vendor/payouts",       icon: DollarSign },
 ];
 
 function VendorSidebar() {
@@ -38,7 +38,10 @@ function VendorSidebar() {
             <span className="font-heading font-bold text-white text-sm">V</span>
           </div>
           {!collapsed && (
-            <span className="font-heading text-lg font-bold text-sidebar-foreground">Vendor Portal</span>
+            <div className="flex flex-col">
+              <span className="font-heading text-lg font-bold text-sidebar-foreground leading-tight">Vendor Portal</span>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-orange-500 opacity-80 leading-tight">Business Partner</span>
+            </div>
           )}
         </div>
         <SidebarGroup>
@@ -47,8 +50,12 @@ function VendorSidebar() {
             <SidebarMenu>
               {vendorMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                    <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
+                  <SidebarMenuButton asChild isActive={
+                    item.url === "/dashboard"
+                      ? location.pathname === "/dashboard"
+                      : location.pathname.startsWith(item.url)
+                  }>
+                    <NavLink to={item.url} end={item.url === "/dashboard"} className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
                       <item.icon className="mr-2 h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
@@ -62,6 +69,7 @@ function VendorSidebar() {
     </Sidebar>
   );
 }
+
 
 export default function VendorLayout({ children, title }: { children: React.ReactNode, title: string }) {
   const navigate = useNavigate();

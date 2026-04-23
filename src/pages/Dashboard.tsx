@@ -37,6 +37,11 @@ import VendorPortal from "./dashboard/VendorPortal";
 import AgentReferralsPage from "./dashboard/agent/AgentReferralsPage";
 import AgentEarningsPage from "./dashboard/agent/AgentEarningsPage";
 import AgentOrdersPage from "./dashboard/agent/AgentOrdersPage";
+import VendorDashboard from "./dashboard/vendor/VendorDashboard";
+import VendorProductsPage from "./dashboard/vendor/VendorProductsPage";
+import VendorOrdersPage from "./dashboard/vendor/VendorOrdersPage";
+import VendorPerformancePage from "./dashboard/vendor/VendorPerformancePage";
+import VendorPayoutsPage from "./dashboard/vendor/VendorPayoutsPage";
 
 const menuItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
@@ -530,6 +535,10 @@ const pageTitles: Record<string, string> = {
   "/dashboard/agents": "Agents",
   "/dashboard/vendors": "Vendors",
   "/dashboard/vendor-portal": "Vendor Portal",
+  "/dashboard/vendor/products": "My Products",
+  "/dashboard/vendor/orders": "Orders",
+  "/dashboard/vendor/performance": "Performance",
+  "/dashboard/vendor/payouts": "Payouts",
   "/dashboard/profit-intel": "Profit Intelligence",
   "/dashboard/agent-portal": "Agent Portal",
   "/dashboard/agent/referrals": "My Referrals",
@@ -553,7 +562,11 @@ const DashboardPage = () => {
 
   const mainContent = (
     <Routes>
-      <Route index element={<OverviewPage />} />
+      <Route index element={
+        appMode === "agent" ? <AgentDashboard /> : 
+        appMode === "vendor" ? <VendorDashboard /> : 
+        <OverviewPage />
+      } />
       <Route path="products" element={<ProductsPage />} />
       <Route path="orders" element={<OrdersPage />} />
       <Route path="customers" element={<CustomersPage />} />
@@ -561,7 +574,11 @@ const DashboardPage = () => {
       <Route path="content" element={<ContentPage />} />
       <Route path="agents" element={<AgentsPage />} />
       <Route path="vendors" element={<VendorsPage />} />
-      <Route path="vendor-portal" element={<VendorPortal />} />
+      <Route path="vendor-portal" element={<VendorDashboard />} />
+      <Route path="vendor/products" element={<VendorProductsPage />} />
+      <Route path="vendor/orders" element={<VendorOrdersPage />} />
+      <Route path="vendor/performance" element={<VendorPerformancePage />} />
+      <Route path="vendor/payouts" element={<VendorPayoutsPage />} />
       <Route path="profit-intel" element={<ProfitDashboard />} />
       <Route path="agent-portal" element={<AgentDashboard />} />
       <Route path="agent/referrals" element={<AgentReferralsPage />} />
