@@ -110,7 +110,7 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
         </motion.div>
         
         <p className="mt-8 text-center text-cream/40 text-sm font-body lg:absolute lg:bottom-12 lg:mt-0">
-          &copy; {new Date().getFullYear()} Forgiven AI Commerce. All rights reserved.
+          &copy; {new Date().getFullYear()} Forgiven Shopping Centre. All rights reserved.
         </p>
       </div>
     </div>

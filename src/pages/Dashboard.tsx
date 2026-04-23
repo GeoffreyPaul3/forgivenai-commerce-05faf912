@@ -57,6 +57,37 @@ function DashboardSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
 
+  const { data: profile } = useQuery({
+    queryKey: ["user-profile-sidebar"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      return data;
+    }
+  });
+
+  const filteredMenuItems = menuItems.filter(item => {
+    if (!profile) return true;
+    const role = profile.role;
+
+    // Admin sees everything
+    if (role === "admin") return true;
+
+    // Restrictions for non-admins
+    if (item.title === "Agents" || item.title === "Vendors" || item.title === "Analytics") return false;
+    
+    if (role === "vendor") {
+      if (item.title === "Agent Portal" || item.title === "Agents") return false;
+    }
+    
+    if (role === "agent") {
+      if (item.title === "Vendor Portal" || item.title === "Vendors" || item.title === "Profit Intel") return false;
+    }
+
+    return true;
+  });
+
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
@@ -72,7 +103,7 @@ function DashboardSidebar() {
           <SidebarGroupLabel className="text-sidebar-foreground/40">Commerce OS</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {filteredMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.url}>
                     <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
@@ -94,24 +125,85 @@ function OverviewPage() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-  const { data: stats } = useQuery({
-    queryKey: ["overview-stats"],
+  const { data: profile } = useQuery({
+    queryKey: ["user-profile"],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      return data;
+    }
+  });
+
+  const { data: vendorId } = useQuery({
+    queryKey: ["user-vendor-id", profile?.id],
+    enabled: profile?.role === "vendor",
+    queryFn: async () => {
+      const { data } = await supabase.from("vendors").select("id").eq("user_id", profile!.id).maybeSingle();
+      return data?.id;
+    }
+  });
+
+  const { data: agentId } = useQuery({
+    queryKey: ["user-agent-id", profile?.id],
+    enabled: profile?.role === "agent",
+    queryFn: async () => {
+      const { data } = await supabase.from("agents").select("id").eq("user_id", profile!.id).maybeSingle();
+      return data?.id;
+    }
+  });
+
+  const { data: myProducts } = useQuery({
+    queryKey: ["vendor-products", vendorId],
+    enabled: !!vendorId,
+    queryFn: async () => {
+      const { data } = await supabase.from("products").select("id").eq("vendor_id", vendorId!);
+      return (data || []).map(p => p.id);
+    }
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ["overview-stats", profile?.role, vendorId, agentId, myProducts],
+    enabled: !!profile,
+    queryFn: async () => {
+      let productsQuery = supabase.from("products").select("*", { count: "exact", head: true });
+      let ordersQuery = supabase.from("orders").select("total, status, agent_id, items");
+      let customersQuery = supabase.from("customers").select("*", { count: "exact", head: true });
+      let conversationsQuery = supabase.from("conversations").select("*", { count: "exact", head: true });
+
+      if (profile?.role === "vendor" && vendorId) {
+        productsQuery = productsQuery.eq("vendor_id", vendorId);
+        // For orders, we'll fetch all and filter in JS due to lack of direct vendor_id on orders
+      } else if (profile?.role === "agent" && agentId) {
+        ordersQuery = ordersQuery.eq("agent_id", agentId);
+        customersQuery = customersQuery.eq("first_agent_id", agentId);
+        // Agents see all products for now, or we could filter if needed
+      }
+
       const [products, orders, customers, conversations] = await Promise.all([
-        supabase.from("products").select("*", { count: "exact", head: true }),
-        supabase.from("orders").select("total, status"),
-        supabase.from("customers").select("*", { count: "exact", head: true }),
-        supabase.from("conversations").select("*", { count: "exact", head: true }),
+        productsQuery,
+        ordersQuery,
+        customersQuery,
+        conversationsQuery,
       ]);
-      const revenue = (orders.data || [])
+
+      let filteredOrders = orders.data || [];
+      if (profile?.role === "vendor" && myProducts) {
+        filteredOrders = filteredOrders.filter((o: any) => 
+          (o.items as any[]).some(item => myProducts.includes(item.product_id))
+        );
+      }
+
+      const revenue = filteredOrders
         .filter((o: any) => ["paid", "delivered"].includes(o.status))
         .reduce((sum: number, o: any) => sum + (o.total || 0), 0);
-      const pending = (orders.data || []).filter((o: any) => o.status === "pending").length;
+      const pending = filteredOrders.filter((o: any) => o.status === "pending").length;
+      
       return {
         products: products.count || 0,
-        orders: orders.data?.length || 0,
+        orders: filteredOrders.length,
         customers: customers.count || 0,
-        conversations: conversations.count || 0,
+        conversations: profile?.role === "admin" ? (conversations.count || 0) : 0, // Only admin sees all conversations for now
         revenue,
         pending,
       };
@@ -119,31 +211,52 @@ function OverviewPage() {
   });
 
   const { data: recentOrders } = useQuery({
-    queryKey: ["recent-orders-overview"],
+    queryKey: ["recent-orders-overview", profile?.role, vendorId, agentId, myProducts],
+    enabled: !!profile,
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("orders")
-        .select("id, customer_name, customer_phone, total, status, channel, created_at")
-        .order("created_at", { ascending: false })
-        .limit(6);
-      return data || [];
+        .select("id, customer_name, customer_phone, total, status, channel, created_at, agent_id, items")
+        .order("created_at", { ascending: false });
+
+      if (profile?.role === "agent" && agentId) {
+        q = q.eq("agent_id", agentId);
+      }
+
+      const { data } = await q.limit(profile?.role === "vendor" ? 100 : 6);
+      let filtered = data || [];
+
+      if (profile?.role === "vendor" && myProducts) {
+        filtered = filtered.filter((o: any) => 
+          (o.items as any[]).some(item => myProducts.includes(item.product_id))
+        ).slice(0, 6);
+      }
+
+      return filtered;
     },
   });
 
   const { data: recentProducts } = useQuery({
-    queryKey: ["recent-products"],
+    queryKey: ["recent-products", profile?.role, vendorId],
+    enabled: !!profile,
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("products")
         .select("id, name, category, price, currency, images, status")
-        .order("created_at", { ascending: false })
-        .limit(4);
+        .order("created_at", { ascending: false });
+
+      if (profile?.role === "vendor" && vendorId) {
+        q = q.eq("vendor_id", vendorId);
+      }
+
+      const { data } = await q.limit(4);
       return data || [];
     },
   });
 
   const { data: recentConvos } = useQuery({
-    queryKey: ["recent-convos-overview"],
+    queryKey: ["recent-convos-overview", profile?.role],
+    enabled: profile?.role === "admin",
     queryFn: async () => {
       const { data } = await supabase
         .from("conversations")

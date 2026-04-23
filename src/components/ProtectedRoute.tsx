@@ -3,7 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Lock, LogOut, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getAppMode } from "@/lib/app-mode";
+import { getAppMode, getRedirectUrl, type AppMode } from "@/lib/app-mode";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -56,7 +56,14 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   }
 
   if (!authenticated) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    console.log("ProtectedRoute: Not authenticated, redirecting to /auth on", window.location.hostname);
+    // Ensuring we stay on the current subdomain/origin by using a relative path with window.location.assign
+    window.location.assign("/auth");
+    return (
+      <div className="min-h-screen bg-maroon-dark flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-gold animate-spin" />
+      </div>
+    );
   }
 
   const handleLogout = async () => {
@@ -65,30 +72,16 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   };
 
   // HARD ENFORCEMENT: Check if role matches portal
-  const isUnauthorizedForPortal = 
+  // Admins can oversee all portals; Vendors and Agents are restricted to their own.
+  const isUnauthorizedForPortal = userRole !== "admin" && (
     (appMode === "vendor" && userRole !== "vendor") ||
     (appMode === "agent" && userRole !== "agent") ||
-    (appMode === "admin" && userRole !== "admin");
+    (appMode === "admin" && userRole !== "admin")
+  );
 
   if (isUnauthorizedForPortal && userRole) {
-    const hostname = window.location.hostname;
-    const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
-    const protocol = window.location.protocol;
-
-    let targetUrl = "";
-    if (userRole === "vendor") {
-      targetUrl = isLocalhost 
-        ? `${protocol}//vendors.localhost:5173/dashboard` 
-        : `${protocol}//vendors-forgiven-ai-commerce.vercel.app/dashboard`;
-    } else if (userRole === "agent") {
-      targetUrl = isLocalhost 
-        ? `${protocol}//agents.localhost:5173/dashboard` 
-        : `${protocol}//agents-forgiven-ai-commerce.vercel.app/dashboard`;
-    } else if (userRole === "admin") {
-      targetUrl = isLocalhost 
-        ? `${protocol}//localhost:5173/dashboard` 
-        : `${protocol}//forgiven-ai-commerce.vercel.app/dashboard`;
-    }
+    const targetUrl = getRedirectUrl(userRole as AppMode);
+    console.log("ProtectedRoute: Unauthorized for portal. Redirecting to", targetUrl);
 
     if (targetUrl) {
       window.location.href = targetUrl;

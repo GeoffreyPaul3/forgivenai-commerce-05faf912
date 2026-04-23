@@ -33,12 +33,38 @@ const ProductsPage = () => {
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
+  const { data: profile } = useQuery({
+    queryKey: ["user-profile"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      return data;
+    }
+  });
+
+  const { data: vendorId } = useQuery({
+    queryKey: ["user-vendor-id", profile?.id],
+    enabled: profile?.role === "vendor",
+    queryFn: async () => {
+      const { data } = await supabase.from("vendors").select("id").eq("user_id", profile!.id).maybeSingle();
+      return data?.id;
+    }
+  });
+
   const { data: products, isLoading } = useQuery({
-    queryKey: ["products", search, categoryFilter],
+    queryKey: ["products", search, categoryFilter, profile?.role, vendorId],
+    enabled: !!profile,
     queryFn: async () => {
       let query = supabase.from("products").select("*").order("created_at", { ascending: false });
+      
       if (search) query = query.ilike("name", `%${search}%`);
       if (categoryFilter !== "all") query = query.eq("category", categoryFilter);
+      
+      if (profile?.role === "vendor" && vendorId) {
+        query = query.eq("vendor_id", vendorId);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
       return data as Product[];

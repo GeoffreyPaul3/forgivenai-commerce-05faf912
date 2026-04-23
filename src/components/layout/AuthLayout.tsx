@@ -21,7 +21,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             </div>
             <div className="flex flex-col">
               <span className="font-heading text-2xl font-bold text-white tracking-tight leading-none uppercase">Forgiven</span>
-              <span className="text-gold text-[10px] uppercase tracking-[0.4em] font-bold mt-1">AI Commerce OS</span>
+              <span className="text-gold text-[10px] uppercase tracking-[0.4em] font-bold mt-1">Shopping Centre</span>
             </div>
           </Link>
         </div>
@@ -34,7 +34,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
         
         <p className="mt-8 text-center text-cream/40 text-sm font-body">
-          &copy; {new Date().getFullYear()} Forgiven AI Commerce. All rights reserved.
+          &copy; {new Date().getFullYear()} Forgiven Shopping Centre. All rights reserved.
         </p>
       </motion.div>
     </div>

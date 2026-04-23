@@ -11,6 +11,7 @@ import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import { useEffect } from "react";
 import { getAppMode } from "@/lib/app-mode";
 import { Navigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
@@ -28,9 +29,24 @@ const ReferralTracker = () => {
 
 const RootRedirect = () => {
   const appMode = getAppMode();
+  
+  useEffect(() => {
+    console.log("RootRedirect: hostname =", window.location.hostname, "appMode =", appMode);
+    if (appMode !== "admin") {
+      // Use window.location.assign for a clean redirect within the same origin
+      window.location.assign("/dashboard");
+    }
+  }, [appMode]);
+
   if (appMode !== "admin") {
-    return <Navigate to="/dashboard" replace />;
+    return (
+      <div className="min-h-screen bg-maroon-dark flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="w-8 h-8 text-gold animate-spin mb-4" />
+        <p className="text-white font-body">Detecting portal: {appMode}...</p>
+      </div>
+    );
   }
+  
   return <Index />;
 };
 

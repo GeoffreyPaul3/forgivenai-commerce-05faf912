@@ -8,7 +8,7 @@ import AuthLayout from "@/components/layout/AuthLayout";
 import PortalAuthLayout from "@/components/layout/PortalAuthLayout";
 import { Mail, Lock, User, ArrowRight, Loader2, KeyRound, CheckCircle2, Store, Phone } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getAppMode } from "@/lib/app-mode";
+import { getAppMode, getRedirectUrl, type AppMode } from "@/lib/app-mode";
 
 type AuthMode = "login" | "signup" | "forgot" | "reset";
 
@@ -61,27 +61,18 @@ export default function AuthPage() {
           .single();
 
         const userRole = profile?.role;
-        const hostname = window.location.hostname;
-        const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
-        const protocol = window.location.protocol;
         
         toast({ title: "Welcome back!", description: "Successfully logged in." });
 
         // Force redirect to correct portal if user is on the wrong one
         if (userRole === "vendor" && appMode !== "vendor") {
-          window.location.href = isLocalhost 
-            ? `${protocol}//vendors.localhost:5173/dashboard` 
-            : `${protocol}//vendors-forgiven-ai-commerce.vercel.app/dashboard`;
+          window.location.href = getRedirectUrl("vendor");
           return;
         } else if (userRole === "agent" && appMode !== "agent") {
-          window.location.href = isLocalhost 
-            ? `${protocol}//agents.localhost:5173/dashboard` 
-            : `${protocol}//agents-forgiven-ai-commerce.vercel.app/dashboard`;
+          window.location.href = getRedirectUrl("agent");
           return;
         } else if (userRole === "admin" && appMode !== "admin") {
-          window.location.href = isLocalhost 
-            ? `${protocol}//localhost:5173/dashboard` 
-            : `${protocol}//forgiven-ai-commerce.vercel.app/dashboard`;
+          window.location.href = getRedirectUrl("admin");
           return;
         }
 
@@ -134,7 +125,7 @@ export default function AuthPage() {
       sub: appMode === "admin" ? "Access the core commerce engine." : "Log in to manage your commerce empire." 
     },
     signup: { 
-      title: appMode === "vendor" ? "Start selling with FSC" : appMode === "agent" ? "Start earning with FSC" : "Join the OS", 
+      title: appMode === "vendor" ? "Start selling with Forgiven Shopping Centre" : appMode === "agent" ? "Start earning with Forgiven Shopping Centre" : "Join the OS", 
       sub: appMode === "vendor" ? "Join as a vendor and manage your products and orders." : appMode === "agent" ? "Join as an agent and earn commissions by selling." : "Register to start selling with AI." 
     },
     forgot: { title: "Reset Password",      sub: "Enter your email and we'll send a reset link." },

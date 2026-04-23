@@ -31,15 +31,67 @@ const OrdersPage = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
+  const { data: profile } = useQuery({
+    queryKey: ["user-profile"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      return data;
+    }
+  });
+
+  const { data: vendorId } = useQuery({
+    queryKey: ["user-vendor-id", profile?.id],
+    enabled: profile?.role === "vendor",
+    queryFn: async () => {
+      const { data } = await supabase.from("vendors").select("id").eq("user_id", profile!.id).maybeSingle();
+      return data?.id;
+    }
+  });
+
+  const { data: agentId } = useQuery({
+    queryKey: ["user-agent-id", profile?.id],
+    enabled: profile?.role === "agent",
+    queryFn: async () => {
+      const { data } = await supabase.from("agents").select("id").eq("user_id", profile!.id).maybeSingle();
+      return data?.id;
+    }
+  });
+
+  const { data: myProducts } = useQuery({
+    queryKey: ["vendor-products", vendorId],
+    enabled: !!vendorId,
+    queryFn: async () => {
+      const { data } = await supabase.from("products").select("id").eq("vendor_id", vendorId!);
+      return (data || []).map(p => p.id);
+    }
+  });
+
   const { data: orders, isLoading } = useQuery({
-    queryKey: ["orders", search, statusFilter],
+    queryKey: ["orders", search, statusFilter, profile?.role, vendorId, agentId, myProducts],
+    enabled: !!profile,
     queryFn: async () => {
       let q = supabase.from("orders").select("*").order("created_at", { ascending: false });
+      
       if (search) q = q.or(`customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%`);
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      
+      if (profile?.role === "agent" && agentId) {
+        q = q.eq("agent_id", agentId);
+      }
+      
       const { data, error } = await q;
       if (error) throw error;
-      return data as Order[];
+      
+      let filtered = data || [];
+      if (profile?.role === "vendor" && myProducts) {
+        filtered = filtered.filter((o: any) => 
+          (o.items as any[]).some(item => myProducts.includes(item.product_id))
+        );
+      }
+      
+      return filtered as Order[];
     },
   });
 

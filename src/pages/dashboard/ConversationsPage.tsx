@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Phone, Send, Loader2, Bot, User, Clock, Search, RefreshCw } from "lucide-react";
+import { MessageSquare, Phone, Send, Loader2, Bot, User, Clock, Search, RefreshCw, ShieldCheck } from "lucide-react";
 
 const ConversationsPage = () => {
   const { toast } = useToast();
@@ -16,9 +16,21 @@ const ConversationsPage = () => {
   const [search, setSearch] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: conversations, isLoading } = useQuery({
-    queryKey: ["conversations"],
+  const { data: profile } = useQuery({
+    queryKey: ["user-profile"],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      return data;
+    }
+  });
+
+  const { data: conversations, isLoading } = useQuery({
+    queryKey: ["conversations", profile?.role],
+    enabled: !!profile,
+    queryFn: async () => {
+      if (profile?.role !== "admin") return []; // Restrict to admins for now
       const { data, error } = await supabase.from("conversations").select("*").order("last_message_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -102,7 +114,12 @@ const ConversationsPage = () => {
             </div>
           </div>
           <div className="flex-1 divide-y divide-border overflow-y-auto">
-            {isLoading ? (
+            {profile?.role !== "admin" ? (
+              <div className="p-6 text-center text-muted-foreground text-sm">
+                <ShieldCheck className="w-6 h-6 mx-auto mb-2 opacity-40" />
+                Access restricted to administrators.
+              </div>
+            ) : isLoading ? (
               [1, 2, 3].map(i => <div key={i} className="h-16 animate-pulse bg-muted" />)
             ) : filteredConvos?.length ? (
               filteredConvos.map(c => (
