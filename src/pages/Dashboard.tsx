@@ -34,6 +34,9 @@ import AgentsPage from "./dashboard/AgentsPage";
 import VendorsPage from "./dashboard/VendorsPage";
 import ProfitDashboard from "./dashboard/ProfitDashboard";
 import VendorPortal from "./dashboard/VendorPortal";
+import AgentReferralsPage from "./dashboard/agent/AgentReferralsPage";
+import AgentEarningsPage from "./dashboard/agent/AgentEarningsPage";
+import AgentOrdersPage from "./dashboard/agent/AgentOrdersPage";
 
 const menuItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
@@ -529,6 +532,9 @@ const pageTitles: Record<string, string> = {
   "/dashboard/vendor-portal": "Vendor Portal",
   "/dashboard/profit-intel": "Profit Intelligence",
   "/dashboard/agent-portal": "Agent Portal",
+  "/dashboard/agent/referrals": "My Referrals",
+  "/dashboard/agent/earnings": "My Earnings",
+  "/dashboard/agent/orders": "Orders Tracking",
   "/dashboard/assistant": "AI Assistant",
   "/dashboard/analytics": "Analytics",
   "/dashboard/settings": "Settings",
@@ -558,6 +564,9 @@ const DashboardPage = () => {
       <Route path="vendor-portal" element={<VendorPortal />} />
       <Route path="profit-intel" element={<ProfitDashboard />} />
       <Route path="agent-portal" element={<AgentDashboard />} />
+      <Route path="agent/referrals" element={<AgentReferralsPage />} />
+      <Route path="agent/earnings" element={<AgentEarningsPage />} />
+      <Route path="agent/orders" element={<AgentOrdersPage />} />
       <Route path="assistant" element={<AIAssistantPage />} />
       <Route path="analytics" element={<AnalyticsPage />} />
       <Route path="settings" element={<SettingsPage />} />

@@ -1,8 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, CreditCard, User, LogOut, 
-  ChevronDown, UserCheck, TrendingUp
+  LayoutDashboard, CreditCard, User, LogOut,
+  ChevronDown, Users, TrendingUp, PackageSearch
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -18,10 +18,10 @@ import { useState, useEffect } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 const agentMenuItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "My Referrals", url: "/dashboard/agent-portal", icon: UserCheck },
-  { title: "Earnings", url: "/dashboard/agent-portal#earnings", icon: TrendingUp },
-  { title: "Orders Tracking", url: "/dashboard/orders", icon: CreditCard },
+  { title: "Dashboard",      url: "/dashboard",                     icon: LayoutDashboard },
+  { title: "My Referrals",   url: "/dashboard/agent/referrals",     icon: Users },
+  { title: "Earnings",       url: "/dashboard/agent/earnings",      icon: TrendingUp },
+  { title: "Orders Tracking",url: "/dashboard/agent/orders",        icon: PackageSearch },
 ];
 
 function AgentSidebar() {
@@ -46,8 +46,12 @@ function AgentSidebar() {
             <SidebarMenu>
               {agentMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                    <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
+                  <SidebarMenuButton asChild isActive={
+                    item.url === "/dashboard"
+                      ? location.pathname === "/dashboard"
+                      : location.pathname.startsWith(item.url)
+                  }>
+                    <NavLink to={item.url} end={item.url === "/dashboard"} className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
                       <item.icon className="mr-2 h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
