@@ -92,10 +92,19 @@ export default function AuthPage() {
           },
         });
         if (error) throw error;
+        
+        const isAdmin = role === 'admin';
         toast({
-          title: "Account created!",
-          description: "Your account is awaiting administrator approval.",
+          title: isAdmin ? "Admin account created!" : "Account created!",
+          description: isAdmin 
+            ? "Your administrator account is active. Please sign in." 
+            : "Your account is awaiting administrator approval.",
         });
+
+        if (isAdmin) {
+          setMode("login");
+          setEmail(email); // Keep email for convenience
+        }
 
       } else if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {

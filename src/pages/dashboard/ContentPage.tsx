@@ -1457,7 +1457,7 @@ function InfluencerManager() {
             ) : (
               <Sparkles className="w-5 h-5 text-gold" />
             )}
-            {generating ? "AI Engine Producing..." : "Generate World-Class Visual"}
+            {generating ? "Producing..." : "Generate"}
           </Button>
 
           {generating && (
@@ -1481,7 +1481,7 @@ function InfluencerManager() {
       {/* RIGHT PANEL: GENERATION WORKSPACE & GALLERY */}
       <div className="xl:col-span-8 space-y-6">
         {/* Latest Generation / Hero */}
-        <div className="rounded-2xl border-2 border-primary/20 bg-card overflow-hidden shadow-xl relative min-h-[600px] flex items-center justify-center bg-[url('/grid-bg.png')] bg-repeat">
+        <div className={`rounded-2xl border-2 border-primary/20 bg-card overflow-hidden shadow-xl relative ${generatedVisuals?.[0] ? 'min-h-[400px]' : 'min-h-[600px]'} flex items-center justify-center bg-[url('/grid-bg.png')] bg-repeat`}>
           {generatedVisuals?.[0] ? (
             <div className="w-full h-full group">
               <img src={generatedVisuals[0].media_url} alt="Campaign Shot" className="w-full h-full object-contain" />
