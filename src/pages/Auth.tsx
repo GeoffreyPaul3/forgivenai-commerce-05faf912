@@ -125,8 +125,8 @@ export default function AuthPage() {
       sub: appMode === "admin" ? "Access the core commerce engine." : "Log in to manage your commerce empire." 
     },
     signup: { 
-      title: appMode === "vendor" ? "Start selling with Forgiven Shopping Centre" : appMode === "agent" ? "Start earning with Forgiven Shopping Centre" : "Join the OS", 
-      sub: appMode === "vendor" ? "Join as a vendor and manage your products and orders." : appMode === "agent" ? "Join as an agent and earn commissions by selling." : "Register to start selling with AI." 
+      title: appMode === "vendor" ? "Start selling with Forgiven Shopping Centre" : appMode === "agent" ? "Start earning with Forgiven Shopping Centre" : "Create Admin Account", 
+      sub: appMode === "vendor" ? "Join as a vendor and manage your products and orders." : appMode === "agent" ? "Join as an agent and earn commissions by selling." : "Join as an administrator to manage the commerce ecosystem." 
     },
     forgot: { title: "Reset Password",      sub: "Enter your email and we'll send a reset link." },
     reset:  { title: "New Password",        sub: "Choose a strong password for your account." },
@@ -249,9 +249,7 @@ export default function AuthPage() {
             <div className="mt-8 pt-6 border-t border-white/5 text-center">
               <p className="text-cream/40 text-sm font-body">
                 {mode === "login" ? (
-                  appMode !== "admin" ? (
-                    <>New to Forgiven?{" "}<button type="button" onClick={() => setMode("signup")} className="text-gold font-bold hover:text-gold-light ml-1">Create Account</button></>
-                  ) : "Admin Portal Access Only"
+                  <>{appMode === "admin" ? "New admin?" : "New to Forgiven?"}{" "}<button type="button" onClick={() => setMode("signup")} className="text-gold font-bold hover:text-gold-light ml-1">Create Account</button></>
                 ) : (
                   <>Already have an account?{" "}<button type="button" onClick={() => setMode("login")} className="text-gold font-bold hover:text-gold-light ml-1">Sign In</button></>
                 )}
