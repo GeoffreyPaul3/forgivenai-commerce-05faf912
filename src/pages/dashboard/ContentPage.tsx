@@ -1279,7 +1279,7 @@ function InfluencerManager() {
       if (error) throw error;
 
       // Save to content gallery
-      await supabase.from("content").insert({
+      const { error: insertError } = await supabase.from("content").insert({
         type: "ai_visual",
         title: `${selectedInfluencer.name} x ${selectedProd.name} Campaign`,
         body: `Campaign Visual: ${styleMode.replace("_", " ")} styling in ${sceneType.replace("_", " ")} scene.`,
@@ -1293,10 +1293,17 @@ function InfluencerManager() {
         } as any
       });
 
-      refetchVisuals();
+      if (insertError) throw insertError;
+
+      await refetchVisuals();
       toast({ title: "Campaign visual generated! 📸" });
     } catch (err: any) {
-      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+      console.error("Generation error:", err);
+      toast({ 
+        title: "Generation failed", 
+        description: err.message || "An error occurred during generation", 
+        variant: "destructive" 
+      });
     } finally {
       setGenerating(false);
       setGenerationStep(0);

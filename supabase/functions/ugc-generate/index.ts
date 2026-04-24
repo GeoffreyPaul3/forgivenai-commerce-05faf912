@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.40.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 const QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
@@ -35,7 +35,6 @@ async function callTextAI(apiKey: string, prompt: string, model = "qwen-plus") {
 }
 
 async function callImageAI(apiKey: string, prompt: string, refImageUrl?: string) {
-  // 1. Submit Image Generation Task (Wanx-v1)
   const body: any = {
     model: "qwen-image-plus",
     input: { prompt },
@@ -44,8 +43,6 @@ async function callImageAI(apiKey: string, prompt: string, refImageUrl?: string)
 
   if (refImageUrl) {
     body.input.ref_img = refImageUrl;
-    // For image-to-image, sometimes specific parameters are needed
-    // but we'll stick to basic prompt reference for now
   }
 
   console.log(`Submitting image task for prompt: ${prompt.substring(0, 100)}...`);
@@ -81,9 +78,8 @@ async function callImageAI(apiKey: string, prompt: string, refImageUrl?: string)
     throw { status: 500, message: "No task ID received from AI provider" };
   }
 
-  // 2. Poll for Completion
   let attempts = 0;
-  const maxAttempts = 30; // Increased to 1 min total
+  const maxAttempts = 30;
   while (attempts < maxAttempts) {
     attempts++;
     await new Promise(r => setTimeout(r, 2000));
@@ -94,7 +90,7 @@ async function callImageAI(apiKey: string, prompt: string, refImageUrl?: string)
 
     if (!pollRes.ok) {
       console.error(`Polling error (${pollRes.status}) for task ${taskId}`);
-      continue; // Retry polling if temporary network issue
+      continue;
     }
 
     const pollData = await pollRes.json();
@@ -128,14 +124,14 @@ async function persistImage(supabaseClient: any, imageUrl: string, folder: strin
 
     if (uploadError) {
       console.error("Storage upload error:", uploadError);
-      return imageUrl; // Fallback to original URL
+      return imageUrl;
     }
 
     const { data: { publicUrl } } = supabaseClient.storage.from("ugc-assets").getPublicUrl(fileName);
     return publicUrl;
   } catch (err) {
     console.error("Persist image error:", err);
-    return imageUrl; // Fallback
+    return imageUrl;
   }
 }
 
@@ -180,7 +176,6 @@ async function persistAudio(supabaseClient: any, audioBlob: Blob, folder: string
   }
 }
 
-// ─── Identity Lock Prompt Builder ───
 function buildIdentityLock(avatarDescription: string, productName: string): string {
   return `STRICT IDENTITY LOCK — USE CONTINUITY:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -194,8 +189,10 @@ PRODUCT: "${productName}"
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
     const body = await req.json();
@@ -219,10 +216,8 @@ serve(async (req) => {
 
     const referenceImage = body.avatarImageUrl || body.avatarImageBase64;
 
-    // ─── GENERATE AVATAR ───
     if (action === "generate-avatar") {
       const { gender, ethnicity, setting, productName } = body;
-
       const settingDescriptions: Record<string, string> = {
         studio: "in a clean, well-lit photography studio",
         bedroom: "in a cozy, aesthetic bedroom",
@@ -246,12 +241,15 @@ serve(async (req) => {
       );
     }
 
-    // ─── GENERATE MULTI-FRAME STORYBOARD ───
     if (action === "generate-storyboard") {
-      const { productName, avatarDescription, avatarImageUrl, frameCount = 4 } = body;
+      const { productName, productImageUrl, avatarDescription, avatarImageUrl, frameCount = 4 } = body;
 
       const frames: Array<{ frame: number; imageUrl: string; scene: string }> = [];
-      const identityLock = buildIdentityLock(avatarDescription, productName);
+      const identityLock = `STRICT IDENTITY & PRODUCT LOCK:
+- PERSON: ${avatarDescription}
+- PRODUCT: "${productName}"
+- PRODUCT IMAGE REFERENCE: ${productImageUrl || "N/A"}
+- Maintain consistent facial features and EXACT product design across all frames.`;
 
       const scenes = [
         { scene: "Hook - Creator holds up the product excitedly, showing it to camera", camera: "close-up" },
@@ -267,10 +265,10 @@ serve(async (req) => {
         const framePrompt = `${identityLock}
 Scene: ${s.scene}
 Camera: ${s.camera}
+Requirement: High fidelity to product design from ${productImageUrl}.
 Style: Cinematic UGC, vertical 9:16, natural lighting, consistent with previous frames.`;
 
         try {
-          // If we have an avatar image, we use it as a reference
           const imageUrl = await callImageAI(QWEN_API_KEY, framePrompt, referenceImage);
           if (imageUrl) {
             const persistedUrl = await persistImage(supabase, imageUrl, "frames");
@@ -280,7 +278,6 @@ Style: Cinematic UGC, vertical 9:16, natural lighting, consistent with previous 
           console.error(`Frame ${i + 1} failed:`, err);
         }
 
-        // Delay to avoid overwhelming task rate limits
         if (i < actualFrames.length - 1) {
           await new Promise(r => setTimeout(r, 1000));
         }
@@ -296,10 +293,8 @@ Style: Cinematic UGC, vertical 9:16, natural lighting, consistent with previous 
       );
     }
 
-    // ─── GENERATE SINGLE FRAME (e.g. Regeneration) ───
     if (action === "generate-frame") {
       const { productName, avatarDescription, avatarImageUrl, scene, camera, expression } = body;
-      
       const identityLock = buildIdentityLock(avatarDescription, productName);
       const framePrompt = `${identityLock}
 Scene: ${scene}
@@ -316,10 +311,42 @@ Style: Cinematic UGC, vertical 9:16, natural lighting.`;
       );
     }
 
-    // ─── GENERATE SCRIPT ───
+    if (action === "generate-campaign-shot") {
+      const { influencer, product, style, scene } = body;
+      const productImageUrl = product.images?.[0] || "";
+      const influencerImageUrl = influencer.avatar_url || "";
+      
+      const prompt = `REALITY OVER FICTION — 100% PRODUCT FIDELITY:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. PRODUCT LOCK: The model MUST wear the EXACT item from this image: ${productImageUrl}
+   - NO hallucinations. NO generic clothes. 
+   - Replicate the EXACT design, pattern, fabric, and color (if it's black, it must be the same black).
+   - The "${product.name}" is the focal point.
+
+2. IDENTITY LOCK: The model is ${influencer.name} (${influencer.ethnicity} ${influencer.gender}, ${influencer.body_type || "tall editorial"}).
+   - Use this face reference: ${influencerImageUrl}
+   - Maintain consistent facial features and skin tone.
+
+3. SETTING: ${scene.replace("_", " ")}
+4. STYLE: ${style.replace("_", " ")} - High-end fashion campaign.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Composition: 9:16 Vertical, professional lighting.
+Quality: 8K, Photorealistic, sharp focus, natural textures.
+NO: Text, watermarks, distorted hands, blurry face, fictional clothing.`;
+
+      // Use the PRODUCT as the primary reference image for the AI synthesis engine
+      // This ensures the clothes are the "source of truth"
+      const imageUrl = await callImageAI(QWEN_API_KEY, prompt, productImageUrl);
+      const persistedUrl = await persistImage(supabase, imageUrl, "campaigns");
+
+      return new Response(
+        JSON.stringify({ success: true, imageUrl: persistedUrl }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (action === "generate-script") {
       const { productName, productCategory, productPrice, currency, context } = body;
-
       const prompt = `You are a UGC content strategist for Forgiven Shopping Centre. Create a compelling 15-30 second video script for "${productName}" (${productCategory}, ${currency} ${productPrice}).
 ${context ? `Additional context: ${context}` : ""}
 
@@ -358,7 +385,6 @@ Return ONLY valid JSON:
       );
     }
 
-    // ─── GENERATE TTS ───
     if (action === "generate-tts") {
       const { text, voice } = body;
       if (!text) throw { status: 400, message: "Text is required for TTS" };
@@ -373,11 +399,10 @@ Return ONLY valid JSON:
     }
 
     throw { status: 400, message: `Unknown action: ${action}` };
-  } catch (e: unknown) {
+  } catch (e: any) {
     console.error("UGC error details:", e);
-    const err = e as { status?: number; message?: string };
-    const status = err?.status || 500;
-    const message = err?.message || (e instanceof Error ? e.message : "An unexpected error occurred in the AI generator");
+    const status = e?.status || 500;
+    const message = e?.message || "An unexpected error occurred in the AI generator";
     
     return new Response(
       JSON.stringify({ error: message, details: e instanceof Error ? e.stack : undefined }),
