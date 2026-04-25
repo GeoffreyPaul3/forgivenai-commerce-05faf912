@@ -94,7 +94,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     }
   }
 
-  if (profileStatus === "pending") {
+  if (profileStatus === "pending" && userRole !== "admin") {
     return (
       <div className="min-h-screen bg-maroon-dark flex flex-col items-center justify-center p-6 text-center">
         <div className="w-20 h-20 rounded-full bg-gold/10 flex items-center justify-center mb-6 animate-pulse">
