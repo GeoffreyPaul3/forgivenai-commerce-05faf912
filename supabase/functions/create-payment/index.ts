@@ -75,7 +75,12 @@ serve(async (req) => {
 
     if (action === "create_payment") {
       const generatedTxRef = tx_ref || `FG-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-      const callbackTarget = `${SUPABASE_URL}/functions/v1/create-payment${return_url ? `?redirect_url=${encodeURIComponent(return_url)}` : ""}`;
+
+      // callback_url  → server-side webhook (this edge function verifies + syncs the order)
+      // return_url    → where the USER'S BROWSER lands after payment (Vercel frontend)
+      const FRONTEND_URL = "https://forgiven-ai-commerce.vercel.app";
+      const callbackUrl = `${SUPABASE_URL}/functions/v1/create-payment`;
+      const browserReturnUrl = `${FRONTEND_URL}/create-payment?tx_ref=${generatedTxRef}`;
 
       const response = await fetch("https://api.paychangu.com/payment", {
         method: "POST",
@@ -90,8 +95,8 @@ serve(async (req) => {
           email: email || "",
           first_name: first_name || "",
           last_name: last_name || "",
-          callback_url: callbackTarget,
-          return_url: callbackTarget,
+          callback_url: callbackUrl,
+          return_url: browserReturnUrl,
           tx_ref: generatedTxRef,
           customization: {
             title: title || "Forgiven Shopping Centre Order",

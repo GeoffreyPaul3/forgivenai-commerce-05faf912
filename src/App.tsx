@@ -7,6 +7,7 @@ import Index from "./pages/Index.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AuthPage from "./pages/Auth.tsx";
+import PaymentSuccess from "./pages/PaymentSuccess.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import { useEffect } from "react";
 import { getAppMode } from "@/lib/app-mode";
@@ -68,6 +69,8 @@ const App = () => (
               </ProtectedRoute>
             } 
           />
+          {/* Payment callback landing page – must be public */}
+          <Route path="/create-payment" element={<PaymentSuccess />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
