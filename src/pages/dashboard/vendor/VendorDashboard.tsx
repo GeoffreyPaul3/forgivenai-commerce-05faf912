@@ -9,8 +9,10 @@ import { motion } from "framer-motion";
 import {
   DollarSign, ShoppingBag, Package, TrendingUp, Star, Clock,
   CheckCircle2, ArrowRight, AlertCircle, ArrowUpRight, Truck, Zap,
-  MessageSquare, MessageCircle, BarChart3, Video, Plus, Phone, Store
+  MessageSquare, MessageCircle, BarChart3, Video, Plus, Phone, Store,
+  Timer
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -187,57 +189,114 @@ export default function VendorDashboard() {
         </div>
       </div>
 
-      {/* KPI Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                <DollarSign className="w-5 h-5" />
-              </div>
+      {/* Performance Ranking §8 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 rounded-[2.5rem] border-0 bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-white shadow-2xl shadow-primary/20 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+             <Zap className="w-32 h-32" />
+          </div>
+          <CardContent className="p-8 md:p-10 flex flex-col md:flex-row items-center gap-8 relative z-10">
+            <div className="w-32 h-32 rounded-[2.5rem] bg-white/10 backdrop-blur-xl border border-white/20 flex flex-col items-center justify-center shadow-inner">
+               <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Rank</p>
+               <span className="text-6xl font-heading font-black">{vendor.class || 'C'}</span>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Total Sales</p>
-            <h3 className="text-2xl font-heading font-black">MWK {stats.revenue.toLocaleString()}</h3>
-            <p className="text-[10px] text-muted-foreground mt-2 font-body">Gross revenue from products</p>
+            <div className="flex-1 text-center md:text-left space-y-4">
+               <div>
+                 <h3 className="text-2xl font-heading font-black tracking-tight mb-1">Performance Excellence §8</h3>
+                 <p className="text-white/70 font-body text-sm">Your vendor class determines your placement priority in the AI Sales Assistant.</p>
+               </div>
+               <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: "Speed", val: "92%", icon: Clock },
+                    { label: "Rate", val: "98%", icon: TrendingUp },
+                    { label: "Fullfil", val: "88%", icon: Package },
+                  ].map(m => (
+                    <div key={m.label} className="bg-white/5 border border-white/10 rounded-2xl p-3 backdrop-blur-sm">
+                       <m.icon className="w-3.5 h-3.5 mb-2 opacity-60" />
+                       <p className="text-xs font-black uppercase tracking-widest opacity-60 mb-0.5">{m.label}</p>
+                       <p className="text-lg font-black">{m.val}</p>
+                    </div>
+                  ))}
+               </div>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
+        <Card className="rounded-[2.5rem] border-border/50 bg-card shadow-xl shadow-black/5 flex flex-col justify-center p-8">
+           <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                 <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500">
+                    <Timer className="w-6 h-6" />
+                 </div>
+                 <div>
+                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Avg Confirmation §7</p>
+                    <p className="text-3xl font-heading font-black text-foreground tracking-tight">14.2m</p>
+                 </div>
+              </div>
+              <div className="space-y-2">
+                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">
+                    <span>Platform Threshold</span>
+                    <span>30m Limit</span>
+                 </div>
+                 <Progress value={47} className="h-2 rounded-full bg-muted shadow-inner" />
+                 <p className="text-[10px] text-emerald-500 font-bold text-center mt-2">✓ YOU ARE CURRENTLY IN THE IDEAL ZONE</p>
+              </div>
+           </div>
+        </Card>
+      </div>
+
+      {/* KPI Section */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="rounded-3xl border-border/50 bg-card shadow-sm hover:shadow-xl transition-all group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500">
+              <div className="p-2.5 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+                <DollarSign className="w-5 h-5" />
+              </div>
+              <ArrowUpRight className="w-4 h-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Total Payouts</p>
+            <h3 className="text-2xl font-heading font-black tracking-tight">MWK {stats.revenue.toLocaleString()}</h3>
+            <p className="text-[10px] text-muted-foreground mt-2 font-bold uppercase tracking-tighter">Gross earned §11</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-border/50 bg-card shadow-sm hover:shadow-xl transition-all group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-500 group-hover:scale-110 transition-transform">
                 <ShoppingBag className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Orders Count</p>
-            <h3 className="text-2xl font-heading font-black">{stats.orderCount}</h3>
-            <p className="text-[10px] text-muted-foreground mt-2 font-body">{stats.pending} pending confirmation</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Order Volume</p>
+            <h3 className="text-2xl font-heading font-black tracking-tight">{stats.orderCount}</h3>
+            <p className="text-[10px] text-amber-500 mt-2 font-black uppercase tracking-tighter">{stats.pending} await confirmation</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
+        <Card className="rounded-3xl border-border/50 bg-card shadow-sm hover:shadow-xl transition-all group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+              <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-500 group-hover:scale-110 transition-transform">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Revenue</p>
-            <h3 className="text-2xl font-heading font-black">MWK {Math.round(stats.revenue * 0.8).toLocaleString()}</h3>
-            <p className="text-[10px] text-muted-foreground mt-2 font-body">Net earnings (80%)</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Fulfillment Rate</p>
+            <h3 className="text-2xl font-heading font-black tracking-tight">96.4%</h3>
+            <p className="text-[10px] text-muted-foreground mt-2 font-bold uppercase tracking-tighter">Last 30 days</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
+        <Card className="rounded-3xl border-border/50 bg-card shadow-sm hover:shadow-xl transition-all group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
+              <div className="p-2.5 rounded-2xl bg-purple-500/10 text-purple-500 group-hover:scale-110 transition-transform">
                 <TrendingUp className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Fulfillment</p>
-            <h3 className="text-2xl font-heading font-black">{stats.delivered}</h3>
-            <p className="text-[10px] text-muted-foreground mt-2 font-body">Delivered items</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Market Reach</p>
+            <h3 className="text-2xl font-heading font-black tracking-tight">TOP 5%</h3>
+            <p className="text-[10px] text-muted-foreground mt-2 font-bold uppercase tracking-tighter">In category</p>
           </CardContent>
         </Card>
       </div>

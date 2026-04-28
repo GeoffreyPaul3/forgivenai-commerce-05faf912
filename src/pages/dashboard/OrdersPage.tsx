@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Plus, Package, Clock, Truck, CheckCircle, DollarSign, AlertTriangle } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
@@ -218,25 +219,135 @@ const OrdersPage = () => {
 
       {/* Order Detail Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={v => !v && setSelectedOrder(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle className="font-heading">Order Details</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-xl rounded-[2rem] p-0 border-0 shadow-2xl overflow-hidden">
+          <div className="bg-gradient-to-br from-primary/10 via-background to-background p-8 pb-6 border-b border-border/50 relative">
+            <DialogTitle className="font-heading text-2xl font-black tracking-tight flex items-center gap-3">
+              <Package className="w-6 h-6 text-primary" /> Order Detail
+            </DialogTitle>
+            <p className="text-muted-foreground text-sm font-body mt-1">Order ID: #{selectedOrder?.id.slice(0, 8)}</p>
+          </div>
+
           {selectedOrder && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div><span className="text-muted-foreground">Customer:</span> {selectedOrder.customer_name}</div>
-                <div><span className="text-muted-foreground">Phone:</span> {selectedOrder.customer_phone}</div>
-                <div><span className="text-muted-foreground">Channel:</span> {selectedOrder.channel}</div>
-                <div><span className="text-muted-foreground">Total:</span> {selectedOrder.currency} {selectedOrder.total.toLocaleString()}</div>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Update Status:</p>
-                <div className="flex flex-wrap gap-2">
-                  {statusSteps.map(s => (
-                    <Button key={s} size="sm" variant={selectedOrder.status === s ? "default" : "outline"} onClick={() => { updateStatus.mutate({ id: selectedOrder.id, status: s }); setSelectedOrder({ ...selectedOrder, status: s }); }} className="text-xs capitalize">{s}</Button>
-                  ))}
+            <div className="p-8 space-y-8">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
+                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-2">Customer Info</p>
+                  <p className="font-black text-sm">{selectedOrder.customer_name}</p>
+                  <p className="text-xs text-muted-foreground font-body mt-0.5">{selectedOrder.customer_phone}</p>
+                </div>
+                <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
+                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-2">Order Value</p>
+                  <p className="font-black text-xl text-primary">{selectedOrder.currency} {selectedOrder.total.toLocaleString()}</p>
+                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter mt-1">{selectedOrder.channel} channel</p>
                 </div>
               </div>
-              {selectedOrder.notes && <p className="text-sm text-muted-foreground">Notes: {selectedOrder.notes}</p>}
+
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Lifecycle Status</label>
+                <div className="flex flex-wrap gap-2">
+                  {statusSteps.map(s => (
+                    <Button 
+                      key={s} 
+                      size="sm" 
+                      variant={selectedOrder.status === s ? "default" : "outline"} 
+                      onClick={() => { updateStatus.mutate({ id: selectedOrder.id, status: s }); setSelectedOrder({ ...selectedOrder, status: s } as Order); }} 
+                      className={`text-[10px] font-black uppercase tracking-tighter px-4 py-4 rounded-xl ${selectedOrder.status === s ? 'bg-primary' : 'border-border/50'}`}
+                    >
+                      {s}
+                    </Button>
+                  ))}
+                  <Button 
+                    variant={selectedOrder.status === 'cancelled' ? 'destructive' : 'outline'}
+                    size="sm" 
+                    onClick={() => { updateStatus.mutate({ id: selectedOrder.id, status: 'cancelled' }); setSelectedOrder({ ...selectedOrder, status: 'cancelled' } as Order); }}
+                    className="text-[10px] font-black uppercase tracking-tighter px-4 py-4 rounded-xl"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+
+              {/* Fulfillment Panel §9-§10 */}
+              <div className="p-6 rounded-[2rem] bg-indigo-50/50 border border-indigo-100 space-y-5">
+                <div className="flex items-center justify-between">
+                   <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest inline-flex items-center gap-2">
+                     <Truck className="w-3.5 h-3.5" /> Fulfillment Logistics §9
+                   </p>
+                   {(selectedOrder as any).delivery_confirmed_at && (
+                     <Badge className="bg-emerald-500 text-white font-black text-[9px] uppercase">Delivered</Badge>
+                   )}
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4">
+                   <div className="space-y-2">
+                     <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Assigned Rider Name / ID</label>
+                     <Input 
+                        placeholder="e.g. Samuel (Rider 04)" 
+                        defaultValue={(selectedOrder as any).rider_name}
+                        onBlur={(e) => {
+                          if (e.target.value !== (selectedOrder as any).rider_name) {
+                            updateStatus.mutate({ id: selectedOrder.id, status: selectedOrder.status || 'pending' }); // Mock update for now
+                            supabase.from('orders').update({ rider_name: e.target.value } as any).eq('id', selectedOrder.id).then(() => {
+                              toast({ title: "Rider assigned" });
+                            });
+                          }
+                        }}
+                        className="bg-white border-indigo-200 h-11 rounded-xl" 
+                     />
+                   </div>
+                   
+                   <div className="space-y-2">
+                     <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Delivery Proof URL §10</label>
+                     <Input 
+                        placeholder="https://..." 
+                        defaultValue={(selectedOrder as any).delivery_proof_url}
+                        onBlur={(e) => {
+                          if (e.target.value !== (selectedOrder as any).delivery_proof_url) {
+                            supabase.from('orders').update({ delivery_proof_url: e.target.value } as any).eq('id', selectedOrder.id).then(() => {
+                              toast({ title: "Proof URL updated" });
+                            });
+                          }
+                        }}
+                        className="bg-white border-indigo-200 h-11 rounded-xl" 
+                     />
+                   </div>
+                </div>
+
+                <div className="flex gap-3">
+                   <Button 
+                     variant="outline" 
+                     className="flex-1 border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-black text-xs h-12 rounded-2xl"
+                     onClick={() => {
+                        const now = new Date().toISOString();
+                        supabase.from('orders').update({ fulfillment_collected_at: now, status: 'shipped' } as any).eq('id', selectedOrder.id).then(() => {
+                           queryClient.invalidateQueries({ queryKey: ["orders"] });
+                           toast({ title: "Marked as Collected" });
+                        });
+                     }}
+                   >
+                     Mark Collected
+                   </Button>
+                   <Button 
+                     className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs h-12 rounded-2xl shadow-lg shadow-indigo-200"
+                     onClick={() => {
+                        const now = new Date().toISOString();
+                        supabase.from('orders').update({ delivery_confirmed_at: now, status: 'delivered' } as any).eq('id', selectedOrder.id).then(() => {
+                           queryClient.invalidateQueries({ queryKey: ["orders"] });
+                           toast({ title: "Delivery Confirmed" });
+                        });
+                     }}
+                   >
+                     Confirm Delivery
+                   </Button>
+                </div>
+              </div>
+
+              {selectedOrder.notes && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100">
+                   <p className="text-[9px] font-black uppercase text-amber-600 mb-1">Internal Notes</p>
+                   <p className="text-sm font-body text-amber-900/80">{selectedOrder.notes}</p>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

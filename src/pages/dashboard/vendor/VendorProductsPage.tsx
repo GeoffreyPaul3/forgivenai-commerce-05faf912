@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Package, Search, ShoppingBag, Tag, Eye, EyeOff, Pencil,
-  Check, X, AlertCircle, Filter, Star, ImageOff
+  Check, X, AlertCircle, Filter, Star, ImageOff, Plus
 } from "lucide-react";
 import { useVendorProfile } from "./VendorDashboard";
 
@@ -111,20 +111,18 @@ export default function VendorProductsPage() {
     onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
   });
 
-  const updateMarkup = useMutation({
-    mutationFn: async ({ productId, price }: { productId: string; price: number }) => {
+  const updateStockStatus = useMutation({
+    mutationFn: async ({ productId, stock_status }: { productId: string; stock_status: string }) => {
       const { error } = await (supabase as any)
         .from("products")
-        .update({ price })
+        .update({ stock_status })
         .eq("id", productId)
         .eq("vendor_id", vendor?.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendor-my-products"] });
       queryClient.invalidateQueries({ queryKey: ["all-products-vendor-view"] });
-      setEditingId(null);
-      toast({ title: "Price updated!", description: "Your markup price has been saved." });
+      toast({ title: "Inventory status updated!" });
     },
     onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
   });
@@ -137,15 +135,15 @@ export default function VendorProductsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="font-heading text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">
-            My Products
+            My Product Catalogue
           </h2>
           <p className="text-muted-foreground font-body mt-1">
-            Browse all available products · select which ones to sell · set your markup price.
+            Browse main inventory · Enable products you supply · Manage stock status §5.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="border-primary/20 text-primary bg-primary/5 font-bold px-3 py-1.5">
-            <Package className="w-3 h-3 mr-1.5" /> {enabledCount} in catalogue
+          <Badge variant="outline" className="border-primary/20 text-primary bg-primary/5 font-black px-4 py-2 rounded-xl">
+            <Package className="w-4 h-4 mr-2" /> {enabledCount} Active Items
           </Badge>
         </div>
       </div>
@@ -155,21 +153,21 @@ export default function VendorProductsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search products..."
+            placeholder="Filter catalogue..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-9 bg-muted/30 border-border focus:border-primary/40 h-10"
+            className="pl-10 bg-card border-border/50 rounded-xl h-12 focus:ring-primary/20"
           />
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           {categories.slice(0, 6).map(cat => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-tight transition-all border ${
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
                 categoryFilter === cat
-                  ? "bg-primary text-white border-primary"
-                  : "bg-muted/30 text-muted-foreground border-transparent hover:border-border"
+                  ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
+                  : "bg-card text-muted-foreground border-border/50 hover:border-primary/30"
               }`}
             >
               {cat}
@@ -178,156 +176,139 @@ export default function VendorProductsPage() {
         </div>
       </div>
 
-      {/* Notice */}
-      <div className="p-3.5 rounded-xl border border-border bg-muted/20 flex items-center gap-3">
-        <AlertCircle className="w-4 h-4 text-primary shrink-0" />
-        <p className="text-xs text-muted-foreground font-body">
-          <strong className="text-foreground">Read-only base data:</strong> Product details are managed by admin. You can enable/disable products and set your own markup price only.
-        </p>
+      {/* Notice §15 Core Principle */}
+      <div className="p-4 rounded-2xl border border-primary/20 bg-primary/5 flex items-start gap-4">
+        <AlertCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="text-sm font-black text-primary uppercase tracking-tighter">Forgiven Pricing Policy §15</p>
+          <p className="text-xs text-muted-foreground font-body leading-relaxed">
+            As an FSC Vendor, selling prices are managed centrally by the platform. You are responsible for maintaining accurate 
+            <strong className="text-foreground"> Stock Status</strong> for your flexible inventory to ensure seamless order fulfillment.
+          </p>
+        </div>
       </div>
 
       {/* Product Grid */}
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden animate-pulse">
-              <div className="h-40 bg-muted" />
-              <div className="p-4 space-y-2">
-                <div className="h-3 bg-muted rounded w-3/4" />
-                <div className="h-3 bg-muted rounded w-1/2" />
+            <div key={i} className="rounded-3xl border border-border/50 bg-card overflow-hidden animate-pulse">
+              <div className="h-48 bg-muted" />
+              <div className="p-5 space-y-3">
+                <div className="h-4 bg-muted rounded-full w-3/4" />
+                <div className="h-3 bg-muted rounded-full w-1/2" />
               </div>
             </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <ShoppingBag className="w-12 h-12 text-muted-foreground/30 mb-4" />
-          <p className="font-heading font-bold text-lg text-muted-foreground">No products found</p>
-          <p className="text-muted-foreground/60 text-sm mt-1">Try adjusting your search or filters.</p>
+          <div className="w-20 h-20 rounded-3xl bg-muted/30 flex items-center justify-center mb-6">
+             <ShoppingBag className="w-10 h-10 text-muted-foreground/30" />
+          </div>
+          <p className="font-heading font-black text-xl text-foreground tracking-tight">Catalogue is empty</p>
+          <p className="text-muted-foreground text-sm mt-2 max-w-xs mx-auto">Try adjusting your search or filters to find products to supply.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           <AnimatePresence>
             {filtered.map((product: any, i: number) => {
               const isEnabled = myProductIds.has(product.id);
-              const myData = myProductMap[product.id];
-              const isEditing = editingId === product.id;
-              const displayPrice = myData?.price ?? product.price;
+              const displayPrice = product.price; // Read-only FSC price
+              const stockStatus = product.stock_status || "available";
 
               return (
                 <motion.div
                   key={product.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.03 }}
-                  className={`rounded-2xl border overflow-hidden bg-card transition-all hover:shadow-md group ${
-                    isEnabled ? "border-primary/30" : "border-border opacity-75 hover:opacity-100"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.02 }}
+                  className={`rounded-[2rem] border overflow-hidden bg-card transition-all group ${
+                    isEnabled ? "border-primary/20 ring-1 ring-primary/5 shadow-xl shadow-primary/5" : "border-border/50 opacity-80 hover:opacity-100"
                   }`}
                 >
                   {/* Image */}
-                  <div className="relative h-40 bg-muted overflow-hidden">
+                  <div className="relative h-48 bg-muted overflow-hidden">
                     {product.images?.[0] ? (
                       <img
                         src={product.images[0]}
                         alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         loading="lazy"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <ImageOff className="w-8 h-8 text-muted-foreground/30" />
+                        <ImageOff className="w-10 h-10 text-muted-foreground/20" />
                       </div>
                     )}
-                    {/* Enable/Disable Toggle */}
-                    <button
-                      onClick={() => toggleProduct.mutate({ productId: product.id, enable: !isEnabled })}
-                      className={`absolute top-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center transition-all shadow-sm ${
-                        isEnabled
-                          ? "bg-primary text-white hover:bg-primary/80"
-                          : "bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm"
-                      }`}
-                      title={isEnabled ? "Disable product" : "Enable product"}
-                    >
-                      {isEnabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                    </button>
+                    
+                    <div className="absolute top-4 right-4 flex flex-col gap-2">
+                       <button
+                         onClick={() => toggleProduct.mutate({ productId: product.id, enable: !isEnabled })}
+                         className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-xl backdrop-blur-md ${
+                           isEnabled
+                             ? "bg-primary text-white hover:rotate-12"
+                             : "bg-white/90 text-primary hover:bg-white"
+                         }`}
+                       >
+                         {isEnabled ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                       </button>
+                    </div>
+
                     {isEnabled && (
-                      <div className="absolute top-2 left-2">
-                        <Badge className="text-[9px] bg-primary/90 text-white border-0 font-bold">✓ Active</Badge>
+                      <div className="absolute top-4 left-4">
+                        <Badge className="bg-emerald-500 text-white border-0 font-black text-[9px] uppercase tracking-widest px-3 py-1 shadow-lg shadow-emerald-500/20">
+                          My Product
+                        </Badge>
                       </div>
                     )}
                   </div>
 
                   {/* Info */}
-                  <div className="p-3 space-y-2">
+                  <div className="p-6 space-y-4">
                     <div>
-                      <p className="font-semibold text-sm truncate leading-tight">{product.name}</p>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{product.category}</p>
+                      <p className="font-heading font-black text-sm truncate tracking-tight">{product.name}</p>
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">{product.category}</p>
                     </div>
 
-                    {/* Price Section */}
-                    <div className="flex items-center justify-between gap-2">
-                      {isEditing ? (
-                        <div className="flex items-center gap-1 flex-1">
-                          <Input
-                            type="number"
-                            value={editPrice}
-                            onChange={e => setEditPrice(e.target.value)}
-                            className="h-7 text-xs px-2 bg-muted/50 border-border"
-                            placeholder="Price"
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => updateMarkup.mutate({ productId: product.id, price: Number(editPrice) })}
-                            className="w-6 h-7 flex items-center justify-center rounded bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                          >
-                            <Check className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => setEditingId(null)}
-                            className="w-6 h-7 flex items-center justify-center rounded bg-muted text-muted-foreground hover:bg-muted/80"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
+                    <div className="flex items-center justify-between">
+                       <p className="text-lg font-heading font-black text-primary">
+                         {product.currency || "MWK"} {(displayPrice || 0).toLocaleString()}
+                       </p>
+                       <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter border-border/50 text-muted-foreground">
+                         FSC Selling Price
+                       </Badge>
+                    </div>
+
+                    {isEnabled && product.inventory_mode === 'flexible' && (
+                      <div className="pt-2 border-t border-border/50">
+                        <p className="text-[9px] font-black uppercase text-muted-foreground mb-2 tracking-widest">Inventory Status §5</p>
+                        <div className="flex gap-1.5">
+                           {['available', 'low_stock', 'unavailable'].map((status) => (
+                              <button
+                                key={status}
+                                onClick={() => updateStockStatus.mutate({ productId: product.id, stock_status: status })}
+                                className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all border ${
+                                   stockStatus === status 
+                                   ? (status === 'available' ? 'bg-emerald-500 text-white border-emerald-500' : status === 'low_stock' ? 'bg-amber-500 text-white border-amber-500' : 'bg-red-500 text-white border-red-500')
+                                   : 'bg-muted/30 text-muted-foreground border-transparent hover:border-border'
+                                }`}
+                              >
+                                {status.replace('_', ' ')}
+                              </button>
+                           ))}
                         </div>
-                      ) : (
-                        <>
-                          <div>
-                            <p className="text-sm font-bold text-primary">
-                              {product.currency || "MWK"} {(displayPrice || 0).toLocaleString()}
-                            </p>
-                            {myData?.price && myData.price !== product.price && (
-                              <p className="text-[9px] text-muted-foreground line-through">
-                                Base: {(product.price || 0).toLocaleString()}
-                              </p>
-                            )}
-                          </div>
-                          {isEnabled && (
-                            <button
-                              onClick={() => { setEditingId(product.id); setEditPrice(String(displayPrice || "")); }}
-                              className="w-7 h-7 flex items-center justify-center rounded-lg bg-muted hover:bg-muted/80 transition-colors"
-                              title="Set markup price"
-                            >
-                              <Tag className="w-3 h-3 text-muted-foreground" />
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
-                    {/* Enable / Disable button */}
-                    <Button
-                      size="sm"
-                      variant={isEnabled ? "outline" : "default"}
-                      className={`w-full h-7 text-xs font-bold ${
-                        isEnabled
-                          ? "border-red-500/20 text-red-500 hover:bg-red-500/5"
-                          : "bg-primary hover:bg-primary/90"
-                      }`}
-                      onClick={() => toggleProduct.mutate({ productId: product.id, enable: !isEnabled })}
-                      disabled={toggleProduct.isPending}
-                    >
-                      {isEnabled ? "Remove from Catalogue" : "Add to Catalogue"}
-                    </Button>
+                    {!isEnabled && (
+                      <Button
+                        onClick={() => toggleProduct.mutate({ productId: product.id, enable: true })}
+                        className="w-full rounded-2xl bg-primary hover:bg-primary/90 text-white font-black text-xs h-11 shadow-lg shadow-primary/10"
+                      >
+                        Add to Supply Catalog
+                      </Button>
+                    )}
                   </div>
                 </motion.div>
               );

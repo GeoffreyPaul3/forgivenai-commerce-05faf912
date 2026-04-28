@@ -15,19 +15,19 @@ const features = [
   {
     icon: ShoppingBag,
     title: "Product Hub",
-    description: "AI-driven onboarding that extracts 200+ fabric, fit, and style attributes into sophisticated brand-aligned descriptors.",
+    description: "Automated onboarding that extracts 200+ fabric, fit, and style attributes into sophisticated brand-aligned descriptors.",
     benefit: "Precision Cataloging"
   },
   {
     icon: Video,
     title: "UGC Studio",
-    description: "Convert flat imagery into cinematic high-conversion short-form videos featuring AI avatars (fal.ai + Veo 3.1).",
+    description: "Convert flat imagery into cinematic high-conversion short-form videos featuring virtual avatars (fal.ai + Veo 3.1).",
     benefit: "Zero Production Lag"
   },
   {
     icon: MessageSquare,
     title: "WhatsApp Sales Agent",
-    description: "Multi-modal persistent AI agents that handle sales, support, and orders with the elegance of a personal shopper.",
+    description: "Multi-modal persistent intelligent agents that handle sales, support, and orders with the elegance of a personal shopper.",
     benefit: "Twilio-Powered Concierge"
   },
   {
@@ -72,7 +72,7 @@ const FeaturesSection = () => {
             viewport={{ once: true }}
             className="text-maroon/60 text-lg max-w-md font-body"
           >
-            Forgiven AI Commerce OS provides the essential infrastructure to automate every touchpoint of your fashion brand.
+            Forgiven Commerce Infrastructure provides the essential tools to automate every touchpoint of your fashion brand.
           </motion.p>
         </div>
 

@@ -9,23 +9,23 @@ interface PortalAuthLayoutProps {
 
 const content = {
   vendor: {
-    title: "The Future of Digital Supply",
-    subtitle: "Scale your inventory across global markets with AI-driven logistics and automated fulfillment.",
+    title: "Premium Retail Infrastructure",
+    subtitle: "Scale your inventory across high-traffic channels with precision logistics and automated fulfillment protocols.",
     features: [
-      { icon: Globe, text: "Global distribution network" },
-      { icon: Zap, text: "Automated order fulfillment" },
-      { icon: ShieldCheck, text: "Secure payment processing" },
-      { icon: TrendingUp, text: "Real-time performance analytics" },
+      { icon: Globe, text: "Global commerce network" },
+      { icon: Zap, text: "Seamless order fulfillment" },
+      { icon: ShieldCheck, text: "Secure financial settlements" },
+      { icon: TrendingUp, text: "Advanced performance tracking" },
     ]
   },
   agent: {
-    title: "Empowering Social Commerce",
-    subtitle: "Turn your network into a business. Sell premium products and earn top-tier commissions.",
+    title: "Professional Affiliate Commerce",
+    subtitle: "Monetize your network with a curated catalogue of premium products and high-performance earnings.",
     features: [
-      { icon: Users, text: "Dedicated referral tracking" },
-      { icon: Zap, text: "Instant commission payouts" },
-      { icon: Globe, text: "Access to global inventory" },
-      { icon: CheckCircle2, text: "Professional sales toolkit" },
+      { icon: Users, text: "Precision referral tracking" },
+      { icon: Zap, text: "Expedited commission payouts" },
+      { icon: Globe, text: "Premium global inventory" },
+      { icon: CheckCircle2, text: "Executive sales resources" },
     ]
   }
 };
@@ -85,7 +85,7 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
         </div>
 
         <div className="text-cream/30 text-xs font-body uppercase tracking-widest">
-          Engineered for Excellence &bull; Powered by Forgiven AI
+          Engineered for Excellence &bull; Forgiven Shopping Centre
         </div>
       </div>
 

@@ -57,7 +57,7 @@ export default function VendorPayoutsPage() {
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("orders")
-        .select("id, total, status, created_at, items")
+        .select("id, total, vendor_amount, status, created_at, items")
         .order("created_at", { ascending: false });
       return (data || []).filter((o: any) =>
         (o.items as any[]).some((item: any) => vendorProductIds?.includes(item.product_id))
@@ -69,8 +69,9 @@ export default function VendorPayoutsPage() {
     const totalRevenue = (allOrders || []).reduce((s: number, o: any) => s + (o.total || 0), 0);
     const totalPaid = (payouts || []).filter((p: any) => p.status === "paid").reduce((s: number, p: any) => s + (p.amount || 0), 0);
     const totalPending = (payouts || []).filter((p: any) => p.status === "pending").reduce((s: number, p: any) => s + (p.amount || 0), 0);
-    // Simplified commission: platform takes 20%, vendor gets 80%
-    const vendorShare = Math.round(totalRevenue * 0.8);
+    
+    // Use explicit vendor_amount from DB §11
+    const vendorShare = (allOrders || []).reduce((s: number, o: any) => s + (o.vendor_amount || 0), 0);
     const balance = vendorShare - totalPaid;
     return { totalRevenue, vendorShare, totalPaid, totalPending, balance };
   }, [allOrders, payouts]);
@@ -165,25 +166,25 @@ export default function VendorPayoutsPage() {
           </CardHeader>
           <CardContent className="pt-5 space-y-4">
             {[
-              { label: "Total Order Revenue", value: stats.totalRevenue, color: "bg-blue-500" },
-              { label: "Platform Fee (20%)", value: Math.round(stats.totalRevenue * 0.2), color: "bg-red-400", negative: true },
-              { label: "Your Gross Share (80%)", value: stats.vendorShare, color: "bg-primary" },
-              { label: "Already Paid Out", value: stats.totalPaid, color: "bg-emerald-500", negative: true },
-              { label: "Available to Withdraw", value: Math.max(0, stats.balance), color: "bg-gold" },
+              { label: "Gross Marketplace Sales", value: stats.totalRevenue, color: "bg-blue-500" },
+              { label: "Platform Margin (30%)", value: Math.round(stats.totalRevenue - stats.vendorShare), color: "bg-red-400", negative: true },
+              { label: "My Net Earnings (Cost)", value: stats.vendorShare, color: "bg-primary" },
+              { label: "Successfully Withdrawn", value: stats.totalPaid, color: "bg-emerald-500", negative: true },
+              { label: "Available for Payout", value: Math.max(0, stats.balance), color: "bg-gold" },
             ].map((row, i) => (
               <div key={row.label} className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${row.color}`} />
-                    <span className="text-sm font-medium">{row.label}</span>
+                    <span className="text-sm font-black uppercase tracking-tighter text-muted-foreground/80">{row.label}</span>
                   </div>
-                  <span className={`font-bold text-sm ${(row as any).negative ? "text-red-500" : ""}`}>
+                  <span className={`font-black text-sm ${(row as any).negative ? "text-red-500" : "text-foreground"}`}>
                     {(row as any).negative ? "- " : ""}MWK {row.value.toLocaleString()}
                   </span>
                 </div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div className="h-2 rounded-full bg-muted/50 overflow-hidden shadow-inner">
                   <div
-                    className={`h-full rounded-full ${row.color} transition-all duration-700`}
+                    className={`h-full rounded-full ${row.color} transition-all duration-1000 shadow-lg`}
                     style={{ width: stats.totalRevenue > 0 ? `${Math.min((row.value / stats.totalRevenue) * 100, 100)}%` : "0%" }}
                   />
                 </div>
@@ -193,24 +194,24 @@ export default function VendorPayoutsPage() {
         </Card>
 
         {/* Payout Info */}
-        <Card className="rounded-2xl border-border bg-card shadow-sm">
-          <CardHeader className="border-b border-border/50">
-            <CardTitle className="font-heading flex items-center gap-2 text-base">
-              <Wallet className="w-4 h-4 text-gold" /> Payout Info
+        <Card className="rounded-[2rem] border-border/50 bg-card shadow-xl shadow-black/5">
+          <CardHeader className="border-b border-border/50 p-6">
+            <CardTitle className="font-heading flex items-center gap-3 text-lg font-black">
+              <Wallet className="w-5 h-5 text-gold" /> Payout Intelligence §11
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-5 space-y-4">
+          <CardContent className="p-6 space-y-4">
             {[
-              { label: "Platform Commission", value: "20%" },
-              { label: "Your Net Share", value: "80%" },
-              { label: "Payment Method", value: "Mobile Money" },
-              { label: "Payout Cycle", value: "Weekly (Fridays)" },
-              { label: "Min. Withdrawal", value: "MWK 5,000" },
-              { label: "Processing Time", value: "1–24 hours" },
+              { label: "Automated Margin", value: "30% FSC" },
+              { label: "Vendor Remuneration", value: "Cost Price" },
+              { label: "Settlement Protocol", value: "Mobile Money" },
+              { label: "Verification Cycle", value: "Daily Sync" },
+              { label: "Min. Threshold", value: "MWK 5,000" },
+              { label: "Payment Status", value: "Verified Only" },
             ].map(row => (
               <div key={row.label} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-                <span className="text-xs text-muted-foreground font-body">{row.label}</span>
-                <span className="text-xs font-bold">{row.value}</span>
+                <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{row.label}</span>
+                <span className="text-xs font-black text-foreground">{row.value}</span>
               </div>
             ))}
             <Button

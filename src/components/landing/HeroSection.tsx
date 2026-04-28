@@ -72,7 +72,7 @@ const HeroSection = () => {
           >
             <Sparkles className="w-4 h-4 text-gold" />
             <span className="text-gold-light text-[10px] font-black tracking-[0.4em] uppercase">
-              Forgiven AI Commerce OS
+              Universal Commerce OS
             </span>
           </motion.div>
 
@@ -92,8 +92,8 @@ const HeroSection = () => {
             transition={{ duration: 1, delay: 0.6 }}
             className="text-cream/60 text-lg md:text-2xl max-w-3xl mx-auto mb-14 font-body font-extralight tracking-wide leading-relaxed"
           >
-            A high-end AI-powered commerce operating system for fashion brands. 
-            Automate product onboarding, cinematic UGC creation, and global sales end-to-end.
+            A high-end commerce operating system for bespoke fashion brands. 
+            Automate product onboarding, cinematic logistics, and global sales end-to-end.
           </motion.p>
 
           <motion.div

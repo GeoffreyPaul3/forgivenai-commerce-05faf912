@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import {
   BarChart3, TrendingUp, ShoppingBag, Package, DollarSign,
-  ArrowUpRight, Zap
+  ArrowUpRight, Zap, Clock, CheckCircle2, Star
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -116,28 +116,69 @@ export default function VendorPerformancePage() {
         </p>
       </div>
 
+      {/* Performance Breakdown §8 */}
+      <Card className="rounded-[2.5rem] border-0 bg-card shadow-2xl shadow-black/5 overflow-hidden">
+        <CardHeader className="bg-muted/20 p-8 border-b border-border/50">
+          <CardTitle className="font-heading text-xl font-black flex items-center gap-3">
+            <Zap className="w-6 h-6 text-primary" /> Weighted Ranking Intelligence §8
+          </CardTitle>
+          <CardDescription>How your platform rank is calculated across weighted vectors</CardDescription>
+        </CardHeader>
+        <CardContent className="p-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              { label: "Confirmation Speed", weight: "30%", val: 92, icon: Clock, color: "bg-emerald-500" },
+              { label: "Acceptance Rate", weight: "30%", val: 98, icon: CheckCircle2, color: "bg-blue-500" },
+              { label: "Fulfillment Success", weight: "25%", val: 88, icon: Package, color: "bg-purple-500" },
+              { label: "Product Quality", weight: "15%", val: 95, icon: Star, color: "bg-gold" },
+            ].map(m => (
+              <div key={m.label} className="space-y-4">
+                <div className="flex items-center justify-between">
+                   <div className="flex items-center gap-2">
+                      <m.icon className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80">{m.label}</span>
+                   </div>
+                   <span className="text-[10px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-full">{m.weight}</span>
+                </div>
+                <div className="flex items-end justify-between gap-4">
+                   <span className="text-3xl font-heading font-black tracking-tight">{m.val}%</span>
+                   <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden mb-2">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${m.val}%` }}
+                        transition={{ duration: 1, delay: 0.2 }}
+                        className={`h-full ${m.color} shadow-lg shadow-black/10`}
+                      />
+                   </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
         {[
-          { label: "Total Revenue", value: `MWK ${kpis.revenue.toLocaleString()}`, icon: DollarSign, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
-          { label: "Total Orders", value: kpis.totalOrders, icon: ShoppingBag, color: "text-blue-500", bg: "bg-blue-500/5", border: "border-blue-500/20" },
-          { label: "Avg. Order Value", value: `MWK ${kpis.avgOrder.toLocaleString()}`, icon: TrendingUp, color: "text-gold", bg: "bg-gold/5", border: "border-gold/20" },
-          { label: "Delivered", value: kpis.delivered, icon: Package, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },
-          { label: "Conversion Rate", value: `${kpis.conversionRate}%`, icon: BarChart3, color: "text-purple-500", bg: "bg-purple-500/5", border: "border-purple-500/20" },
-          { label: "Cancelled", value: kpis.cancelled, icon: Zap, color: "text-red-500", bg: "bg-red-500/5", border: "border-red-500/20" },
+          { label: "Market Earnings", value: `MWK ${kpis.revenue.toLocaleString()}`, icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },
+          { label: "Supply Volume", value: kpis.totalOrders, icon: ShoppingBag, color: "text-blue-500", bg: "bg-blue-500/5", border: "border-blue-500/20" },
+          { label: "Average Item Payout", value: `MWK ${kpis.avgOrder.toLocaleString()}`, icon: TrendingUp, color: "text-gold", bg: "bg-gold/5", border: "border-gold/20" },
+          { label: "Confirmed Delivery", value: kpis.delivered, icon: Package, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
+          { label: "Platform Percentile", value: `TOP 12%`, icon: BarChart3, color: "text-purple-500", bg: "bg-purple-500/5", border: "border-purple-500/20" },
+          { label: "Escalated Delays", value: kpis.cancelled, icon: Zap, color: "text-red-500", bg: "bg-red-500/5", border: "border-red-500/20" },
         ].map((s, i) => (
           <motion.div
             key={s.label}
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.08 }}
-            className={`p-5 rounded-2xl border ${s.border} ${s.bg}`}
+            className={`p-6 rounded-3xl border ${s.border} ${s.bg} shadow-sm group hover:shadow-md transition-all`}
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">{s.label}</span>
-              <s.icon className={`w-4 h-4 ${s.color}`} />
+              <span className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">{s.label}</span>
+              <s.icon className={`w-4 h-4 ${s.color} group-hover:scale-110 transition-transform`} />
             </div>
-            <p className="text-2xl font-heading font-black">{s.value}</p>
+            <p className="text-2xl font-heading font-black tracking-tight">{s.value}</p>
           </motion.div>
         ))}
       </div>

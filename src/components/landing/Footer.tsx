@@ -12,10 +12,10 @@ const Footer = () => {
               <div className="w-8 h-8 rounded-lg bg-gold flex items-center justify-center">
                 <span className="font-heading font-black text-maroon-dark text-sm">F</span>
               </div>
-              <span className="font-heading text-xl font-bold text-white tracking-tight">Forgiven AI</span>
+              <span className="font-heading text-xl font-bold text-white tracking-tight">Forgiven Shopping Centre</span>
             </Link>
             <p className="text-cream/40 text-sm font-body leading-relaxed max-w-sm mb-8">
-              The world's most advanced AI-powered commerce operating system for 
+              The world's most sophisticated integrated commerce infrastructure for 
               forward-thinking fashion and lifestyle brands.
             </p>
           </div>

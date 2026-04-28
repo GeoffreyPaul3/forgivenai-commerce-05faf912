@@ -62,7 +62,7 @@ export default function AuthPage() {
 
         const userRole = profile?.role;
         
-        toast({ title: "Welcome back!", description: "Successfully logged in." });
+        toast({ title: "Access Granted", description: "Authentication successful. Welcome back." });
 
         // Force redirect to correct portal if user is on the wrong one
         if (userRole === "vendor" && appMode !== "vendor") {
@@ -116,7 +116,7 @@ export default function AuthPage() {
       } else if (mode === "reset") {
         const { error } = await supabase.auth.updateUser({ password: newPassword });
         if (error) throw error;
-        toast({ title: "Password updated!", description: "You can now sign in with your new password." });
+        toast({ title: "Credentials Updated", description: "Security protocols updated. Please sign in." });
         await supabase.auth.signOut();
         setMode("login");
         setNewPassword("");
@@ -130,15 +130,15 @@ export default function AuthPage() {
 
   const headings: Record<AuthMode, { title: string; sub: string }> = {
     login:  { 
-      title: appMode === "admin" ? "Sign in to Dashboard" : "Welcome Back", 
-      sub: appMode === "admin" ? "Access the core commerce engine." : "Log in to manage your commerce empire." 
+      title: appMode === "admin" ? "Systems Access" : "Portal Sign In", 
+      sub: appMode === "admin" ? "Access the central commerce control hub." : "Manage your retail operations and performance." 
     },
     signup: { 
-      title: appMode === "vendor" ? "Start selling with Forgiven Shopping Centre" : appMode === "agent" ? "Start earning with Forgiven Shopping Centre" : "Create Admin Account", 
-      sub: appMode === "vendor" ? "Join as a vendor and manage your products and orders." : appMode === "agent" ? "Join as an agent and earn commissions by selling." : "Join as an administrator to manage the commerce ecosystem." 
+      title: appMode === "vendor" ? "Partner with Forgiven" : appMode === "agent" ? "Join the Commerce Network" : "Administrator Registration", 
+      sub: appMode === "vendor" ? "Register as a certified vendor to access our distribution network." : appMode === "agent" ? "Become a certified agent and earn through premium retail." : "Initialize administrative credentials for the commerce ecosystem." 
     },
-    forgot: { title: "Reset Password",      sub: "Enter your email and we'll send a reset link." },
-    reset:  { title: "New Password",        sub: "Choose a strong password for your account." },
+    forgot: { title: "Credential Recovery",      sub: "Enter your registered email to receive a secure reset link." },
+    reset:  { title: "Update Credentials",        sub: "Establish a new secure password for your account." },
   };
 
   const formContent = (
