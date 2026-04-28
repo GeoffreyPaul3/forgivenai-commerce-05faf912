@@ -7,11 +7,25 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   Package, DollarSign, Star, Clock, CheckCircle2, 
-  XCircle, Truck, Info, ExternalLink, BarChart3,
-  Calendar, AlertCircle
+  XCircle, Truck, Info, BarChart3,
+  Calendar, AlertCircle, TrendingUp, Wallet, ShieldCheck, Timer
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+
+/** Returns vendor class A/B/C/D based on score (spec §8) */
+function getVendorClass(score: number | null) {
+  if (!score) return { label: "—", color: "text-muted-foreground", bg: "bg-muted/40" };
+  if (score >= 85) return { label: "A", color: "text-emerald-600", bg: "bg-emerald-500/10 border-emerald-500/20" };
+  if (score >= 70) return { label: "B", color: "text-blue-600", bg: "bg-blue-500/10 border-blue-500/20" };
+  if (score >= 50) return { label: "C", color: "text-amber-600", bg: "bg-amber-500/10 border-amber-500/20" };
+  return { label: "D", color: "text-red-600", bg: "bg-red-500/10 border-red-500/20" };
+}
+
+/** Minutes elapsed since ISO timestamp */
+function minutesSince(iso: string) {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+}
 
 const VendorPortal = () => {
   const { toast } = useToast();
@@ -70,6 +84,7 @@ const VendorPortal = () => {
     mutationFn: async (orderId: string) => {
       const { error } = await (supabase as any).from("orders").update({ 
         vendor_confirmation_status: 'accepted',
+        status: 'confirmed',
         vendor_confirmed_at: new Date().toISOString()
       }).eq("id", orderId);
       if (error) throw error;
@@ -80,14 +95,39 @@ const VendorPortal = () => {
     },
   });
 
+  const rejectOrder = useMutation({
+    mutationFn: async (orderId: string) => {
+      const { error } = await (supabase as any).from("orders").update({ 
+        vendor_confirmation_status: 'rejected',
+        status: 'cancelled',
+        vendor_confirmed_at: new Date().toISOString()
+      }).eq("id", orderId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendor-orders"] });
+      toast({ title: "Order rejected", description: "Order has been cancelled.", variant: "destructive" });
+    },
+  });
+
   const stats = useMemo(() => {
-    if (!orders) return { pending: 0, completed: 0, revenue: 0 };
-    return orders.reduce((acc, o) => {
+    if (!orders) return { pending: 0, completed: 0, revenue: 0, avgConfirmMins: 0, confirmRate: 0, vendorAmount: 0 };
+    let totalConfirmMins = 0, confirmCount = 0, accepted = 0, total = 0;
+    return orders.reduce((acc, o: any) => {
+      total++;
       if (o.vendor_confirmation_status === 'pending') acc.pending++;
       if (o.status === 'delivered') acc.completed++;
       acc.revenue += Number(o.total || 0);
+      acc.vendorAmount += Number(o.vendor_amount || 0);
+      if (o.vendor_confirmed_at && o.created_at) {
+        const mins = Math.floor((new Date(o.vendor_confirmed_at).getTime() - new Date(o.created_at).getTime()) / 60000);
+        if (mins >= 0) { totalConfirmMins += mins; confirmCount++; }
+      }
+      if (o.vendor_confirmation_status === 'accepted') accepted++;
       return acc;
-    }, { pending: 0, completed: 0, revenue: 0 });
+    }, { pending: 0, completed: 0, revenue: 0, vendorAmount: 0,
+         avgConfirmMins: confirmCount > 0 ? Math.round(totalConfirmMins / confirmCount) : 0,
+         confirmRate: total > 0 ? Math.round((accepted / total) * 100) : 0 });
   }, [orders]);
 
   if (vendorLoading) return <div className="p-10 text-center font-body text-muted-foreground animate-pulse">Loading vendor portal...</div>;
@@ -111,24 +151,30 @@ const VendorPortal = () => {
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="px-3 py-1 bg-gold/5 text-gold border-gold/20 flex items-center gap-2">
              <Star className="w-3 h-3 fill-gold" />
-             <span className="font-bold">Score: {vendor.score}</span>
+             <span className="font-bold">Score: {vendor.score ?? "—"}</span>
           </Badge>
+          {(() => { const cls = getVendorClass(vendor.score); return (
+            <Badge variant="outline" className={`px-3 py-1 font-black text-sm border ${cls.bg} ${cls.color}`}>
+              Class {cls.label}
+            </Badge>
+          ); })()}
         </div>
       </div>
 
       {/* KPI Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "New Requests", value: stats.pending, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/5", border: "border-amber-500/20" },
           { label: "Fulfilled Orders", value: stats.completed, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },
-          { label: "Projected Sales", value: `MWK ${stats.revenue.toLocaleString()}`, icon: DollarSign, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
+          { label: "Confirm Rate", value: `${stats.confirmRate}%`, icon: TrendingUp, color: "text-blue-500", bg: "bg-blue-500/5", border: "border-blue-500/20" },
+          { label: "Avg Response", value: stats.avgConfirmMins > 0 ? `${stats.avgConfirmMins}m` : "—", icon: Timer, color: stats.avgConfirmMins > 60 ? "text-red-500" : stats.avgConfirmMins > 30 ? "text-amber-500" : "text-emerald-500", bg: "bg-primary/5", border: "border-primary/20" },
         ].map((s, idx) => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }} className={`p-6 rounded-3xl border ${s.border} ${s.bg}`}>
+          <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }} className={`p-5 rounded-2xl border ${s.border} ${s.bg}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{s.label}</span>
               <s.icon className={`w-4 h-4 ${s.color}`} />
             </div>
-            <p className="text-3xl font-heading font-black">{s.value}</p>
+            <p className="text-2xl font-heading font-black">{s.value}</p>
           </motion.div>
         ))}
       </div>
@@ -180,7 +226,7 @@ const VendorPortal = () => {
                      <TableCell className="text-right pr-6">
                         {order.vendor_confirmation_status === 'pending' ? (
                           <div className="flex items-center justify-end gap-2">
-                             <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-500/10" title="Reject">
+                             <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-500/10" title="Reject" onClick={() => rejectOrder.mutate(order.id)} disabled={rejectOrder.isPending}>
                                <XCircle className="w-4 h-4" />
                              </Button>
                              <Button size="icon" className="h-8 w-8 bg-emerald-500 hover:bg-emerald-600" onClick={() => acceptOrder.mutate(order.id)} title="Accept">
@@ -202,45 +248,82 @@ const VendorPortal = () => {
 
         {/* Side Info */}
         <div className="space-y-6">
+           {/* Vendor Scoring Breakdown — spec §8 */}
            <Card className="rounded-3xl border-border bg-card shadow-sm overflow-hidden">
              <CardHeader className="bg-gradient-to-br from-primary/5 to-transparent border-b border-border/50">
                <CardTitle className="font-heading text-lg flex items-center gap-2 font-bold uppercase tracking-tight">
                  <BarChart3 className="w-4 h-4 text-primary" /> Vendor Insights
                </CardTitle>
              </CardHeader>
-             <CardContent className="pt-6 space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/40">
-                   <div className="flex items-center gap-3">
-                      <Clock className="w-4 h-4 text-amber-500" />
-                      <span className="text-xs font-bold uppercase tracking-tight text-muted-foreground">Avg Confirmation</span>
-                   </div>
-                   <span className="font-heading font-black">12m</span>
+             <CardContent className="pt-5 space-y-3">
+                {[
+                  { label: "Avg Confirmation", value: stats.avgConfirmMins > 0 ? `${stats.avgConfirmMins}m` : "—", icon: Clock, color: stats.avgConfirmMins > 60 ? "text-red-500" : stats.avgConfirmMins > 30 ? "text-amber-500" : "text-emerald-500" },
+                  { label: "Confirm Rate (30%)", value: `${stats.confirmRate}%`, icon: TrendingUp, color: "text-blue-500" },
+                  { label: "Fulfilled Orders", value: stats.completed, icon: CheckCircle2, color: "text-emerald-500" },
+                  { label: "Vendor Score", value: vendor.score ?? "—", icon: Star, color: "text-gold" },
+                ].map(row => (
+                  <div key={row.label} className="flex items-center justify-between p-3 rounded-2xl bg-muted/40">
+                     <div className="flex items-center gap-3">
+                        <row.icon className={`w-4 h-4 ${row.color}`} />
+                        <span className="text-xs font-bold uppercase tracking-tight text-muted-foreground">{row.label}</span>
+                     </div>
+                     <span className={`font-heading font-black ${row.color}`}>{row.value}</span>
+                  </div>
+                ))}
+                {/* Confirmation timing rules — spec §7 */}
+                <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 space-y-1">
+                  <p className="text-[10px] font-bold uppercase text-primary tracking-widest mb-2">Timing Rules</p>
+                  {[
+                    { range: "5 – 15 min", label: "Ideal", color: "text-emerald-600" },
+                    { range: "up to 30 min", label: "Acceptable", color: "text-amber-600" },
+                    { range: "30 – 60 min", label: "Flagged", color: "text-orange-600" },
+                    { range: "60+ min", label: "Escalated", color: "text-red-600" },
+                  ].map(r => (
+                    <div key={r.label} className="flex justify-between text-[10px]">
+                      <span className="text-muted-foreground">{r.range}</span>
+                      <span className={`font-bold ${r.color}`}>{r.label}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/40">
-                   <div className="flex items-center gap-3">
-                      <Calendar className="w-4 h-4 text-blue-500" />
-                      <span className="text-xs font-bold uppercase tracking-tight text-muted-foreground">Next Payout</span>
-                   </div>
-                   <span className="font-heading font-black">Fri, 23 Apr</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground font-body leading-relaxed text-center px-4">
-                   Keep your confirmation speed under **30 minutes** to maintain your **VIP Vendor** status and unlock lower placement fees.
-                </p>
              </CardContent>
            </Card>
 
-           <div className="p-6 rounded-3xl border border-gold/30 bg-gold/5 flex items-start gap-4 shadow-sm group">
-              <div className="w-10 h-10 rounded-2xl bg-gold flex items-center justify-center text-white shrink-0 shadow-lg shadow-gold/20 group-hover:scale-110 transition-transform">
+           {/* Payout Tracking — spec §11 */}
+           <Card className="rounded-3xl border-border bg-card shadow-sm overflow-hidden">
+             <CardHeader className="bg-gradient-to-br from-emerald-500/5 to-transparent border-b border-border/50">
+               <CardTitle className="font-heading text-lg flex items-center gap-2 font-bold uppercase tracking-tight">
+                 <Wallet className="w-4 h-4 text-emerald-500" /> Payout Summary
+               </CardTitle>
+               <CardDescription className="text-[10px] font-body">FSC collects first · pays vendors after fulfillment</CardDescription>
+             </CardHeader>
+             <CardContent className="pt-5 space-y-3">
+               <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/40">
+                 <span className="text-xs font-bold uppercase tracking-tight text-muted-foreground">Completed Orders</span>
+                 <span className="font-heading font-black text-emerald-600">{stats.completed}</span>
+               </div>
+               <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/40">
+                 <span className="text-xs font-bold uppercase tracking-tight text-muted-foreground">Vendor Amount</span>
+                 <span className="font-heading font-black">MWK {stats.vendorAmount > 0 ? stats.vendorAmount.toLocaleString() : "Pending"}</span>
+               </div>
+               <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                 <ShieldCheck className="w-4 h-4 text-amber-500 shrink-0" />
+                 <p className="text-[10px] text-muted-foreground leading-relaxed font-body">Payouts processed by FSC admin after order fulfillment.</p>
+               </div>
+             </CardContent>
+           </Card>
+
+           <div className="p-5 rounded-3xl border border-gold/30 bg-gold/5 flex items-start gap-4 shadow-sm">
+              <div className="w-10 h-10 rounded-2xl bg-gold flex items-center justify-center text-white shrink-0 shadow-lg shadow-gold/20">
                 <Info className="w-5 h-5" />
               </div>
               <div>
                 <p className="text-xs font-bold text-foreground mb-1 uppercase tracking-tight">Important Notice</p>
                 <p className="text-[11px] text-muted-foreground leading-relaxed font-body">
-                  All orders accepted through this portal must be ready for rider pickup within **2 hours**. Delayed readiness negatively impacts your Vendor Score.
+                  Items must be ready for rider pickup within 2 hours of acceptance. Delays reduce your Vendor Score and Class ranking.
                 </p>
               </div>
            </div>
-        </div>
+         </div>
       </div>
     </div>
   );

@@ -6,10 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Package, Clock, Truck, CheckCircle, DollarSign } from "lucide-react";
+import { Search, Plus, Package, Clock, Truck, CheckCircle, DollarSign, AlertTriangle } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Order = Tables<"orders">;
+
+/** Returns delay state for pending orders (spec §7) */
+function getConfirmDelay(order: Order): { mins: number; state: "ok" | "flagged" | "escalated" } | null {
+  if ((order as any).vendor_confirmation_status !== 'pending' && order.status !== 'pending') return null;
+  const mins = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000);
+  if (mins >= 60) return { mins, state: "escalated" };
+  if (mins >= 30) return { mins, state: "flagged" };
+  return { mins, state: "ok" };
+}
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -177,6 +186,21 @@ const OrdersPage = () => {
                   <p className="text-xs text-muted-foreground font-body">{order.customer_phone || order.customer_email || "No contact"} • {order.channel} • {new Date(order.created_at).toLocaleDateString()}</p>
                 </div>
                 <div className="flex items-center gap-3">
+                  {/* Confirmation delay flag — spec §7 & §13 */}
+                  {(() => {
+                    const delay = getConfirmDelay(order);
+                    if (!delay || delay.state === "ok") return null;
+                    return (
+                      <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        delay.state === "escalated"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}>
+                        <AlertTriangle className="w-3 h-3" />
+                        {delay.state === "escalated" ? `${delay.mins}m – Escalate` : `${delay.mins}m – Delayed`}
+                      </span>
+                    );
+                  })()}
                   <span className="text-sm font-semibold font-body">{order.currency} {order.total.toLocaleString()}</span>
                   <span className={`px-2 py-0.5 text-xs rounded-full capitalize ${statusColors[order.status || "pending"]}`}>{order.status}</span>
                 </div>

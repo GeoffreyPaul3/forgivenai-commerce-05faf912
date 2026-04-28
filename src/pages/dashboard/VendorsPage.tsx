@@ -20,6 +20,15 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+/** Vendor class A/B/C/D per spec §8 */
+function getVendorClass(score: number | null) {
+  if (!score && score !== 0) return { label: "—", color: "text-muted-foreground border-muted", bg: "" };
+  if (score >= 85) return { label: "A", color: "text-emerald-700 border-emerald-500/30", bg: "bg-emerald-500/10" };
+  if (score >= 70) return { label: "B", color: "text-blue-700 border-blue-500/30", bg: "bg-blue-500/10" };
+  if (score >= 50) return { label: "C", color: "text-amber-700 border-amber-500/30", bg: "bg-amber-500/10" };
+  return { label: "D", color: "text-red-700 border-red-500/30", bg: "bg-red-500/10" };
+}
+
 const VendorsPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -146,6 +155,7 @@ const VendorsPage = () => {
               <TableHead>Category</TableHead>
               <TableHead>Products</TableHead>
               <TableHead>Score</TableHead>
+              <TableHead>Class</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -188,6 +198,11 @@ const VendorsPage = () => {
                       <Star className="w-3 h-3 fill-gold" />
                       <span className="text-sm">{vendor.score}</span>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {(() => { const cls = getVendorClass(vendor.score); return (
+                      <Badge variant="outline" className={`text-[10px] font-black border ${cls.color} ${cls.bg}`}>{cls.label}</Badge>
+                    ); })()}
                   </TableCell>
                   <TableCell>
                     <Badge variant={vendor.status === "active" ? "default" : "secondary"} className="capitalize text-[10px] font-bold">
