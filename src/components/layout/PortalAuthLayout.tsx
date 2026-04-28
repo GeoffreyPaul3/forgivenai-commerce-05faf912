@@ -85,7 +85,7 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
         </div>
 
         <div className="text-cream/30 text-xs font-body uppercase tracking-widest">
-          Engineered for Excellence &bull; Forgiven Shopping Centre
+          Forgiven Shopping Centre
         </div>
       </div>
 
