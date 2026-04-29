@@ -574,6 +574,7 @@ const DashboardPage = () => {
       <Route path="content" element={<ContentPage />} />
       <Route path="agents" element={<AgentsPage />} />
       <Route path="vendors" element={<VendorsPage />} />
+      <Route path="vendors/:id/analytics" element={<VendorPerformancePage />} />
       <Route path="vendor-portal" element={<VendorDashboard />} />
       <Route path="vendor/products" element={<VendorProductsPage />} />
       <Route path="vendor/orders" element={<VendorOrdersPage />} />

@@ -18,15 +18,22 @@ import { useNavigate } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 // Shared vendor-profile hook
-export function useVendorProfile(sessionUserId?: string) {
+export function useVendorProfile(id?: string, type: 'user' | 'vendor' = 'user') {
   return useQuery({
-    queryKey: ["vendor-profile", sessionUserId],
+    queryKey: ["vendor-profile", id, type],
     queryFn: async () => {
-      if (sessionUserId) {
-        const { data } = await (supabase as any).from("vendors").select("*").eq("user_id", sessionUserId).maybeSingle();
-        if (data) return data;
+      if (!id) {
+        const { data } = await (supabase as any).from("vendors").select("*").limit(1).maybeSingle();
+        return data;
       }
-      const { data } = await (supabase as any).from("vendors").select("*").limit(1).maybeSingle();
+      
+      const { data, error } = await (supabase as any)
+        .from("vendors")
+        .select("*")
+        .eq(type === 'user' ? "user_id" : "id", id)
+        .maybeSingle();
+        
+      if (error) throw error;
       return data;
     },
   });
@@ -432,17 +439,7 @@ export default function VendorDashboard() {
                   <ShoppingBag className="w-4 h-4" />
                 </div>
                 <span className="font-semibold text-sm">View All Orders</span>
-              </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start gap-3 rounded-2xl hover:bg-emerald-500/5 hover:text-emerald-500 transition-all h-12"
-                onClick={() => navigate("/dashboard/assistant")}
-              >
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                  <MessageCircle className="w-4 h-4" />
-                </div>
-                <span className="font-semibold text-sm">Open WhatsApp Chat</span>
-              </Button>
+              </Button>            
               <Button 
                 variant="ghost" 
                 className="w-full justify-start gap-3 rounded-2xl hover:bg-gold/5 hover:text-gold transition-all h-12"
@@ -456,6 +453,7 @@ export default function VendorDashboard() {
               <Button 
                 variant="ghost" 
                 className="w-full justify-start gap-3 rounded-2xl hover:bg-purple-500/5 hover:text-purple-500 transition-all h-12"
+                onClick={() => navigate("/dashboard/vendor/performance")}
               >
                 <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
                   <BarChart3 className="w-4 h-4" />

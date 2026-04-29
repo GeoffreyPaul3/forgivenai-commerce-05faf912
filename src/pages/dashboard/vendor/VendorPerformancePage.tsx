@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
+import { useParams, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import {
   BarChart3, TrendingUp, ShoppingBag, Package, DollarSign,
-  ArrowUpRight, Zap, Clock, CheckCircle2, Star
+  ArrowUpRight, Zap, Clock, CheckCircle2, Star, ArrowLeft
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -17,6 +19,8 @@ import { useVendorProfile } from "./VendorDashboard";
 const CHART_COLORS = ["hsl(var(--primary))", "#f59e0b", "#10b981", "#6366f1", "#ec4899", "#14b8a6"];
 
 export default function VendorPerformancePage() {
+  const { id: urlVendorId } = useParams();
+  const navigate = useNavigate();
   const [session, setSession] = useState<any>(null);
 
   useQuery({
@@ -28,7 +32,10 @@ export default function VendorPerformancePage() {
     },
   });
 
-  const { data: vendor } = useVendorProfile(session?.user?.id);
+  const { data: vendor, isLoading: vendorLoading } = useVendorProfile(
+    urlVendorId || session?.user?.id,
+    urlVendorId ? 'vendor' : 'user'
+  );
 
   const { data: products } = useQuery({
     queryKey: ["vendor-products-perf", vendor?.id],
@@ -107,13 +114,33 @@ export default function VendorPerformancePage() {
 
   return (
     <div className="space-y-8 pb-12">
-      <div>
-        <h2 className="font-heading text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">
-          Performance
-        </h2>
-        <p className="text-muted-foreground font-body mt-1">
-          Analytics, product performance, and conversion tracking.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          {urlVendorId && (
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate(-1)} 
+              className="mb-2 -ml-2 gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to Vendors
+            </Button>
+          )}
+          <h2 className="font-heading text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">
+            {urlVendorId ? `${vendor?.business_name || 'Vendor'} Performance` : 'Performance'}
+          </h2>
+          <p className="text-muted-foreground font-body mt-1">
+            {urlVendorId 
+              ? `In-depth analytics for ${vendor?.business_name || 'this business partner'}.` 
+              : 'Analytics, product performance, and conversion tracking.'
+            }
+          </p>
+        </div>
+        
+        {urlVendorId && (
+          <Badge className="bg-primary/10 text-primary border-primary/20 font-black px-4 py-1.5 rounded-xl">
+            ADMIN VIEW
+          </Badge>
+        )}
       </div>
 
       {/* Performance Breakdown */}

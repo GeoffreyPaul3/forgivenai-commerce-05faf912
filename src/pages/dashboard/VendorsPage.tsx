@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ function getDelayStatus(createdAt: string) {
 }
 
 const VendorsPage = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
@@ -504,7 +506,11 @@ const VendorsPage = () => {
                       </div>
                     </div>
 
-                    <Button variant="outline" className="w-full rounded-2xl border-2 border-primary/20 hover:bg-primary hover:text-white hover:border-primary transition-all font-black text-sm py-6 shadow-sm">
+                    <Button 
+                      onClick={() => navigate(`/dashboard/vendors/${v.id}/analytics`)}
+                      variant="outline" 
+                      className="w-full rounded-2xl border-2 border-primary/20 hover:bg-primary hover:text-white hover:border-primary transition-all font-black text-sm py-6 shadow-sm"
+                    >
                       View Full Analytics
                     </Button>
                   </CardContent>
