@@ -123,7 +123,7 @@ const VendorsPage = () => {
 
   const updateVendor = useMutation({
     mutationFn: async (vendor: any) => {
-      const { id, ...data } = vendor;
+      const { id, email, password, ...data } = vendor;
       const { error } = await supabase.from("vendors").update(data).eq("id", id);
       if (error) throw error;
     },

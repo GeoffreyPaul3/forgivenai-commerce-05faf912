@@ -94,7 +94,7 @@ const SettingsPage = () => {
 
         const isUserAdmin = profile?.role === "admin";
         setIsAdmin(isUserAdmin);
-        if (isUserAdmin) fetchTeamUsers(user.id);
+        if (isUserAdmin) fetchTeamUsers();
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
@@ -103,28 +103,26 @@ const SettingsPage = () => {
     }
   };
 
-  const fetchTeamUsers = async (excludeId?: string) => {
-    const _excludeId = excludeId ?? "00000000-0000-0000-0000-000000000000";
+  const fetchTeamUsers = async () => {
 
     const { data: pendingData, error: pendingError } = await supabase
       .from("profiles")
       .select("*")
       .eq("status", "pending")
-      .neq("id", _excludeId)
+      .neq("role", "admin")
       .order("created_at", { ascending: false });
 
     const { data: activeData, error: activeError } = await supabase
       .from("profiles")
       .select("*")
-      .neq("status", "pending")
-      .neq("id", _excludeId)
+      .or("status.neq.pending,role.eq.admin")
       .order("created_at", { ascending: false });
 
     if (pendingError || activeError) {
       toast({ title: "Error", description: "Failed to fetch team data", variant: "destructive" });
     } else {
-      setPendingUsers((pendingData || []).filter((u: any) => u.id !== _excludeId && u.role !== "admin"));
-      setActiveUsers((activeData || []).filter((u: any) => u.id !== _excludeId && u.role !== "admin"));
+      setPendingUsers(pendingData || []);
+      setActiveUsers(activeData || []);
     }
   };
 
@@ -136,7 +134,7 @@ const SettingsPage = () => {
       toast({ title: "Approval failed", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "User approved", description: `User has been approved as a ${role}.` });
-      fetchTeamUsers(user?.id);
+      fetchTeamUsers();
     }
   };
 
@@ -147,7 +145,7 @@ const SettingsPage = () => {
       toast({ title: "Rejection failed", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "User rejected", description: "The user's request has been declined." });
-      fetchTeamUsers(user?.id);
+      fetchTeamUsers();
     }
   };
 
@@ -176,7 +174,7 @@ const SettingsPage = () => {
       setAddUserForm({ email: '', full_name: '', password: '', role: 'vendor' });
       
       const { data: { user } } = await supabase.auth.getUser();
-      fetchTeamUsers(user?.id);
+      fetchTeamUsers();
     } catch (err: any) {
       toast({ title: "Error creating member", description: err.message, variant: "destructive" });
     } finally {
@@ -192,7 +190,7 @@ const SettingsPage = () => {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
     } else {
       toast({ title: `User ${newStatus === "approved" ? "unsuspended" : "suspended"}` });
-      fetchTeamUsers(user?.id);
+      fetchTeamUsers();
     }
   };
 
@@ -204,7 +202,7 @@ const SettingsPage = () => {
       toast({ title: "Role update failed", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Role updated", description: `User is now a ${newRole}.` });
-      fetchTeamUsers(user?.id);
+      fetchTeamUsers();
     }
   };
 
@@ -348,7 +346,12 @@ const SettingsPage = () => {
                           {user.full_name?.[0] || user.id[0]}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold font-heading">{user.full_name || "New User"}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold font-heading">{user.full_name || "New User"}</p>
+                            <Badge variant="outline" className="text-[10px] uppercase font-bold bg-primary/5 text-primary border-primary/20 px-2 py-0">
+                              {user.role}
+                            </Badge>
+                          </div>
                           <p className="text-xs text-muted-foreground">{new Date(user.created_at).toLocaleDateString()}</p>
                         </div>
                       </div>
