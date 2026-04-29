@@ -98,9 +98,9 @@ export default function AdminLayout({ children, title }: { children: React.React
       <div className="min-h-screen flex w-full">
         <AdminSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center border-b border-border px-4 shrink-0">
-            <SidebarTrigger className="mr-4" />
-            <h1 className="font-heading text-xl font-semibold text-foreground flex-1">{title}</h1>
+          <header className="h-14 flex items-center border-b border-border px-4 shrink-0 min-w-0 w-full">
+            <SidebarTrigger className="mr-4 shrink-0" />
+            <h1 className="font-heading text-xl font-semibold text-foreground flex-1 truncate pr-4">{title}</h1>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

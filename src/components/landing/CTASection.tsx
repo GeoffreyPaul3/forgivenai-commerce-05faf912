@@ -34,7 +34,7 @@ const CTASection = () => {
               Apply for Access
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Button>
-            <Button variant="outline" size="lg" className="h-16 px-10 rounded-full border-white/20 text-white hover:bg-white/5 transition-all duration-500">
+            <Button variant="outline" size="lg" className="h-16 px-10 rounded-full border-white/20 text-white bg-black/20 hover:bg-white/5 transition-all duration-500">
               Speak to a Specialist
             </Button>
           </div>
