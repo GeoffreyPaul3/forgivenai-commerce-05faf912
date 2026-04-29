@@ -434,7 +434,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
            <DialogTitle className="font-heading text-2xl font-black tracking-tight">
              {isNew ? "Create New Product" : "Edit Product Details"}
            </DialogTitle>
-           <p className="text-muted-foreground text-sm font-body mt-1">Configure your product, inventory, and vendor costing §4.</p>
+           <p className="text-muted-foreground text-sm font-body mt-1">Configure your product, inventory, and vendor costing.</p>
         </div>
         
         <div className="p-8 space-y-10">
@@ -468,7 +468,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
               <div className="p-6 rounded-[2rem] bg-primary/5 border border-primary/10 space-y-6 shadow-sm">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-primary uppercase tracking-widest px-1 inline-flex items-center gap-2">
-                    <Package className="w-3.5 h-3.5" /> Vendor Fulfillment §3
+                    <Package className="w-3.5 h-3.5" /> Vendor Fulfillment
                   </label>
                   <Select value={form.vendor_id} onValueChange={v => setForm(f => ({ ...f, vendor_id: v }))}>
                     <SelectTrigger className="font-body h-12 rounded-xl bg-background border-primary/20 shadow-sm">
@@ -521,7 +521,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
             {/* Column 3: Inventory & Variants */}
             <div className="space-y-6">
               <div className="space-y-4 p-6 rounded-[2rem] border border-border/50 bg-muted/10 shadow-inner">
-                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Inventory Management §5</label>
+                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Inventory Management</label>
                  <div className="flex gap-6 items-center">
                    <div className="flex items-center gap-2">
                      <input type="radio" checked={form.inventory_mode === "flexible"} onChange={() => setForm(f => ({ ...f, inventory_mode: "flexible" }))} id="flexible" className="w-4 h-4 accent-primary" />

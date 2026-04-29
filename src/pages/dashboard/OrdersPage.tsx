@@ -12,7 +12,7 @@ import type { Tables } from "@/integrations/supabase/types";
 
 type Order = Tables<"orders">;
 
-/** Returns delay state for pending orders (spec §7) */
+/** Returns delay state for pending orders */
 function getConfirmDelay(order: Order): { mins: number; state: "ok" | "flagged" | "escalated" } | null {
   if ((order as any).vendor_confirmation_status !== 'pending' && order.status !== 'pending') return null;
   const mins = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000);
@@ -187,7 +187,7 @@ const OrdersPage = () => {
                   <p className="text-xs text-muted-foreground font-body">{order.customer_phone || order.customer_email || "No contact"} • {order.channel} • {new Date(order.created_at).toLocaleDateString()}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {/* Confirmation delay flag — spec §7 & §13 */}
+                  {/* Confirmation delay flag */}
                   {(() => {
                     const delay = getConfirmDelay(order);
                     if (!delay || delay.state === "ok") return null;
@@ -267,11 +267,11 @@ const OrdersPage = () => {
                 </div>
               </div>
 
-              {/* Fulfillment Panel §9-§10 */}
+              {/* Fulfillment Panel */}
               <div className="p-6 rounded-[2rem] bg-indigo-50/50 border border-indigo-100 space-y-5">
                 <div className="flex items-center justify-between">
                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest inline-flex items-center gap-2">
-                     <Truck className="w-3.5 h-3.5" /> Fulfillment Logistics §9
+                     <Truck className="w-3.5 h-3.5" /> Fulfillment Logistics
                    </p>
                    {(selectedOrder as any).delivery_confirmed_at && (
                      <Badge className="bg-emerald-500 text-white font-black text-[9px] uppercase">Delivered</Badge>
@@ -297,7 +297,7 @@ const OrdersPage = () => {
                    </div>
                    
                    <div className="space-y-2">
-                     <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Delivery Proof URL §10</label>
+                     <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Delivery Proof URL</label>
                      <Input 
                         placeholder="https://..." 
                         defaultValue={(selectedOrder as any).delivery_proof_url}

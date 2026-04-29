@@ -128,7 +128,7 @@ export default function VendorOrdersPage() {
             Order Fulfillment
           </h2>
           <p className="text-muted-foreground font-body mt-1">
-            Manage incoming orders and track your earnings §11.
+            Manage incoming orders and track your earnings.
           </p>
         </div>
       </div>
@@ -160,7 +160,7 @@ export default function VendorOrdersPage() {
               <CardTitle className="font-heading text-xl font-black flex items-center gap-3">
                 <Package className="w-6 h-6 text-primary" /> Active Orders
               </CardTitle>
-              <CardDescription className="mt-1">Real-time confirmation tracking §7</CardDescription>
+              <CardDescription className="mt-1">Real-time confirmation tracking</CardDescription>
             </div>
             <div className="flex gap-2">
                <Badge className="bg-primary/10 text-primary border-0 font-black px-4 py-1.5 rounded-full uppercase text-[10px] tracking-widest">
@@ -209,7 +209,7 @@ export default function VendorOrdersPage() {
                 const confirmStatus = order.vendor_confirmation_status || "pending";
                 const needsAction = confirmStatus === "pending";
                 
-                // Calculate elapsed time §7
+                // Calculate elapsed time
                 const minsElapsed = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000);
                 const delayColor = minsElapsed >= 60 ? "text-red-500 bg-red-50" : minsElapsed >= 30 ? "text-amber-500 bg-amber-50" : "text-emerald-500 bg-emerald-50";
 
@@ -237,7 +237,7 @@ export default function VendorOrdersPage() {
                     <TableCell>
                       <div className="space-y-0.5">
                         <p className="font-black text-emerald-600">MWK {(order.vendor_amount || 0).toLocaleString()}</p>
-                        <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">My Payout §11</p>
+                        <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">My Payout</p>
                       </div>
                     </TableCell>
                     <TableCell>

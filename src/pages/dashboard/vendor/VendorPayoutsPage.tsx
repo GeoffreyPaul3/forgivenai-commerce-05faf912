@@ -70,7 +70,7 @@ export default function VendorPayoutsPage() {
     const totalPaid = (payouts || []).filter((p: any) => p.status === "paid").reduce((s: number, p: any) => s + (p.amount || 0), 0);
     const totalPending = (payouts || []).filter((p: any) => p.status === "pending").reduce((s: number, p: any) => s + (p.amount || 0), 0);
     
-    // Use explicit vendor_amount from DB §11
+    // Use explicit vendor_amount from DB
     const vendorShare = (allOrders || []).reduce((s: number, o: any) => s + (o.vendor_amount || 0), 0);
     const balance = vendorShare - totalPaid;
     return { totalRevenue, vendorShare, totalPaid, totalPending, balance };
@@ -197,7 +197,7 @@ export default function VendorPayoutsPage() {
         <Card className="rounded-[2rem] border-border/50 bg-card shadow-xl shadow-black/5">
           <CardHeader className="border-b border-border/50 p-6">
             <CardTitle className="font-heading flex items-center gap-3 text-lg font-black">
-              <Wallet className="w-5 h-5 text-gold" /> Payout Intelligence §11
+              <Wallet className="w-5 h-5 text-gold" /> Payout Intelligence
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6 space-y-4">

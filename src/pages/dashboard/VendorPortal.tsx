@@ -13,7 +13,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 
-/** Returns vendor class A/B/C/D based on score (spec §8) */
+/** Returns vendor class A/B/C/D based on score */
 function getVendorClass(score: number | null) {
   if (!score) return { label: "—", color: "text-muted-foreground", bg: "bg-muted/40" };
   if (score >= 85) return { label: "A", color: "text-emerald-600", bg: "bg-emerald-500/10 border-emerald-500/20" };
@@ -248,7 +248,7 @@ const VendorPortal = () => {
 
         {/* Side Info */}
         <div className="space-y-6">
-           {/* Vendor Scoring Breakdown — spec §8 */}
+           {/* Vendor Scoring Breakdown */}
            <Card className="rounded-3xl border-border bg-card shadow-sm overflow-hidden">
              <CardHeader className="bg-gradient-to-br from-primary/5 to-transparent border-b border-border/50">
                <CardTitle className="font-heading text-lg flex items-center gap-2 font-bold uppercase tracking-tight">
@@ -270,7 +270,7 @@ const VendorPortal = () => {
                      <span className={`font-heading font-black ${row.color}`}>{row.value}</span>
                   </div>
                 ))}
-                {/* Confirmation timing rules — spec §7 */}
+                {/* Confirmation timing rules */}
                 <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 space-y-1">
                   <p className="text-[10px] font-bold uppercase text-primary tracking-widest mb-2">Timing Rules</p>
                   {[
@@ -288,7 +288,7 @@ const VendorPortal = () => {
              </CardContent>
            </Card>
 
-           {/* Payout Tracking — spec §11 */}
+           {/* Payout Tracking */}
            <Card className="rounded-3xl border-border bg-card shadow-sm overflow-hidden">
              <CardHeader className="bg-gradient-to-br from-emerald-500/5 to-transparent border-b border-border/50">
                <CardTitle className="font-heading text-lg flex items-center gap-2 font-bold uppercase tracking-tight">

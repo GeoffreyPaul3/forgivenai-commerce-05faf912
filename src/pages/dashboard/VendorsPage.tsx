@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
-/** Vendor class A/B/C/D per spec §8 */
+/** Vendor class A/B/C/D */
 function getVendorClass(score: number | null) {
   if (!score && score !== 0) return { label: "—", color: "text-muted-foreground border-muted", bg: "" };
   if (score >= 85) return { label: "A", color: "text-emerald-700 border-emerald-500/30", bg: "bg-emerald-500/10" };
@@ -36,7 +36,7 @@ function getVendorClass(score: number | null) {
   return { label: "D", color: "text-red-700 border-red-500/30", bg: "bg-red-500/10" };
 }
 
-/** Confirmation Delay Helper (§7) */
+/** Confirmation Delay Helper */
 function getDelayStatus(createdAt: string) {
   const mins = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
   if (mins >= 60) return { state: "escalated", label: "Escalated (>60m)", color: "text-red-600 bg-red-50", icon: AlertTriangle };
@@ -312,7 +312,7 @@ const VendorsPage = () => {
                   <CardTitle className="font-heading text-xl font-bold flex gap-2 items-center">
                     <Timer className="w-5 h-5 text-amber-500" /> Confirmation Monitor
                   </CardTitle>
-                  <CardDescription>Real-time tracking of pending vendor confirmations (§7)</CardDescription>
+                  <CardDescription>Real-time tracking of pending vendor confirmations</CardDescription>
                 </div>
                 <Badge className="bg-amber-500 hover:bg-amber-600 font-black">{pendingOrders?.length || 0} Pending</Badge>
               </div>
@@ -391,7 +391,7 @@ const VendorsPage = () => {
                   <CardTitle className="font-heading text-xl font-bold flex gap-2 items-center">
                     <Wallet className="w-5 h-5 text-emerald-500" /> Payout Management
                   </CardTitle>
-                  <CardDescription>Track and settle vendor accounts (§11)</CardDescription>
+                  <CardDescription>Track and settle vendor accounts</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -468,7 +468,7 @@ const VendorsPage = () => {
                     </div>
                     <CardTitle className="mt-4 font-heading font-black text-xl tracking-tight">{v.business_name}</CardTitle>
                     <CardDescription className="font-body text-xs flex items-center gap-1">
-                      <BarChart3 className="w-3 h-3" /> Performance Score Breakdown (§8)
+                      <BarChart3 className="w-3 h-3" /> Performance Score Breakdown
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-5">
@@ -506,7 +506,7 @@ const VendorsPage = () => {
         <DialogContent className="max-w-5xl rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[90vh] flex flex-col">
           <div className="bg-gradient-to-br from-primary/10 via-background to-background p-6 pb-4 border-b border-border/50 shrink-0">
              <DialogTitle className="font-heading font-black text-2xl tracking-tight">Register New Vendor Partner</DialogTitle>
-             <p className="text-muted-foreground text-sm font-body mt-1">Onboard a new supply chain partner to the Forgiven Shopping Centre §2.</p>
+             <p className="text-muted-foreground text-sm font-body mt-1">Onboard a new supply chain partner to the Forgiven Shopping Centre.</p>
           </div>
           <div className="p-6 overflow-y-auto">
             <VendorForm 
@@ -522,7 +522,7 @@ const VendorsPage = () => {
         <DialogContent className="max-w-5xl rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[90vh] flex flex-col">
           <div className="bg-gradient-to-br from-primary/10 via-background to-background p-6 pb-4 border-b border-border/50 shrink-0">
              <DialogTitle className="font-heading font-black text-2xl tracking-tight">Edit Vendor Details</DialogTitle>
-             <p className="text-muted-foreground text-sm font-body mt-1">Update business identity, logistics, and payout configuration §3.</p>
+             <p className="text-muted-foreground text-sm font-body mt-1">Update business identity, logistics, and payout configuration.</p>
           </div>
           <div className="p-6 overflow-y-auto">
             {editVendor && (
@@ -582,7 +582,7 @@ const VendorsPage = () => {
                 <div className="flex items-center justify-between p-6 rounded-3xl bg-gold/5 border-2 border-gold/10 shadow-sm">
                   <div>
                      <p className="text-[10px] font-black uppercase text-gold/80 tracking-widest mb-1">Performance Index</p>
-                     <p className="text-xs text-muted-foreground font-body max-w-[200px]">Aggregate score based on speed, reliability & fulfillment §8</p>
+                     <p className="text-xs text-muted-foreground font-body max-w-[200px]">Aggregate score based on speed, reliability & fulfillment</p>
                   </div>
                   <div className="flex items-center gap-3 bg-background px-6 py-3 rounded-2xl shadow-md border border-gold/10">
                      <Star className="w-6 h-6 fill-gold text-gold" />
@@ -835,7 +835,7 @@ function VendorForm({ vendor, onSave, onCancel, isLoading }: { vendor?: any; onS
             <div className="bg-emerald-500/10 p-4 rounded-2xl flex gap-3 items-start border border-emerald-500/20 shadow-inner">
                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                <p className="text-[10px] text-emerald-700/80 leading-relaxed font-bold">
-                 PAYOUT SECURITY: These details are used for automated disbursement of vendor funds (§11).
+                 PAYOUT SECURITY: These details are used for automated disbursement of vendor funds.
                </p>
             </div>
           </div>

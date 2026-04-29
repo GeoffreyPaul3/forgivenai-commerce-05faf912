@@ -189,7 +189,7 @@ export default function VendorDashboard() {
         </div>
       </div>
 
-      {/* Performance Ranking §8 */}
+      {/* Performance Ranking */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 rounded-[2.5rem] border-0 bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-white shadow-2xl shadow-primary/20 overflow-hidden relative group">
           <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -202,7 +202,7 @@ export default function VendorDashboard() {
             </div>
             <div className="flex-1 text-center md:text-left space-y-4">
                <div>
-                 <h3 className="text-2xl font-heading font-black tracking-tight mb-1">Performance Excellence §8</h3>
+                 <h3 className="text-2xl font-heading font-black tracking-tight mb-1">Performance Excellence</h3>
                  <p className="text-white/70 font-body text-sm">Your vendor class determines your placement priority in the AI Sales Assistant.</p>
                </div>
                <div className="grid grid-cols-3 gap-4">
@@ -229,7 +229,7 @@ export default function VendorDashboard() {
                     <Timer className="w-6 h-6" />
                  </div>
                  <div>
-                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Avg Confirmation §7</p>
+                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Avg Confirmation</p>
                     <p className="text-3xl font-heading font-black text-foreground tracking-tight">14.2m</p>
                  </div>
               </div>
@@ -257,7 +257,7 @@ export default function VendorDashboard() {
             </div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Total Payouts</p>
             <h3 className="text-2xl font-heading font-black tracking-tight">MWK {stats.revenue.toLocaleString()}</h3>
-            <p className="text-[10px] text-muted-foreground mt-2 font-bold uppercase tracking-tighter">Gross earned §11</p>
+            <p className="text-[10px] text-muted-foreground mt-2 font-bold uppercase tracking-tighter">Gross earned</p>
           </CardContent>
         </Card>
 

@@ -138,7 +138,7 @@ export default function VendorProductsPage() {
             My Product Catalogue
           </h2>
           <p className="text-muted-foreground font-body mt-1">
-            Browse main inventory · Enable products you supply · Manage stock status §5.
+            Browse main inventory · Enable products you supply · Manage stock status.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -176,11 +176,11 @@ export default function VendorProductsPage() {
         </div>
       </div>
 
-      {/* Notice §15 Core Principle */}
+      {/* Notice: Core Principle */}
       <div className="p-4 rounded-2xl border border-primary/20 bg-primary/5 flex items-start gap-4">
         <AlertCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <p className="text-sm font-black text-primary uppercase tracking-tighter">Forgiven Pricing Policy §15</p>
+          <p className="text-sm font-black text-primary uppercase tracking-tighter">Forgiven Pricing Policy</p>
           <p className="text-xs text-muted-foreground font-body leading-relaxed">
             As an FSC Vendor, selling prices are managed centrally by the platform. You are responsible for maintaining accurate 
             <strong className="text-foreground"> Stock Status</strong> for your flexible inventory to ensure seamless order fulfillment.
@@ -282,7 +282,7 @@ export default function VendorProductsPage() {
 
                     {isEnabled && product.inventory_mode === 'flexible' && (
                       <div className="pt-2 border-t border-border/50">
-                        <p className="text-[9px] font-black uppercase text-muted-foreground mb-2 tracking-widest">Inventory Status §5</p>
+                        <p className="text-[9px] font-black uppercase text-muted-foreground mb-2 tracking-widest">Inventory Status</p>
                         <div className="flex gap-1.5">
                            {['available', 'low_stock', 'unavailable'].map((status) => (
                               <button

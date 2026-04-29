@@ -116,11 +116,11 @@ export default function VendorPerformancePage() {
         </p>
       </div>
 
-      {/* Performance Breakdown §8 */}
+      {/* Performance Breakdown */}
       <Card className="rounded-[2.5rem] border-0 bg-card shadow-2xl shadow-black/5 overflow-hidden">
         <CardHeader className="bg-muted/20 p-8 border-b border-border/50">
           <CardTitle className="font-heading text-xl font-black flex items-center gap-3">
-            <Zap className="w-6 h-6 text-primary" /> Weighted Ranking Intelligence §8
+            <Zap className="w-6 h-6 text-primary" /> Weighted Ranking Intelligence
           </CardTitle>
           <CardDescription>How your platform rank is calculated across weighted vectors</CardDescription>
         </CardHeader>
