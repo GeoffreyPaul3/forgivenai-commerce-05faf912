@@ -28,6 +28,12 @@ const ProfilePage = () => {
     phone: "",
   });
 
+  const [passwordForm, setPasswordForm] = useState({
+    new_password: "",
+    confirm_password: "",
+  });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (data.user) {
@@ -169,6 +175,31 @@ const ProfilePage = () => {
 
     setLoading(false);
     toast({ title: "Profile saved!" });
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!passwordForm.new_password) return;
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      toast({ title: "Passwords mismatch", description: "New password and confirmation do not match.", variant: "destructive" });
+      return;
+    }
+    if (passwordForm.new_password.length < 6) {
+      toast({ title: "Weak password", description: "Password must be at least 6 characters.", variant: "destructive" });
+      return;
+    }
+
+    setPasswordLoading(true);
+    const { error } = await supabase.auth.updateUser({
+      password: passwordForm.new_password
+    });
+
+    if (error) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Password updated!", description: "Your security credentials have been updated." });
+      setPasswordForm({ new_password: "", confirm_password: "" });
+    }
+    setPasswordLoading(false);
   };
 
   const initials = form.full_name
@@ -371,6 +402,54 @@ const ProfilePage = () => {
           >
             <Save className="w-4 h-4" />
             {loading ? "Saving Changes..." : "Save All Changes"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Account Password Section */}
+      <div className="rounded-2xl border border-border bg-card p-6 space-y-5 shadow-sm">
+        <div className="flex items-center gap-2 text-primary">
+          <Shield className="w-5 h-5" />
+          <h3 className="font-heading text-base font-bold">Account Password</h3>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+              New Password
+            </label>
+            <Input
+              type="password"
+              value={passwordForm.new_password}
+              onChange={(e) => setPasswordForm(f => ({ ...f, new_password: e.target.value }))}
+              placeholder="Enter new password"
+              className="rounded-xl border-border/50 bg-muted/20"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+              Confirm New Password
+            </label>
+            <Input
+              type="password"
+              value={passwordForm.confirm_password}
+              onChange={(e) => setPasswordForm(f => ({ ...f, confirm_password: e.target.value }))}
+              placeholder="Repeat new password"
+              className="rounded-xl border-border/50 bg-muted/20"
+            />
+          </div>
+        </div>
+
+        <div className="pt-4 flex justify-end">
+          <Button 
+            onClick={handleUpdatePassword} 
+            disabled={passwordLoading || !passwordForm.new_password} 
+            variant="outline"
+            className="gap-2 rounded-xl h-11 px-8 font-bold border-primary/20 hover:border-primary/50"
+          >
+            <Shield className="w-4 h-4" />
+            {passwordLoading ? "Updating..." : "Update Password"}
           </Button>
         </div>
       </div>
