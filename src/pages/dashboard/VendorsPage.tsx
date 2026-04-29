@@ -491,7 +491,7 @@ const VendorsPage = () => {
                       </div>
                     </div>
 
-                    <Button variant="ghost" className="w-full rounded-2xl border border-border/50 group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-all font-bold text-sm py-6">
+                    <Button variant="outline" className="w-full rounded-2xl border-2 border-primary/20 hover:bg-primary hover:text-white hover:border-primary transition-all font-black text-sm py-6 shadow-sm">
                       View Full Analytics
                     </Button>
                   </CardContent>
@@ -530,55 +530,67 @@ const VendorsPage = () => {
 
       {/* View Vendor Details */}
       <Dialog open={!!viewVendor} onOpenChange={v => !v && setViewVendor(null)}>
-        <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl">
-          <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 pb-6 border-b border-border/50 relative">
-             <div className="absolute top-6 right-6">
-                {(() => { const cls = getVendorClass(viewVendor?.score); return (
-                  <Badge variant="outline" className={`text-xs font-black border-2 px-4 py-1 shadow-sm ${cls.color} ${cls.bg}`}>
-                    Class {cls.label}
-                  </Badge>
-                ); })()}
-             </div>
-             <div className="w-20 h-20 rounded-[2rem] bg-background shadow-lg flex items-center justify-center text-4xl font-black text-primary mb-6">
-                {viewVendor?.business_name[0]}
-             </div>
-             <DialogTitle className="font-heading font-black text-3xl tracking-tighter mb-1">{viewVendor?.business_name}</DialogTitle>
-             <p className="text-muted-foreground font-body text-sm flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-500" /> Verified FSC Vendor since {new Date(viewVendor?.created_at).getFullYear()}
-             </p>
-          </div>
-          <div className="p-8 space-y-8">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
-                <div className="flex items-center gap-2 mb-2 text-muted-foreground"><User className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Contact</span></div>
-                <p className="font-black text-sm tracking-tight">{viewVendor?.contact_person}</p>
-              </div>
-              <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
-                <div className="flex items-center gap-2 mb-2 text-muted-foreground"><Phone className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Phone</span></div>
-                <p className="font-black text-sm tracking-tight">{viewVendor?.phone}</p>
-              </div>
-              <div className="p-4 rounded-3xl bg-muted/30 border border-border/50 col-span-2">
-                <div className="flex items-center gap-2 mb-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Warehouse Location</span></div>
-                <p className="font-black text-sm tracking-tight leading-snug">{viewVendor?.address || "Not specified"}</p>
-              </div>
+        <DialogContent className="max-w-5xl rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl">
+          <div className="flex flex-col md:flex-row h-full">
+            <div className="md:w-1/3 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 border-b md:border-b-0 md:border-r border-border/50 relative flex flex-col justify-center items-center text-center">
+               <div className="absolute top-6 right-6">
+                  {(() => { const cls = getVendorClass(viewVendor?.score); return (
+                    <Badge variant="outline" className={`text-xs font-black border-2 px-4 py-1 shadow-sm ${cls.color} ${cls.bg}`}>
+                      Class {cls.label}
+                    </Badge>
+                  ); })()}
+               </div>
+               <div className="w-32 h-32 rounded-[2.5rem] bg-background shadow-xl flex items-center justify-center text-6xl font-black text-primary mb-6 border-4 border-white">
+                  {viewVendor?.business_name[0]}
+               </div>
+               <DialogTitle className="font-heading font-black text-3xl tracking-tighter mb-2">{viewVendor?.business_name}</DialogTitle>
+               <p className="text-muted-foreground font-body text-sm flex items-center gap-2 mb-4">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" /> Verified FSC Vendor
+               </p>
+               <div className="w-full pt-6 border-t border-border/20">
+                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-2">Member Since</p>
+                  <p className="font-bold">{new Date(viewVendor?.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long' })}</p>
+               </div>
             </div>
             
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-5 rounded-3xl bg-gold/5 border-2 border-gold/10">
-                <div>
-                   <p className="text-[10px] font-black uppercase text-gold/80 tracking-widest mb-1">Aggregate Score</p>
-                   <p className="text-xs text-muted-foreground font-body">Based on speed, rate & fulfillment</p>
+            <div className="md:w-2/3 p-8 space-y-8 overflow-y-auto max-h-[80vh]">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
+                  <div className="flex items-center gap-2 mb-2 text-muted-foreground"><User className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Primary Contact</span></div>
+                  <p className="font-black text-sm tracking-tight">{viewVendor?.contact_person}</p>
                 </div>
-                <div className="flex items-center gap-1.5 bg-background px-4 py-2 rounded-2xl shadow-sm border border-gold/10">
-                   <Star className="w-5 h-5 fill-gold text-gold" />
-                   <span className="text-3xl font-heading font-black text-gold tracking-tighter">{viewVendor?.score}</span>
+                <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
+                  <div className="flex items-center gap-2 mb-2 text-muted-foreground"><Phone className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Contact Phone</span></div>
+                  <p className="font-black text-sm tracking-tight">{viewVendor?.phone}</p>
+                </div>
+                <div className="p-4 rounded-3xl bg-muted/30 border border-border/50 col-span-2">
+                  <div className="flex items-center gap-2 mb-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Warehouse & Logistics Address</span></div>
+                  <p className="font-black text-sm tracking-tight leading-snug">{viewVendor?.address || "Not specified"}</p>
                 </div>
               </div>
-              <div className="p-6 rounded-3xl bg-primary/5 border border-primary/10">
-                <p className="text-[10px] text-primary uppercase font-black tracking-widest mb-4">Payout Method Details</p>
-                <div className="bg-background/50 p-4 rounded-2xl border border-primary/10">
-                  <p className="text-sm font-bold leading-relaxed font-body text-foreground/80">{viewVendor?.payment_details || "No payment information provided."}</p>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-6 rounded-3xl bg-gold/5 border-2 border-gold/10 shadow-sm">
+                  <div>
+                     <p className="text-[10px] font-black uppercase text-gold/80 tracking-widest mb-1">Performance Index</p>
+                     <p className="text-xs text-muted-foreground font-body max-w-[200px]">Aggregate score based on speed, reliability & fulfillment §8</p>
+                  </div>
+                  <div className="flex items-center gap-3 bg-background px-6 py-3 rounded-2xl shadow-md border border-gold/10">
+                     <Star className="w-6 h-6 fill-gold text-gold" />
+                     <span className="text-4xl font-heading font-black text-gold tracking-tighter">{viewVendor?.score}%</span>
+                  </div>
                 </div>
+                <div className="p-6 rounded-3xl bg-primary/5 border border-primary/10">
+                  <p className="text-[10px] text-primary uppercase font-black tracking-widest mb-4">Financial Settings & Payout Method</p>
+                  <div className="bg-background/80 p-5 rounded-2xl border border-primary/10 shadow-inner">
+                    <p className="text-sm font-bold leading-relaxed font-body text-foreground/80">{viewVendor?.payment_details || "No payment information provided."}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-4 pt-4">
+                <Button onClick={() => setViewVendor(null)} variant="outline" className="flex-1 rounded-2xl h-12 font-bold">Close Profile</Button>
+                <Button onClick={() => { setEditVendor(viewVendor); setViewVendor(null); }} className="flex-1 rounded-2xl h-12 font-bold bg-primary shadow-lg shadow-primary/20">Edit Vendor</Button>
               </div>
             </div>
           </div>

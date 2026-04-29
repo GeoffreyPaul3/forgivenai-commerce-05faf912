@@ -360,7 +360,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
         price: product.price?.toString() || "",
         description: product.description || "",
         status: (product as any).status || "draft",
-        vendor_id: (product as any).vendor_id || "",
+        vendor_id: (product as any).vendor_id || "none",
         vendor_cost: (product as any).vendor_cost?.toString() || "",
         inventory_mode: (product as any).inventory_mode || "flexible",
         stock_quantity: (product as any).stock_quantity?.toString() || "0",
@@ -377,7 +377,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
         price: "",
         description: "",
         status: "draft",
-        vendor_id: "",
+        vendor_id: "none",
         vendor_cost: "",
         inventory_mode: "flexible",
         stock_quantity: "0",
@@ -398,7 +398,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
       price: form.price ? parseFloat(form.price) : null,
       description: form.description || null,
       status: form.status,
-      vendor_id: form.vendor_id || null,
+      vendor_id: form.vendor_id === "none" ? null : (form.vendor_id || null),
       vendor_cost: form.vendor_cost ? parseFloat(form.vendor_cost) : null,
       inventory_mode: form.inventory_mode,
       stock_quantity: parseInt(form.stock_quantity) || 0,
@@ -429,7 +429,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh] rounded-[2rem] p-0 border-0 shadow-2xl">
+      <DialogContent className="max-w-6xl overflow-y-auto max-h-[95vh] rounded-[2rem] p-0 border-0 shadow-2xl">
         <div className="bg-gradient-to-br from-primary/10 via-background to-background p-8 pb-6 border-b border-border/50">
            <DialogTitle className="font-heading text-2xl font-black tracking-tight">
              {isNew ? "Create New Product" : "Edit Product Details"}
@@ -437,19 +437,21 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
            <p className="text-muted-foreground text-sm font-body mt-1">Configure your product, inventory, and vendor costing §4.</p>
         </div>
         
-        <div className="p-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Left Column: Basic Info */}
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Identity & Content</label>
-                <Input placeholder="Product name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50" />
-                <Input placeholder="Category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50" />
-                <Textarea placeholder="Full description..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="font-body min-h-[120px] rounded-xl bg-muted/20 border-border/50 p-4" />
+        <div className="p-8 space-y-10">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            {/* Column 1: Basic Identity */}
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Product Identity</label>
+                <div className="space-y-4">
+                  <Input placeholder="Product name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
+                  <Input placeholder="Category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
+                  <Textarea placeholder="Full description..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="font-body min-h-[200px] rounded-xl bg-muted/20 border-border/50 p-4 focus:bg-background transition-all" />
+                </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Display Status</label>
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Visibility Status</label>
                 <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
                   <SelectTrigger className="font-body h-12 rounded-xl bg-muted/20 border-border/50"><SelectValue /></SelectTrigger>
                   <SelectContent className="rounded-xl">
@@ -461,18 +463,19 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
               </div>
             </div>
 
-            {/* Right Column: Vendor & Pricing */}
+            {/* Column 2: Vendor & Pricing */}
             <div className="space-y-6">
-              <div className="p-6 rounded-3xl bg-primary/5 border border-primary/10 space-y-5 shadow-sm">
+              <div className="p-6 rounded-[2rem] bg-primary/5 border border-primary/10 space-y-6 shadow-sm">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-primary uppercase tracking-widest px-1 inline-flex items-center gap-2">
                     <Package className="w-3.5 h-3.5" /> Vendor Fulfillment §3
                   </label>
                   <Select value={form.vendor_id} onValueChange={v => setForm(f => ({ ...f, vendor_id: v }))}>
-                    <SelectTrigger className="font-body h-12 rounded-xl bg-background border-primary/20">
+                    <SelectTrigger className="font-body h-12 rounded-xl bg-background border-primary/20 shadow-sm">
                       <SelectValue placeholder="Select Supply Partner" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
+                      <SelectItem value="none" className="font-bold text-primary">In-house stock</SelectItem>
                       {vendors?.map(v => (
                         <SelectItem key={v.id} value={v.id}>{v.business_name}</SelectItem>
                       ))}
@@ -480,7 +483,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-muted-foreground uppercase px-1">Vendor Cost (MWK)</label>
                     <Input 
@@ -496,47 +499,50 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-primary uppercase px-1">FSC Price (MWK)</label>
+                    <label className="text-[10px] font-black text-primary uppercase px-1">FSC Store Price (MWK)</label>
                     <Input 
                       type="number" 
                       placeholder="0.00" 
                       value={form.price} 
                       onChange={e => setForm(f => ({ ...f, price: e.target.value }))} 
-                      className="h-12 rounded-xl bg-background border-primary/30 font-mono font-black text-primary" 
+                      className="h-12 rounded-xl bg-background border-primary/30 font-mono font-black text-primary text-lg" 
                     />
                   </div>
                 </div>
-                <div className="bg-primary/10 p-3 rounded-2xl flex gap-3 items-start">
+                <div className="bg-primary/10 p-4 rounded-2xl flex gap-3 items-start border border-primary/20 shadow-inner">
                    <TrendingUp className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                    <p className="text-[10px] text-primary/80 leading-relaxed font-bold">
                      FSC PRICING ENGINE ACTIVE: Selling price is automatically optimized for a 30% gross margin.
                    </p>
                 </div>
               </div>
+            </div>
 
-              <div className="space-y-4 p-5 rounded-3xl border border-border/50 bg-muted/10 shadow-inner">
+            {/* Column 3: Inventory & Variants */}
+            <div className="space-y-6">
+              <div className="space-y-4 p-6 rounded-[2rem] border border-border/50 bg-muted/10 shadow-inner">
                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Inventory Management §5</label>
-                 <div className="flex gap-4 items-center">
+                 <div className="flex gap-6 items-center">
                    <div className="flex items-center gap-2">
-                     <input type="radio" checked={form.inventory_mode === "flexible"} onChange={() => setForm(f => ({ ...f, inventory_mode: "flexible" }))} id="flexible" className="accent-primary" />
+                     <input type="radio" checked={form.inventory_mode === "flexible"} onChange={() => setForm(f => ({ ...f, inventory_mode: "flexible" }))} id="flexible" className="w-4 h-4 accent-primary" />
                      <label htmlFor="flexible" className="text-xs font-black cursor-pointer uppercase tracking-tighter">Flexible</label>
                    </div>
                    <div className="flex items-center gap-2">
-                     <input type="radio" checked={form.inventory_mode === "fixed"} onChange={() => setForm(f => ({ ...f, inventory_mode: "fixed" }))} id="fixed" className="accent-primary" />
-                     <label htmlFor="fixed" className="text-xs font-black cursor-pointer uppercase tracking-tighter">Fixed</label>
+                     <input type="radio" checked={form.inventory_mode === "fixed"} onChange={() => setForm(f => ({ ...f, inventory_mode: "fixed" }))} id="fixed" className="w-4 h-4 accent-primary" />
+                     <label htmlFor="fixed" className="text-xs font-black cursor-pointer uppercase tracking-tighter">Fixed Stock</label>
                    </div>
                  </div>
                  
                  {form.inventory_mode === "fixed" ? (
                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                     <label className="text-[9px] font-black uppercase text-muted-foreground">Stock Quantity</label>
-                     <Input type="number" value={form.stock_quantity} onChange={e => setForm(f => ({ ...f, stock_quantity: e.target.value }))} className="h-10 rounded-xl bg-background" />
+                     <label className="text-[9px] font-black uppercase text-muted-foreground">Available Quantity</label>
+                     <Input type="number" value={form.stock_quantity} onChange={e => setForm(f => ({ ...f, stock_quantity: e.target.value }))} className="h-12 rounded-xl bg-background border-border/50" />
                    </div>
                  ) : (
                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                     <label className="text-[9px] font-black uppercase text-muted-foreground">Inventory Status</label>
+                     <label className="text-[9px] font-black uppercase text-muted-foreground">Supply Status</label>
                      <Select value={form.stock_status} onValueChange={v => setForm(f => ({ ...f, stock_status: v }))}>
-                       <SelectTrigger className="h-10 rounded-xl bg-background"><SelectValue /></SelectTrigger>
+                       <SelectTrigger className="h-12 rounded-xl bg-background border-border/50"><SelectValue /></SelectTrigger>
                        <SelectContent className="rounded-xl">
                          <SelectItem value="available">Available</SelectItem>
                          <SelectItem value="low_stock">Low Stock</SelectItem>
@@ -547,41 +553,41 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
                  )}
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-6">
                  <div className="space-y-2">
-                   <label className="text-[10px] font-black text-muted-foreground uppercase px-1">Sizes</label>
-                   <div className="flex gap-1">
-                     <Input value={form.newSize} onChange={e => setForm(f => ({ ...f, newSize: e.target.value }))} onKeyDown={e => e.key === "Enter" && addTag("sizes")} placeholder="XL, 42..." className="h-9 rounded-lg text-xs" />
-                     <Button size="icon" variant="ghost" className="h-9 w-9 rounded-lg" onClick={() => addTag("sizes")}><Plus className="w-3.5 h-3.5" /></Button>
-                   </div>
-                   <div className="flex flex-wrap gap-1.5 pt-1">
-                     {form.sizes.map((s, i) => (
-                       <Badge key={i} variant="secondary" className="gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-muted/50 border-0">
-                         {s} <Trash2 className="w-2.5 h-2.5 cursor-pointer opacity-50 hover:opacity-100 transition-opacity" onClick={() => removeTag("sizes", i)} />
-                       </Badge>
-                     ))}
-                   </div>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase px-1">Size Variants</label>
+                    <div className="flex gap-2">
+                      <Input value={form.newSize} onChange={e => setForm(f => ({ ...f, newSize: e.target.value }))} onKeyDown={e => e.key === "Enter" && addTag("sizes")} placeholder="XL, 42..." className="h-10 rounded-xl text-xs bg-muted/20" />
+                      <Button size="icon" variant="secondary" className="h-10 w-10 rounded-xl" onClick={() => addTag("sizes")}><Plus className="w-4 h-4" /></Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {form.sizes.map((s, i) => (
+                        <Badge key={i} variant="secondary" className="gap-2 text-[10px] font-black uppercase px-3 py-1 rounded-lg bg-background border border-border/50 shadow-sm">
+                          {s} <Trash2 className="w-3 h-3 cursor-pointer text-destructive/60 hover:text-destructive transition-colors" onClick={() => removeTag("sizes", i)} />
+                        </Badge>
+                      ))}
+                    </div>
                  </div>
                  <div className="space-y-2">
-                   <label className="text-[10px] font-black text-muted-foreground uppercase px-1">Colors</label>
-                   <div className="flex gap-1">
-                     <Input value={form.newColor} onChange={e => setForm(f => ({ ...f, newColor: e.target.value }))} onKeyDown={e => e.key === "Enter" && addTag("colors")} placeholder="Red, Tan..." className="h-9 rounded-lg text-xs" />
-                     <Button size="icon" variant="ghost" className="h-9 w-9 rounded-lg" onClick={() => addTag("colors")}><Plus className="w-3.5 h-3.5" /></Button>
-                   </div>
-                   <div className="flex flex-wrap gap-1.5 pt-1">
-                     {form.colors.map((c, i) => (
-                       <Badge key={i} variant="secondary" className="gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-muted/50 border-0">
-                         {c} <Trash2 className="w-2.5 h-2.5 cursor-pointer opacity-50 hover:opacity-100 transition-opacity" onClick={() => removeTag("colors", i)} />
-                       </Badge>
-                     ))}
-                   </div>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase px-1">Color Variants</label>
+                    <div className="flex gap-2">
+                      <Input value={form.newColor} onChange={e => setForm(f => ({ ...f, newColor: e.target.value }))} onKeyDown={e => e.key === "Enter" && addTag("colors")} placeholder="Red, Tan..." className="h-10 rounded-xl text-xs bg-muted/20" />
+                      <Button size="icon" variant="secondary" className="h-10 w-10 rounded-xl" onClick={() => addTag("colors")}><Plus className="w-4 h-4" /></Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {form.colors.map((c, i) => (
+                        <Badge key={i} variant="secondary" className="gap-2 text-[10px] font-black uppercase px-3 py-1 rounded-lg bg-background border border-border/50 shadow-sm">
+                          {c} <Trash2 className="w-3 h-3 cursor-pointer text-destructive/60 hover:text-destructive transition-colors" onClick={() => removeTag("colors", i)} />
+                        </Badge>
+                      ))}
+                    </div>
                  </div>
               </div>
             </div>
           </div>
           
-          <Button onClick={handleSave} className="w-full bg-primary text-white hover:bg-primary/90 font-heading font-black h-16 text-xl rounded-3xl shadow-xl shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99]">
-            Save Product & Sync Catalog
+          <Button onClick={handleSave} className="w-full bg-primary text-white hover:bg-primary/90 font-heading font-black h-20 text-2xl rounded-[2rem] shadow-2xl shadow-primary/30 transition-all hover:scale-[1.005] active:scale-[0.995] flex items-center justify-center gap-3">
+            <Package className="w-6 h-6" /> Save Product & Update Catalog
           </Button>
         </div>
       </DialogContent>
