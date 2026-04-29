@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/hooks/use-toast";
+import { toast, useToast } from "@/hooks/use-toast";
 import { 
   Store, Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Star, 
   MapPin, Phone, User, Loader2, Clock, AlertTriangle, Wallet, 
@@ -89,18 +89,31 @@ const VendorsPage = () => {
 
   const createVendor = useMutation({
     mutationFn: async (vendor: any) => {
-      const { error } = await supabase.from("vendors").insert(vendor);
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: {
+          email: vendor.email,
+          password: vendor.password,
+          full_name: vendor.contact_person || vendor.business_name,
+          role: 'vendor',
+          business_name: vendor.business_name,
+          phone: vendor.phone,
+          address: vendor.address,
+          category: vendor.category,
+          payment_details: JSON.parse(vendor.payment_details || "{}")
+        }
+      });
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendors"] });
       setShowAdd(false);
-      toast({ title: "Vendor created successfully!" });
+      toast({ title: "Vendor account created! 🚀", description: "Login credentials have been sent to their email." });
     },
     onError: (error: any) => {
       toast({ 
         variant: "destructive", 
-        title: "Failed to create vendor", 
+        title: "Registration Failed", 
         description: error.message || "Please check your permissions and try again."
       });
     },
@@ -648,6 +661,8 @@ function VendorForm({ vendor, onSave, onCancel, isLoading }: { vendor?: any; onS
     address: vendor?.address || "",
     category: vendor?.category || "",
     status: vendor?.status || "active",
+    email: "",
+    password: "",
   });
 
   const [payout, setPayout] = useState(initialPayout);
@@ -655,6 +670,10 @@ function VendorForm({ vendor, onSave, onCancel, isLoading }: { vendor?: any; onS
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.business_name || !form.phone) return;
+    if (!vendor && (!form.email || !form.password)) {
+      toast({ variant: "destructive", title: "Missing Credentials", description: "Email and password are required for new vendors." });
+      return;
+    }
     onSave({
       ...form,
       payment_details: JSON.stringify(payout)
@@ -665,10 +684,40 @@ function VendorForm({ vendor, onSave, onCancel, isLoading }: { vendor?: any; onS
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Left: Identity & Logistics */}
-        <div className="space-y-5">
-          <div className="space-y-3">
+        <div className="space-y-6">
+          <div className="space-y-4">
             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Identity & Logistics</label>
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {!vendor && (
+                <div className="p-5 rounded-2xl bg-primary/5 border border-primary/10 space-y-4 mb-2">
+                   <p className="text-[10px] font-black text-primary uppercase tracking-widest px-1">Login Credentials</p>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-muted-foreground/70 uppercase px-1">Login Email *</label>
+                        <Input 
+                          type="email"
+                          placeholder="vendor@example.com" 
+                          value={form.email} 
+                          onChange={e => setForm(f => ({ ...f, email: e.target.value }))} 
+                          required 
+                          className="font-body h-11 rounded-xl bg-background border-primary/20" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-muted-foreground/70 uppercase px-1">Temp Password *</label>
+                        <Input 
+                          type="text"
+                          placeholder="Set password" 
+                          value={form.password} 
+                          onChange={e => setForm(f => ({ ...f, password: e.target.value }))} 
+                          required 
+                          className="font-body h-11 rounded-xl bg-background border-primary/20" 
+                        />
+                      </div>
+                   </div>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <label className="text-[9px] font-bold text-muted-foreground/70 uppercase px-1">Business Name *</label>
                 <Input 

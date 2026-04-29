@@ -12,7 +12,17 @@ serve(async (req) => {
   }
 
   try {
-    const { email, password, full_name, role } = await req.json()
+    const { 
+      email, 
+      password, 
+      full_name, 
+      role,
+      business_name,
+      phone,
+      address,
+      category,
+      payment_details
+    } = await req.json()
 
     if (!email || !password || !role) {
       throw new Error('Missing required fields: email, password, role')
@@ -52,7 +62,12 @@ serve(async (req) => {
       email_confirm: true,
       user_metadata: {
          full_name,
-         role
+         role,
+         business_name,
+         phone,
+         address,
+         category,
+         payment_details: JSON.stringify(payment_details)
       }
     })
 
@@ -66,6 +81,51 @@ serve(async (req) => {
       .eq('id', newAuthUser.user.id)
 
     if (updateError) throw updateError;
+
+    // 4. Send Welcome Email via Resend
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    if (RESEND_API_KEY) {
+      try {
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: Deno.env.get('RESEND_FROM_EMAIL') || 'Forgiven Shopping Centre <onboarding@resend.dev>',
+            to: [email],
+            subject: 'Welcome to Forgiven Shopping Centre!',
+            html: `
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; rounded: 10px;">
+                <h1 style="color: #f97316;">Welcome to the Platform!</h1>
+                <p>Hello ${business_name || full_name || 'Partner'},</p>
+                <p>Your vendor account has been successfully created. You can now access your dashboard to manage your products and orders.</p>
+                
+                <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <h3 style="margin-top: 0;">Your Login Credentials:</h3>
+                  <p><strong>Email:</strong> ${email}</p>
+                  <p><strong>Temporary Password:</strong> ${password}</p>
+                </div>
+                
+                <p>Please log in here: <a href="${Deno.env.get('PUBLIC_URL') || 'https://forgiven.ai'}/dashboard">Vendor Dashboard</a></p>
+                <p>For your security, we recommend changing your password after your first login.</p>
+                
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 40px 0;" />
+                <p style="font-size: 12px; color: #6b7280;">Forgiven Shopping Centre — AI-Powered Commerce</p>
+              </div>
+            `,
+          }),
+        });
+        
+        if (!res.ok) {
+          const errorData = await res.json();
+          console.error('Resend error:', errorData);
+        }
+      } catch (emailErr) {
+        console.error('Failed to send email:', emailErr);
+      }
+    }
 
     return new Response(
       JSON.stringify({ success: true, user: newAuthUser.user }),
