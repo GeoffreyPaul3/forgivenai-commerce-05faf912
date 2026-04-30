@@ -241,7 +241,8 @@ const AgentDashboard = () => {
               </Button>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
+              <div className="overflow-x-auto custom-scrollbar">
+                <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30 border-0">
                     <TableHead className="pl-6">Customer</TableHead>
@@ -282,7 +283,8 @@ const AgentDashboard = () => {
                   )))}
                 </TableBody>
               </Table>
-            </CardContent>
+            </div>
+          </CardContent>
           </Card>
 
           {/* Top Products */}

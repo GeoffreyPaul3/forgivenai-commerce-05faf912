@@ -797,7 +797,7 @@ function UGCStudio() {
                   <div className="relative flex justify-center"><span className="bg-card px-3 text-xs text-muted-foreground">or generate AI avatar</span></div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-body text-muted-foreground mb-1 block">Gender</label>
                     <Select value={avatarGender} onValueChange={setAvatarGender} disabled={!!avatarUrl}>
@@ -976,7 +976,7 @@ function UGCStudio() {
               </div>
 
               {/* Summary cards */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="rounded-lg bg-muted/50 p-3 text-center">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Avatar</p>
                   {currentAvatar ? (
@@ -999,7 +999,7 @@ function UGCStudio() {
               {frames.length > 0 && (
                 <div className="space-y-4">
                   <h4 className="font-heading text-md font-semibold">🎬 Generated Frames</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {frames.map((f, i) => (
                       <motion.div
                         key={i}
@@ -1356,7 +1356,7 @@ function InfluencerManager() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
             {influencers?.map(inf => (
               <button
                 key={inf.id}
@@ -1406,7 +1406,7 @@ function InfluencerManager() {
             
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Style Mode</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   { id: "luxury_campaign", label: "Luxury", icon: <Star className="w-3 h-3" /> },
                   { id: "editorial_minimal", label: "Editorial", icon: <Image className="w-3 h-3" /> },
@@ -1538,7 +1538,7 @@ function InfluencerManager() {
             <p className="text-xs text-muted-foreground">All images maintain full brand consistency</p>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {generatedVisuals?.slice(1).map((visual: any) => (
               <div key={visual.id} className="group relative aspect-[3/4] rounded-xl overflow-hidden border border-border bg-muted cursor-pointer hover:shadow-xl transition-all">
                 <img src={visual.media_url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
@@ -1579,7 +1579,7 @@ function InfluencerManager() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Ethnicity</label>
                 <Select value={newInfluencer.ethnicity} onValueChange={v => setNewInfluencer(f => ({ ...f, ethnicity: v }))}>

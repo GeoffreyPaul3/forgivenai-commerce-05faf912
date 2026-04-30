@@ -444,16 +444,16 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-6xl overflow-y-auto max-h-[95vh] rounded-[2rem] p-0 border-0 shadow-2xl">
-        <div className="bg-gradient-to-br from-primary/10 via-background to-background p-8 pb-6 border-b border-border/50">
+      <DialogContent className="w-[95vw] sm:max-w-4xl overflow-y-auto max-h-[85vh] rounded-3xl p-0 border-0 shadow-2xl custom-scrollbar">
+        <div className="bg-gradient-to-br from-primary/10 via-background to-background p-5 sm:p-8 pb-4 sm:pb-6 border-b border-border/50">
            <DialogTitle className="font-heading text-2xl font-black tracking-tight">
              {isNew ? "Create New Product" : "Edit Product Details"}
            </DialogTitle>
            <p className="text-muted-foreground text-sm font-body mt-1">Configure your product, inventory, and vendor costing.</p>
         </div>
         
-        <div className="p-8 space-y-10">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div className="p-5 sm:p-8 space-y-6 sm:space-y-10">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-10">
             {/* Column 1: Basic Identity */}
             <div className="space-y-6">
               <div className="space-y-3">
@@ -601,7 +601,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
             </div>
           </div>
           
-          <Button onClick={handleSave} className="w-full bg-primary text-white hover:bg-primary/90 font-heading font-black h-20 text-2xl rounded-[2rem] shadow-2xl shadow-primary/30 transition-all hover:scale-[1.005] active:scale-[0.995] flex items-center justify-center gap-3">
+          <Button onClick={handleSave} className="w-full bg-primary text-white hover:bg-primary/90 font-heading font-black h-14 sm:h-20 text-lg sm:text-2xl rounded-2xl sm:rounded-[2rem] shadow-2xl shadow-primary/30 transition-all hover:scale-[1.005] active:scale-[0.995] flex items-center justify-center gap-3">
             <Package className="w-6 h-6" /> Save Product & Update Catalog
           </Button>
         </div>

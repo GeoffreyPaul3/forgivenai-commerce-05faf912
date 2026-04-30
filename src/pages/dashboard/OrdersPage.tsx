@@ -141,7 +141,7 @@ const OrdersPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total Orders", value: orders?.length || 0, icon: Package },
           { label: "Pending", value: orders?.filter(o => o.status === "pending").length || 0, icon: Clock },
@@ -219,8 +219,8 @@ const OrdersPage = () => {
 
       {/* Order Detail Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={v => !v && setSelectedOrder(null)}>
-        <DialogContent className="max-w-xl rounded-[2rem] p-0 border-0 shadow-2xl overflow-hidden">
-          <div className="bg-gradient-to-br from-primary/10 via-background to-background p-8 pb-6 border-b border-border/50 relative">
+        <DialogContent className="w-[95vw] sm:max-w-xl overflow-y-auto max-h-[85vh] rounded-3xl p-0 border-0 shadow-2xl custom-scrollbar">
+          <div className="bg-gradient-to-br from-primary/10 via-background to-background p-5 sm:p-8 pb-4 sm:pb-6 border-b border-border/50 relative">
             <DialogTitle className="font-heading text-2xl font-black tracking-tight flex items-center gap-3">
               <Package className="w-6 h-6 text-primary" /> Order Detail
             </DialogTitle>
@@ -228,8 +228,8 @@ const OrdersPage = () => {
           </div>
 
           {selectedOrder && (
-            <div className="p-8 space-y-8">
-              <div className="grid grid-cols-2 gap-6">
+            <div className="p-5 sm:p-8 space-y-6 sm:space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
                   <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-2">Customer Info</p>
                   <p className="font-black text-sm">{selectedOrder.customer_name}</p>

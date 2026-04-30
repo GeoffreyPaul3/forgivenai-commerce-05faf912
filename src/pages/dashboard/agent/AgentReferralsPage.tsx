@@ -180,7 +180,7 @@ export default function AgentReferralsPage() {
       </motion.div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "Total Referred", value: stats.total, icon: Users, color: "text-blue-500", bg: "bg-blue-500/5", border: "border-blue-500/20" },
           { label: "Converted", value: stats.converted, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },

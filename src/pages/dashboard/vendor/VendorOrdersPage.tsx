@@ -134,7 +134,7 @@ export default function VendorOrdersPage() {
       </div>
 
       {/* Payout & Performance KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpis.map((s, i) => (
           <motion.div
             key={s.label}
@@ -170,121 +170,123 @@ export default function VendorOrdersPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/10 border-0">
-                <TableHead className="pl-8 py-5">Order Reference</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Confirm Speed</TableHead>
-                <TableHead>Payout Amount</TableHead>
-                <TableHead>Fulfillment</TableHead>
-                <TableHead className="text-right pr-8">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ordersLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-20 animate-pulse text-muted-foreground">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                      <p className="text-sm font-bold uppercase tracking-widest">Synchronizing Encrypted Data...</p>
-                    </div>
-                  </TableCell>
+          <div className="overflow-x-auto custom-scrollbar">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/10 border-0">
+                  <TableHead className="pl-8 py-5">Order Reference</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Confirm Speed</TableHead>
+                  <TableHead>Payout Amount</TableHead>
+                  <TableHead>Fulfillment</TableHead>
+                  <TableHead className="text-right pr-8">Action</TableHead>
                 </TableRow>
-              ) : (orders || []).length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-24">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="w-16 h-16 rounded-3xl bg-muted/30 flex items-center justify-center">
-                        <PackageSearch className="w-8 h-8 text-muted-foreground/30" />
+              </TableHeader>
+              <TableBody>
+                {ordersLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-20 animate-pulse text-muted-foreground">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                        <p className="text-sm font-bold uppercase tracking-widest">Synchronizing Encrypted Data...</p>
                       </div>
-                      <p className="text-muted-foreground font-heading font-black text-xl">No active orders</p>
-                      <p className="text-sm text-muted-foreground/60 max-w-xs">New orders will appear here automatically when placed on WhatsApp or Web.</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (orders || []).map((order: any) => {
-                const orderCfg = statusConfig[order.status] || statusConfig.pending;
-                const StatusIcon = orderCfg.icon;
-                const confirmStatus = order.vendor_confirmation_status || "pending";
-                const needsAction = confirmStatus === "pending";
-                
-                // Calculate elapsed time
-                const minsElapsed = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000);
-                const delayColor = minsElapsed >= 60 ? "text-red-500 bg-red-50" : minsElapsed >= 30 ? "text-amber-500 bg-amber-50" : "text-emerald-500 bg-emerald-50";
-
-                return (
-                  <TableRow key={order.id} className="hover:bg-muted/10 transition-colors border-b border-border/50 group">
-                    <TableCell className="pl-8 py-6">
-                      <p className="font-mono text-xs font-black text-muted-foreground tracking-tighter">#{order.id.slice(0, 8)}</p>
-                      <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{new Date(order.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-                    </TableCell>
-                    <TableCell>
-                      <p className="font-black text-sm text-foreground/90">{order.customer_name || "Guest"}</p>
-                      <p className="text-[10px] text-muted-foreground tracking-tight">{order.customer_phone}</p>
-                    </TableCell>
-                    <TableCell>
-                      {needsAction ? (
-                        <Badge variant="outline" className={`font-black text-[10px] uppercase border-0 px-3 py-1 rounded-full ${delayColor}`}>
-                           {minsElapsed}m Elapsed
-                        </Badge>
-                      ) : (
-                        <p className="text-[10px] font-black uppercase text-muted-foreground/50">
-                           {order.vendor_confirmed_at ? `${Math.floor((new Date(order.vendor_confirmed_at).getTime() - new Date(order.created_at).getTime()) / 60000)}m response` : '—'}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-0.5">
-                        <p className="font-black text-emerald-600">MWK {(order.vendor_amount || 0).toLocaleString()}</p>
-                        <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">My Payout</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={`text-[10px] uppercase font-black flex items-center gap-1.5 w-fit px-3 py-1 rounded-full border-transparent ${orderCfg.bg} ${orderCfg.color}`}>
-                        <StatusIcon className="w-3 h-3" /> {orderCfg.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right pr-8">
-                      {needsAction ? (
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-9 px-4 text-red-500 hover:bg-red-500/10 font-black text-[10px] uppercase rounded-xl"
-                            onClick={() => rejectOrder.mutate(order.id)}
-                            disabled={rejectOrder.isPending}
-                          >
-                            Reject
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="h-9 px-6 bg-primary hover:bg-primary/90 text-white font-black text-[10px] uppercase rounded-xl shadow-lg shadow-primary/20"
-                            onClick={() => acceptOrder.mutate(order.id)}
-                            disabled={acceptOrder.isPending}
-                          >
-                            Confirm Order
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-2">
-                           {confirmStatus === "accepted" ? (
-                             <Badge className="bg-emerald-500/10 text-emerald-600 border-0 font-black text-[10px] uppercase px-4 py-1.5 rounded-full">
-                               ✓ Accepted
-                             </Badge>
-                           ) : (
-                             <Badge className="bg-red-500/10 text-red-600 border-0 font-black text-[10px] uppercase px-4 py-1.5 rounded-full">
-                               ✕ Rejected
-                             </Badge>
-                           )}
-                        </div>
-                      )}
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                ) : (orders || []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-24">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="w-16 h-16 rounded-3xl bg-muted/30 flex items-center justify-center">
+                          <PackageSearch className="w-8 h-8 text-muted-foreground/30" />
+                        </div>
+                        <p className="text-muted-foreground font-heading font-black text-xl">No active orders</p>
+                        <p className="text-sm text-muted-foreground/60 max-w-xs">New orders will appear here automatically when placed on WhatsApp or Web.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (orders || []).map((order: any) => {
+                  const orderCfg = statusConfig[order.status] || statusConfig.pending;
+                  const StatusIcon = orderCfg.icon;
+                  const confirmStatus = order.vendor_confirmation_status || "pending";
+                  const needsAction = confirmStatus === "pending";
+                  
+                  // Calculate elapsed time
+                  const minsElapsed = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000);
+                  const delayColor = minsElapsed >= 60 ? "text-red-500 bg-red-50" : minsElapsed >= 30 ? "text-amber-500 bg-amber-50" : "text-emerald-500 bg-emerald-50";
+
+                  return (
+                    <TableRow key={order.id} className="hover:bg-muted/10 transition-colors border-b border-border/50 group">
+                      <TableCell className="pl-8 py-6">
+                        <p className="font-mono text-xs font-black text-muted-foreground tracking-tighter">#{order.id.slice(0, 8)}</p>
+                        <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{new Date(order.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                      </TableCell>
+                      <TableCell>
+                        <p className="font-black text-sm text-foreground/90">{order.customer_name || "Guest"}</p>
+                        <p className="text-[10px] text-muted-foreground tracking-tight">{order.customer_phone}</p>
+                      </TableCell>
+                      <TableCell>
+                        {needsAction ? (
+                          <Badge variant="outline" className={`font-black text-[10px] uppercase border-0 px-3 py-1 rounded-full ${delayColor}`}>
+                             {minsElapsed}m Elapsed
+                          </Badge>
+                        ) : (
+                          <p className="text-[10px] font-black uppercase text-muted-foreground/50">
+                             {order.vendor_confirmed_at ? `${Math.floor((new Date(order.vendor_confirmed_at).getTime() - new Date(order.created_at).getTime()) / 60000)}m response` : '—'}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-0.5">
+                          <p className="font-black text-emerald-600">MWK {(order.vendor_amount || 0).toLocaleString()}</p>
+                          <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">My Payout</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={`text-[10px] uppercase font-black flex items-center gap-1.5 w-fit px-3 py-1 rounded-full border-transparent ${orderCfg.bg} ${orderCfg.color}`}>
+                          <StatusIcon className="w-3 h-3" /> {orderCfg.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right pr-8">
+                        {needsAction ? (
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-9 px-4 text-red-500 hover:bg-red-500/10 font-black text-[10px] uppercase rounded-xl"
+                              onClick={() => rejectOrder.mutate(order.id)}
+                              disabled={rejectOrder.isPending}
+                            >
+                              Reject
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-9 px-6 bg-primary hover:bg-primary/90 text-white font-black text-[10px] uppercase rounded-xl shadow-lg shadow-primary/20"
+                              onClick={() => acceptOrder.mutate(order.id)}
+                              disabled={acceptOrder.isPending}
+                            >
+                              Confirm Order
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2">
+                             {confirmStatus === "accepted" ? (
+                               <Badge className="bg-emerald-500/10 text-emerald-600 border-0 font-black text-[10px] uppercase px-4 py-1.5 rounded-full">
+                                 ✓ Accepted
+                               </Badge>
+                             ) : (
+                               <Badge className="bg-red-500/10 text-red-600 border-0 font-black text-[10px] uppercase px-4 py-1.5 rounded-full">
+                                 ✕ Rejected
+                               </Badge>
+                             )}
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

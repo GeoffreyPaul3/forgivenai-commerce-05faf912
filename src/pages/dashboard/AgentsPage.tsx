@@ -306,7 +306,7 @@ const AgentsPage = () => {
             const stats = agentStats[viewAgent.id] || { sales: 0, commission: 0, orderCount: 0, customerCount: 0 };
             return (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground uppercase">Phone</p><p className="font-semibold text-sm">{viewAgent.phone || "—"}</p></div>
                   <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground uppercase">Email</p><p className="font-semibold text-sm truncate">{viewAgent.email || "—"}</p></div>
                   <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground uppercase">Referral Code</p><p className="font-mono font-semibold text-sm">{viewAgent.referral_code}</p></div>
@@ -360,7 +360,7 @@ function AddAgentForm({ onSave, generateCode, isLoading }: { onSave: (a: any) =>
     <div className="space-y-4">
       <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-3">
         <p className="text-[10px] font-black text-primary uppercase tracking-widest">Login Credentials</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input type="email" placeholder="Login Email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="bg-background" required />
           <Input placeholder="Temp Password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} className="bg-background" required />
         </div>

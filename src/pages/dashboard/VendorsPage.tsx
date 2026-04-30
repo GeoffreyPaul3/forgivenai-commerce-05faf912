@@ -495,7 +495,7 @@ const VendorsPage = () => {
                       <Progress value={v.score} className="h-2 rounded-full bg-muted shadow-inner" />
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="p-3 rounded-2xl bg-muted/30 border border-border/50">
                         <p className="text-[9px] font-black uppercase text-muted-foreground mb-1">Confirmation</p>
                         <p className="text-lg font-black text-foreground">{v.score > 80 ? 'EXCELLENT' : v.score > 60 ? 'GOOD' : 'POOR'}</p>
@@ -522,12 +522,12 @@ const VendorsPage = () => {
       </Tabs>
 
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="max-w-5xl rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[90vh] flex flex-col">
-          <div className="bg-gradient-to-br from-primary/10 via-background to-background p-6 pb-4 border-b border-border/50 shrink-0">
+        <DialogContent className="w-[95vw] sm:max-w-4xl rounded-3xl p-0 overflow-hidden border-0 shadow-2xl max-h-[85vh] flex flex-col custom-scrollbar">
+          <div className="bg-gradient-to-br from-primary/10 via-background to-background p-5 sm:p-6 pb-3 sm:pb-4 border-b border-border/50 shrink-0">
              <DialogTitle className="font-heading font-black text-2xl tracking-tight">Register New Vendor Partner</DialogTitle>
              <p className="text-muted-foreground text-sm font-body mt-1">Onboard a new supply chain partner to the Forgiven Shopping Centre.</p>
           </div>
-          <div className="p-6 overflow-y-auto">
+          <div className="p-4 sm:p-6 overflow-y-auto">
             <VendorForm 
               onSave={data => createVendor.mutate(data)} 
               onCancel={() => setShowAdd(false)} 
@@ -538,12 +538,12 @@ const VendorsPage = () => {
       </Dialog>
 
       <Dialog open={!!editVendor} onOpenChange={v => !v && setEditVendor(null)}>
-        <DialogContent className="max-w-5xl rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[90vh] flex flex-col">
-          <div className="bg-gradient-to-br from-primary/10 via-background to-background p-6 pb-4 border-b border-border/50 shrink-0">
+        <DialogContent className="w-[95vw] sm:max-w-4xl rounded-3xl p-0 overflow-hidden border-0 shadow-2xl max-h-[85vh] flex flex-col custom-scrollbar">
+          <div className="bg-gradient-to-br from-primary/10 via-background to-background p-5 sm:p-6 pb-3 sm:pb-4 border-b border-border/50 shrink-0">
              <DialogTitle className="font-heading font-black text-2xl tracking-tight">Edit Vendor Details</DialogTitle>
              <p className="text-muted-foreground text-sm font-body mt-1">Update business identity, logistics, and payout configuration.</p>
           </div>
-          <div className="p-6 overflow-y-auto">
+          <div className="p-4 sm:p-6 overflow-y-auto">
             {editVendor && (
               <VendorForm 
                 vendor={editVendor} 
@@ -558,9 +558,9 @@ const VendorsPage = () => {
 
       {/* View Vendor Details */}
       <Dialog open={!!viewVendor} onOpenChange={v => !v && setViewVendor(null)}>
-        <DialogContent className="max-w-5xl rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl">
+        <DialogContent className="w-[95vw] sm:max-w-4xl rounded-3xl p-0 overflow-hidden border-0 shadow-2xl max-h-[85vh] overflow-y-auto custom-scrollbar">
           <div className="flex flex-col md:flex-row h-full">
-            <div className="md:w-1/3 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 border-b md:border-b-0 md:border-r border-border/50 relative flex flex-col justify-center items-center text-center">
+            <div className="md:w-1/3 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 sm:p-8 border-b md:border-b-0 md:border-r border-border/50 relative flex flex-col justify-center items-center text-center">
                <div className="absolute top-6 right-6">
                   {(() => { const cls = getVendorClass(viewVendor?.score); return (
                     <Badge variant="outline" className={`text-xs font-black border-2 px-4 py-1 shadow-sm ${cls.color} ${cls.bg}`}>
@@ -581,8 +581,8 @@ const VendorsPage = () => {
                </div>
             </div>
             
-            <div className="md:w-2/3 p-8 space-y-8 overflow-y-auto max-h-[80vh]">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="md:w-2/3 p-6 sm:p-8 space-y-6 sm:space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
                   <div className="flex items-center gap-2 mb-2 text-muted-foreground"><User className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Primary Contact</span></div>
                   <p className="font-black text-sm tracking-tight">{viewVendor?.contact_person}</p>
@@ -697,7 +697,7 @@ function VendorForm({ vendor, onSave, onCancel, isLoading }: { vendor?: any; onS
               {!vendor && (
                 <div className="p-5 rounded-2xl bg-primary/5 border border-primary/10 space-y-4 mb-2">
                    <p className="text-[10px] font-black text-primary uppercase tracking-widest px-1">Login Credentials</p>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label className="text-[9px] font-bold text-muted-foreground/70 uppercase px-1">Login Email *</label>
                         <Input 
@@ -734,7 +734,7 @@ function VendorForm({ vendor, onSave, onCancel, isLoading }: { vendor?: any; onS
                   className="font-body h-11 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" 
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-muted-foreground/70 uppercase px-1">Contact Name</label>
                   <Input 
@@ -764,7 +764,7 @@ function VendorForm({ vendor, onSave, onCancel, isLoading }: { vendor?: any; onS
                   className="font-body h-11 rounded-xl bg-muted/20 border-border/50" 
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-muted-foreground/70 uppercase px-1">Business Category</label>
                   <Input 
@@ -824,7 +824,7 @@ function VendorForm({ vendor, onSave, onCancel, isLoading }: { vendor?: any; onS
                     className="h-10 rounded-xl bg-background border-emerald-500/20"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-muted-foreground uppercase">Account Number</label>
                     <Input 

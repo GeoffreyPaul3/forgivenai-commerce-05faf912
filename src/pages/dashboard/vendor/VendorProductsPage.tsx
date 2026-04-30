@@ -206,7 +206,7 @@ export default function VendorProductsPage() {
 
       {/* Product Grid */}
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="rounded-3xl border border-border/50 bg-card overflow-hidden animate-pulse">
               <div className="h-48 bg-muted" />
@@ -229,7 +229,7 @@ export default function VendorProductsPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           <AnimatePresence>
             {filtered.map((product: any, i: number) => {
               const displayPrice = product.price; // Read-only FSC price
@@ -550,16 +550,16 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-6xl overflow-y-auto max-h-[95vh] rounded-[2rem] p-0 border-0 shadow-2xl">
-        <div className="bg-gradient-to-br from-primary/10 via-background to-background p-8 pb-6 border-b border-border/50">
+      <DialogContent className="w-[95vw] sm:max-w-4xl overflow-y-auto max-h-[85vh] rounded-3xl p-0 border-0 shadow-2xl custom-scrollbar">
+        <div className="bg-gradient-to-br from-primary/10 via-background to-background p-5 sm:p-8 pb-4 sm:pb-6 border-b border-border/50">
            <DialogTitle className="font-heading text-2xl font-black tracking-tight">
              {isNew ? "Supply New Product" : "Edit Supply Item"}
            </DialogTitle>
            <p className="text-muted-foreground text-sm font-body mt-1">Upload inventory directly to the Forgiven Shopping Centre platform.</p>
         </div>
         
-        <div className="p-8 space-y-10">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div className="p-5 sm:p-8 space-y-6 sm:space-y-10">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
             {/* Column 1: Basic Identity */}
             <div className="space-y-6">
               <div className="space-y-3">
@@ -723,7 +723,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
             </div>
           </div>
           
-          <Button disabled={!form.name || !form.vendor_cost || isUploading} onClick={handleSave} className="w-full bg-primary text-white hover:bg-primary/90 font-heading font-black h-20 text-2xl rounded-[2rem] shadow-2xl shadow-primary/30 transition-all hover:scale-[1.005] active:scale-[0.995] flex items-center justify-center gap-3">
+          <Button disabled={!form.name || !form.vendor_cost || isUploading} onClick={handleSave} className="w-full bg-primary text-white hover:bg-primary/90 font-heading font-black h-14 sm:h-20 text-lg sm:text-2xl rounded-2xl sm:rounded-[2rem] shadow-2xl shadow-primary/30 transition-all hover:scale-[1.005] active:scale-[0.995] flex items-center justify-center gap-3">
             {isUploading ? (
               <>
                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>

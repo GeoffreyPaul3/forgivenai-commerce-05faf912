@@ -162,7 +162,7 @@ const VendorPortal = () => {
       </div>
 
       {/* KPI Section */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "New Requests", value: stats.pending, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/5", border: "border-amber-500/20" },
           { label: "Fulfilled Orders", value: stats.completed, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },
@@ -188,8 +188,8 @@ const VendorPortal = () => {
               </h3>
            </div>
            
-           <div className="rounded-3xl border border-border bg-card overflow-hidden shadow-sm">
-             <Table>
+            <div className="rounded-3xl border border-border bg-card overflow-hidden shadow-sm overflow-x-auto custom-scrollbar">
+              <Table>
                <TableHeader>
                  <TableRow className="bg-muted/30 border-0">
                    <TableHead className="pl-6">Order ID</TableHead>

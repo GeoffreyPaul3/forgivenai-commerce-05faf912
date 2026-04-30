@@ -531,7 +531,7 @@ const SettingsPage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1 p-3 rounded-lg border border-border bg-muted/20">
                   <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">System Role</p>
                   <Badge variant="outline" className="bg-transparent border-gold/30 text-gold capitalize tracking-wide text-xs">
@@ -560,7 +560,7 @@ const SettingsPage = () => {
                       <Loader2 className="w-5 h-5 text-gold animate-spin" />
                     </div>
                   ) : userStats ? (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {viewingUser.role === 'vendor' && (
                         <>
                            <div className="p-3 bg-muted/20 rounded-lg border border-border shadow-sm">
