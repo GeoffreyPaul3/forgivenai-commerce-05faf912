@@ -76,13 +76,38 @@ const AgentsPage = () => {
 
   const createAgent = useMutation({
     mutationFn: async (agent: any) => {
-      const { error } = await supabase.from("agents").insert(agent);
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: {
+          email: agent.email,
+          password: agent.password,
+          full_name: agent.name,
+          role: 'agent',
+          phone: agent.phone
+        }
+      });
       if (error) throw error;
+      
+      const userId = data.user.id;
+      const { error: updateError } = await supabase.from("agents")
+        .update({
+          referral_code: agent.referral_code,
+          commission_rate: agent.commission_rate
+        })
+        .eq("user_id", userId);
+
+      if (updateError) throw updateError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agents"] });
       setShowAdd(false);
-      toast({ title: "Agent registered!" });
+      toast({ title: "Agent registered! 🚀", description: "Login credentials have been sent to their email." });
+    },
+    onError: (error: any) => {
+      toast({ 
+        variant: "destructive", 
+        title: "Registration Failed", 
+        description: error.message || "Please check your permissions and try again."
+      });
     },
   });
 
@@ -212,7 +237,7 @@ const AgentsPage = () => {
                 <Users className="w-8 h-8 mx-auto mb-3 opacity-30" />No agents found.
               </TableCell></TableRow>
             ) : paginatedAgents.map(agent => {
-              const stats = agentStats[agent.id] || { sales: 0, commission: 0, orderCount: 0 };
+              const stats = agentStats[agent.id] || { sales: 0, commission: 0, orderCount: 0, customerCount: 0 };
               return (
                 <TableRow key={agent.id} className="group">
                   <TableCell>
@@ -278,7 +303,7 @@ const AgentsPage = () => {
         <DialogContent>
           <DialogHeader><DialogTitle className="font-heading">{viewAgent?.name}</DialogTitle></DialogHeader>
           {viewAgent && (() => {
-            const stats = agentStats[viewAgent.id] || { sales: 0, commission: 0, orderCount: 0 };
+            const stats = agentStats[viewAgent.id] || { sales: 0, commission: 0, orderCount: 0, customerCount: 0 };
             return (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -322,26 +347,37 @@ const AgentsPage = () => {
       <Dialog open={showAdd} onOpenChange={v => !v && setShowAdd(false)}>
         <DialogContent>
           <DialogHeader><DialogTitle className="font-heading">Register Agent</DialogTitle></DialogHeader>
-          <AddAgentForm onSave={a => createAgent.mutate(a)} generateCode={generateCode} />
+          <AddAgentForm onSave={a => createAgent.mutate(a)} generateCode={generateCode} isLoading={createAgent.isPending} />
         </DialogContent>
       </Dialog>
     </div>
   );
 };
 
-function AddAgentForm({ onSave, generateCode }: { onSave: (a: any) => void; generateCode: () => string }) {
-  const [form, setForm] = useState({ name: "", phone: "", email: "", referral_code: generateCode(), commission_rate: "10" });
+function AddAgentForm({ onSave, generateCode, isLoading }: { onSave: (a: any) => void; generateCode: () => string; isLoading?: boolean }) {
+  const [form, setForm] = useState({ name: "", phone: "", email: "", password: "", referral_code: generateCode(), commission_rate: "10" });
   return (
-    <div className="space-y-3">
-      <Input placeholder="Agent Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-      <Input placeholder="Phone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
-      <Input placeholder="Email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-      <div className="flex gap-2">
-        <Input placeholder="Referral Code" value={form.referral_code} onChange={e => setForm(f => ({ ...f, referral_code: e.target.value }))} />
-        <Button variant="outline" onClick={() => setForm(f => ({ ...f, referral_code: generateCode() }))}>Generate</Button>
+    <div className="space-y-4">
+      <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-3">
+        <p className="text-[10px] font-black text-primary uppercase tracking-widest">Login Credentials</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Input type="email" placeholder="Login Email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="bg-background" required />
+          <Input placeholder="Temp Password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} className="bg-background" required />
+        </div>
       </div>
-      <Input placeholder="Commission Rate (%)" type="number" value={form.commission_rate} onChange={e => setForm(f => ({ ...f, commission_rate: e.target.value }))} />
-      <Button className="w-full" onClick={() => onSave({ ...form, commission_rate: parseFloat(form.commission_rate) || 10 })} disabled={!form.name || !form.referral_code}>Register Agent</Button>
+      <div className="space-y-3">
+        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Agent Details</p>
+        <Input placeholder="Agent Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+        <Input placeholder="Phone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+        <div className="flex gap-2">
+          <Input placeholder="Referral Code" value={form.referral_code} onChange={e => setForm(f => ({ ...f, referral_code: e.target.value }))} required />
+          <Button variant="outline" onClick={() => setForm(f => ({ ...f, referral_code: generateCode() }))}>Generate</Button>
+        </div>
+        <Input placeholder="Commission Rate (%)" type="number" value={form.commission_rate} onChange={e => setForm(f => ({ ...f, commission_rate: e.target.value }))} />
+      </div>
+      <Button className="w-full" disabled={isLoading || !form.name || !form.referral_code || !form.email || !form.password} onClick={() => onSave({ ...form, commission_rate: parseFloat(form.commission_rate) || 10 })}>
+        {isLoading ? "Registering..." : "Register Agent"}
+      </Button>
     </div>
   );
 }

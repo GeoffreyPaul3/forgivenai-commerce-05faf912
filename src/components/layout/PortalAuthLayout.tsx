@@ -44,8 +44,8 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
             <span className="font-heading font-black text-maroon-dark text-xl">F</span>
           </div>
           <div className="flex flex-col">
-            <span className="font-heading text-2xl font-bold text-white tracking-tight leading-none uppercase">Forgiven</span>
-            <span className="text-gold text-[10px] uppercase tracking-[0.4em] font-bold mt-1">Portal</span>
+            <span className="font-heading text-xl lg:text-2xl font-bold text-white tracking-tight leading-none uppercase">Forgiven Shopping Centre</span>
+            <span className="text-gold text-[10px] uppercase tracking-[0.4em] font-bold mt-1">{mode === 'agent' ? "Agent's Portal" : "Vendor's Portal"}</span>
           </div>
         </Link>
 

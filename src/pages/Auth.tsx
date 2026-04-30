@@ -130,7 +130,7 @@ export default function AuthPage() {
 
   const headings: Record<AuthMode, { title: string; sub: string }> = {
     login:  { 
-      title: appMode === "admin" ? "Systems Access" : "Portal Sign In", 
+      title: appMode === "admin" ? "Systems Access" : appMode === "agent" ? "Agents Portal Sign In" : "Vendors Portal Sign In", 
       sub: appMode === "admin" ? "Access the central commerce control hub." : "Manage your retail operations and performance." 
     },
     signup: { 
