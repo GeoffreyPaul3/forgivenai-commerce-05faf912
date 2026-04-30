@@ -14,7 +14,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Package, Search, ShoppingBag, Plus, Pencil, Trash2, Check, X, AlertCircle, ImageOff, TrendingUp
+  Package, Search, ShoppingBag, Plus, Pencil, Trash2, Check, X, AlertCircle, ImageOff, TrendingUp, Sparkles, Loader2
 } from "lucide-react";
 import { useVendorProfile } from "./VendorDashboard";
 
@@ -368,6 +368,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
   product: any | null; open: boolean; onClose: () => void; onSave: (p: any) => void; isNew?: boolean; operationsCost: number;
 }) {
   const { toast } = useToast();
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
@@ -541,6 +542,34 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
     }));
   };
 
+  const generateAiDescription = async () => {
+    if (!form.name.trim()) {
+      toast({ title: "Product name required", description: "Please enter a name first.", variant: "destructive" });
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-generate", {
+        body: {
+          type: "product-description",
+          productName: form.name,
+          productCategory: form.category,
+          productPrice: form.price,
+          currency: "MWK",
+        },
+      });
+      if (error) throw error;
+      if (data?.content) {
+        setForm(f => ({ ...f, description: data.content }));
+        toast({ title: "AI description generated!" });
+      }
+    } catch {
+      toast({ title: "Failed to generate description", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const removeTag = (type: "sizes" | "colors", idx: number) => {
     setForm(f => ({
       ...f,
@@ -567,7 +596,25 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
                 <div className="space-y-4">
                   <Input placeholder="Product name *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
                   <Input placeholder="Category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
-                  <Textarea placeholder="Full description..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="font-body min-h-[140px] rounded-xl bg-muted/20 border-border/50 p-4 focus:bg-background transition-all" />
+                  <div className="relative group/desc">
+                    <Textarea 
+                      placeholder="Full description..." 
+                      value={form.description} 
+                      onChange={e => setForm(f => ({ ...f, description: e.target.value }))} 
+                      className="font-body min-h-[140px] rounded-xl bg-muted/20 border-border/50 p-4 focus:bg-background transition-all pr-12" 
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="absolute right-3 top-3 h-8 w-8 text-primary hover:bg-primary/10 transition-colors"
+                      onClick={generateAiDescription}
+                      disabled={isGenerating}
+                      title="Generate AI Description"
+                    >
+                      {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    </Button>
+                  </div>
                 </div>
               </div>
               <div className="space-y-4">

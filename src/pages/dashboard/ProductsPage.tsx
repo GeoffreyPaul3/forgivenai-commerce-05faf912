@@ -30,7 +30,6 @@ const ProductsPage = () => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
   const { data: profile } = useQuery({
@@ -134,31 +133,6 @@ const ProductsPage = () => {
     },
   });
 
-  const generateAiDescription = async (product: Product) => {
-    setAiLoading(product.id);
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-generate", {
-        body: {
-          type: "product-description",
-          productName: product.name,
-          productCategory: product.category,
-          productPrice: product.price,
-          currency: product.currency || "MWK",
-        },
-      });
-      if (error) throw error;
-      if (data?.content) {
-        await supabase.from("products").update({ ai_description: data.content }).eq("id", product.id);
-        queryClient.invalidateQueries({ queryKey: ["products"] });
-        toast({ title: "AI description generated!" });
-      }
-    } catch {
-      toast({ title: "Failed to generate description", variant: "destructive" });
-    } finally {
-      setAiLoading(null);
-    }
-  };
-
   const statusColor = (status: string | null) => {
     if (status === "active") return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
     if (status === "archived") return "bg-muted text-muted-foreground border-border";
@@ -254,15 +228,6 @@ const ProductsPage = () => {
                   >
                     <Pencil className="w-3 h-3" />
                   </Button>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="h-7 w-7 backdrop-blur-sm bg-background/80 hover:bg-background"
-                    onClick={() => generateAiDescription(product)}
-                    disabled={aiLoading === product.id}
-                  >
-                    {aiLoading === product.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                  </Button>
                 </div>
               </div>
 
@@ -277,9 +242,6 @@ const ProductsPage = () => {
                     {product.currency} {product.price?.toLocaleString() || "—"}
                   </span>
                 </div>
-                {product.ai_description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 font-body leading-relaxed">{product.ai_description}</p>
-                )}
 
                 {/* Bottom actions */}
                 <div className="flex items-center justify-between pt-2 border-t border-border/50">
@@ -342,6 +304,8 @@ const ProductsPage = () => {
 function ProductDialog({ product, open, onClose, onSave, categories, isNew, operationsCost }: {
   product: Product | null; open: boolean; onClose: () => void; onSave: (p: any) => void; categories: string[]; isNew?: boolean; operationsCost: number;
 }) {
+  const { toast } = useToast();
+  const [isGenerating, setIsGenerating] = useState(false);
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -435,6 +399,34 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
     }));
   };
 
+  const generateAiDescription = async () => {
+    if (!form.name.trim()) {
+      toast({ title: "Product name required", description: "Please enter a name first.", variant: "destructive" });
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-generate", {
+        body: {
+          type: "product-description",
+          productName: form.name,
+          productCategory: form.category,
+          productPrice: form.price,
+          currency: "MWK",
+        },
+      });
+      if (error) throw error;
+      if (data?.content) {
+        setForm(f => ({ ...f, description: data.content }));
+        toast({ title: "AI description generated!" });
+      }
+    } catch {
+      toast({ title: "Failed to generate description", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const removeTag = (type: "sizes" | "colors", idx: number) => {
     setForm(f => ({
       ...f,
@@ -461,7 +453,25 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
                 <div className="space-y-4">
                   <Input placeholder="Product name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
                   <Input placeholder="Category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
-                  <Textarea placeholder="Full description..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="font-body min-h-[200px] rounded-xl bg-muted/20 border-border/50 p-4 focus:bg-background transition-all" />
+                  <div className="relative group/desc">
+                    <Textarea 
+                      placeholder="Full description..." 
+                      value={form.description} 
+                      onChange={e => setForm(f => ({ ...f, description: e.target.value }))} 
+                      className="font-body min-h-[200px] rounded-xl bg-muted/20 border-border/50 p-4 focus:bg-background transition-all pr-12" 
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="absolute right-3 top-3 h-8 w-8 text-primary hover:bg-primary/10 transition-colors"
+                      onClick={generateAiDescription}
+                      disabled={isGenerating}
+                      title="Generate AI Description"
+                    >
+                      {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    </Button>
+                  </div>
                 </div>
               </div>
 
