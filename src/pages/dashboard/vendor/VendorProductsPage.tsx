@@ -473,13 +473,13 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
         const filePath = `product_images/${fileName}`;
         
         const { error: uploadError } = await supabase.storage
-          .from('ugc-assets')
+          .from('vendor-products')
           .upload(filePath, file);
           
         if (uploadError) throw uploadError;
         
         const { data: { publicUrl } } = supabase.storage
-          .from('ugc-assets')
+          .from('vendor-products')
           .getPublicUrl(filePath);
           
         uploadedUrls.push(publicUrl);
