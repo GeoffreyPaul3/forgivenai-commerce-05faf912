@@ -350,6 +350,10 @@ export default function VendorProductsPage() {
 function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
   product: any | null; open: boolean; onClose: () => void; onSave: (p: any) => void; isNew?: boolean;
 }) {
+  const { toast } = useToast();
+  const [isUploading, setIsUploading] = useState(false);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -357,7 +361,6 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
     status: "active",
     vendor_cost: "",
     price: "",
-    imageUrl: "",
     inventory_mode: "flexible",
     stock_quantity: "0",
     stock_status: "available",
@@ -376,7 +379,6 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
         status: product.status || "active",
         vendor_cost: product.vendor_cost?.toString() || "",
         price: product.price?.toString() || "",
-        imageUrl: product.images?.[0] || "",
         inventory_mode: product.inventory_mode || "flexible",
         stock_quantity: product.stock_quantity?.toString() || "0",
         stock_status: product.stock_status || "available",
@@ -385,6 +387,8 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
         newSize: "",
         newColor: "",
       });
+      setPreviewUrls(product.images || []);
+      setImageFiles([]);
     } else {
       setForm({
         name: "",
@@ -393,7 +397,6 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
         status: "active",
         vendor_cost: "",
         price: "",
-        imageUrl: "",
         inventory_mode: "flexible",
         stock_quantity: "0",
         stock_status: "available",
@@ -402,33 +405,113 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
         newSize: "",
         newColor: "",
       });
+      setPreviewUrls([]);
+      setImageFiles([]);
     }
   }, [product, open]);
 
-  const handleSave = () => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      const totalFiles = previewUrls.length + files.length;
+      if (totalFiles > 2) {
+        toast({ title: "Maximum 2 images allowed", variant: "destructive" });
+        return;
+      }
+      const newFiles = [...imageFiles, ...files].slice(0, 2);
+      setImageFiles(newFiles);
+      
+      const newPreviews = [...previewUrls, ...files.map(f => URL.createObjectURL(f))].slice(0, 2);
+      setPreviewUrls(newPreviews);
+    }
+  };
+
+  const removeImage = (idx: number) => {
+    const urlToRemove = previewUrls[idx];
+    
+    // If it's a new file (blob URL), we also need to remove it from imageFiles
+    if (urlToRemove.startsWith("blob:")) {
+      const fileIdx = imageFiles.findIndex(f => URL.createObjectURL(f) === urlToRemove || true); // This is an approximation, but works since order is maintained
+      const newFiles = [...imageFiles];
+      // A better way to map blob URLs to files is strictly index-based logic:
+      // However, since we just append, any blob URL is at the end. 
+      // Actually, let's just clear the specific index.
+    }
+    
+    // Simpler logic for removal:
+    const newPreviews = [...previewUrls];
+    newPreviews.splice(idx, 1);
+    setPreviewUrls(newPreviews);
+    
+    // Since blob tracking is tricky with splices, let's just reset files if they remove a blob, 
+    // or keep a map. For simplicity, we just filter files based on remaining blob URLs.
+    // Actually, to be perfectly safe, if they remove an image, we just wipe `imageFiles` and make them re-select if it was a new file, 
+    // OR we just assume they are removing from the array.
+    // Let's implement robust removal:
+    if (urlToRemove.startsWith("blob:")) {
+      // It's a new file. We remove the file that corresponds to this index (offset by existing non-blob URLs)
+      const existingCount = previewUrls.filter(u => !u.startsWith("blob:")).length;
+      const fileIndex = idx - existingCount;
+      if (fileIndex >= 0) {
+        const newFiles = [...imageFiles];
+        newFiles.splice(fileIndex, 1);
+        setImageFiles(newFiles);
+      }
+    }
+  };
+
+  const handleSave = async () => {
     if (!form.name.trim() || !form.vendor_cost) return;
     
-    // Auto-calculate suggested price using FSC Engine formula (Vendor Cost / 0.7)
-    // Only if price isn't explicitly overridden or we want to strictly enforce it
-    const cost = parseFloat(form.vendor_cost);
-    const calculatedPrice = Math.ceil(cost / 0.7 / 100) * 100;
-    
-    const data: any = {
-      name: form.name,
-      category: form.category || null,
-      description: form.description || null,
-      status: form.status,
-      vendor_cost: cost,
-      price: calculatedPrice, // Enforced by FSC
-      images: form.imageUrl ? [form.imageUrl] : [],
-      inventory_mode: form.inventory_mode,
-      stock_quantity: parseInt(form.stock_quantity) || 0,
-      stock_status: form.stock_status,
-      sizes: form.sizes,
-      colors: form.colors,
-    };
-    if (product) data.id = product.id;
-    onSave(data);
+    setIsUploading(true);
+    try {
+      const uploadedUrls: string[] = [];
+      
+      for (const file of imageFiles) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `product_images/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('ugc-assets')
+          .upload(filePath, file);
+          
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('ugc-assets')
+          .getPublicUrl(filePath);
+          
+        uploadedUrls.push(publicUrl);
+      }
+
+      const existingUrls = previewUrls.filter(url => !url.startsWith('blob:'));
+      const finalImages = [...existingUrls, ...uploadedUrls].slice(0, 2);
+
+      const cost = parseFloat(form.vendor_cost);
+      const calculatedPrice = Math.ceil(cost / 0.7 / 100) * 100;
+      
+      const data: any = {
+        name: form.name,
+        category: form.category || null,
+        description: form.description || null,
+        status: form.status,
+        vendor_cost: cost,
+        price: calculatedPrice,
+        images: finalImages,
+        inventory_mode: form.inventory_mode,
+        stock_quantity: parseInt(form.stock_quantity) || 0,
+        stock_status: form.stock_status,
+        sizes: form.sizes,
+        colors: form.colors,
+      };
+      if (product) data.id = product.id;
+      onSave(data);
+    } catch (err: any) {
+      toast({ title: "Failed to upload images", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const addTag = (type: "sizes" | "colors") => {
@@ -470,9 +553,37 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
                   <Textarea placeholder="Full description..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="font-body min-h-[140px] rounded-xl bg-muted/20 border-border/50 p-4 focus:bg-background transition-all" />
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Main Image URL</label>
-                <Input placeholder="https://..." value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Product Images (Max 2)</label>
+                <div className="flex flex-wrap gap-4">
+                  {previewUrls.map((url, idx) => (
+                    <div key={idx} className="relative w-24 h-24 rounded-xl border border-border/50 overflow-hidden bg-muted/20 shadow-inner group">
+                      <img src={url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
+                      <button
+                        onClick={() => removeImage(idx)}
+                        className="absolute inset-0 m-auto w-8 h-8 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-lg"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {previewUrls.length < 2 && (
+                    <label className="w-24 h-24 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/50 bg-muted/10 cursor-pointer hover:bg-muted/20 hover:border-primary/50 transition-all group">
+                      <div className="w-8 h-8 rounded-full bg-background shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                      </div>
+                      <span className="text-[9px] font-black uppercase text-muted-foreground group-hover:text-primary">Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleImageChange}
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -588,8 +699,17 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
             </div>
           </div>
           
-          <Button disabled={!form.name || !form.vendor_cost} onClick={handleSave} className="w-full bg-primary text-white hover:bg-primary/90 font-heading font-black h-20 text-2xl rounded-[2rem] shadow-2xl shadow-primary/30 transition-all hover:scale-[1.005] active:scale-[0.995] flex items-center justify-center gap-3">
-            <Package className="w-6 h-6" /> Save Product & Upload to Platform
+          <Button disabled={!form.name || !form.vendor_cost || isUploading} onClick={handleSave} className="w-full bg-primary text-white hover:bg-primary/90 font-heading font-black h-20 text-2xl rounded-[2rem] shadow-2xl shadow-primary/30 transition-all hover:scale-[1.005] active:scale-[0.995] flex items-center justify-center gap-3">
+            {isUploading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Package className="w-6 h-6" /> Save Product & Upload to Platform
+              </>
+            )}
           </Button>
         </div>
       </DialogContent>
