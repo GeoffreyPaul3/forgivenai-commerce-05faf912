@@ -377,8 +377,8 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
         category: product.category || "",
         description: product.description || "",
         status: product.status || "active",
-        vendor_cost: product.vendor_cost?.toString() || "",
-        price: product.price?.toString() || "",
+        vendor_cost: product.vendor_cost ? Number(product.vendor_cost).toLocaleString("en-US") : "",
+        price: product.price ? Number(product.price).toLocaleString("en-US") : "",
         inventory_mode: product.inventory_mode || "flexible",
         stock_quantity: product.stock_quantity?.toString() || "0",
         stock_status: product.stock_status || "available",
@@ -488,7 +488,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
       const existingUrls = previewUrls.filter(url => !url.startsWith('blob:'));
       const finalImages = [...existingUrls, ...uploadedUrls].slice(0, 2);
 
-      const cost = parseFloat(form.vendor_cost);
+      const cost = parseFloat(form.vendor_cost.replace(/,/g, ''));
       const calculatedPrice = Math.ceil(cost / 0.7 / 100) * 100;
       
       const data: any = {
@@ -600,13 +600,20 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-muted-foreground uppercase px-1">Your Supply Cost (MWK) *</label>
                     <Input 
-                      type="number" 
-                      placeholder="0.00" 
+                      type="text" 
+                      placeholder="0" 
                       value={form.vendor_cost} 
                       onChange={e => {
-                        const cost = e.target.value;
-                        const suggested = cost ? Math.ceil(parseFloat(cost) / 0.7 / 100) * 100 : "";
-                        setForm(f => ({ ...f, vendor_cost: cost, price: suggested.toString() }));
+                        const rawValue = e.target.value.replace(/\D/g, "");
+                        if (!rawValue) {
+                          setForm(f => ({ ...f, vendor_cost: "", price: "" }));
+                          return;
+                        }
+                        const costNum = parseInt(rawValue, 10);
+                        const formattedCost = costNum.toLocaleString("en-US");
+                        const suggestedNum = Math.ceil(costNum / 0.7 / 100) * 100;
+                        const formattedSuggested = suggestedNum.toLocaleString("en-US");
+                        setForm(f => ({ ...f, vendor_cost: formattedCost, price: formattedSuggested }));
                       }} 
                       className="h-12 rounded-xl bg-background border-border/50 font-mono font-bold" 
                     />
@@ -614,7 +621,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
                   <div className="space-y-2 opacity-80 pointer-events-none">
                     <label className="text-[10px] font-black text-primary uppercase px-1">Platform Selling Price</label>
                     <Input 
-                      type="number" 
+                      type="text" 
                       placeholder="Auto-calculated" 
                       value={form.price} 
                       readOnly
