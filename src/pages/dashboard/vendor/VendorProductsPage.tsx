@@ -38,6 +38,21 @@ export default function VendorProductsPage() {
 
   const { data: vendor } = useVendorProfile(session?.user?.id);
 
+  // Fetch Operations Cost from Settings
+  const { data: operationsCostStr } = useQuery({
+    queryKey: ["settings", "operations_cost"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "operations_cost")
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data?.value || "5000";
+    },
+  });
+  const operationsCost = Number(operationsCostStr || "5000");
+
   // Fetch only this vendor's products
   const { data: products, isLoading } = useQuery({
     queryKey: ["vendor-products", vendor?.id],
@@ -333,7 +348,8 @@ export default function VendorProductsPage() {
         open={!!editProduct} 
         onClose={() => setEditProduct(null)} 
         onSave={(p) => updateMutation.mutate(p)} 
-        isNew={false} 
+        isNew={false}
+        operationsCost={operationsCost}
       />
       
       <VendorProductDialog 
@@ -341,14 +357,15 @@ export default function VendorProductsPage() {
         open={showAdd} 
         onClose={() => setShowAdd(false)} 
         onSave={(p) => insertMutation.mutate(p)} 
-        isNew={true} 
+        isNew={true}
+        operationsCost={operationsCost}
       />
     </div>
   );
 }
 
-function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
-  product: any | null; open: boolean; onClose: () => void; onSave: (p: any) => void; isNew?: boolean;
+function VendorProductDialog({ product, open, onClose, onSave, isNew, operationsCost }: {
+  product: any | null; open: boolean; onClose: () => void; onSave: (p: any) => void; isNew?: boolean; operationsCost: number;
 }) {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
@@ -489,7 +506,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
       const finalImages = [...existingUrls, ...uploadedUrls].slice(0, 2);
 
       const cost = parseFloat(form.vendor_cost.replace(/,/g, ''));
-      const calculatedPrice = Math.ceil(cost / 0.7 / 100) * 100;
+      const calculatedPrice = Math.ceil((cost + operationsCost) / 0.55);
       
       const data: any = {
         name: form.name,
@@ -611,7 +628,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew }: {
                         }
                         const costNum = parseInt(rawValue, 10);
                         const formattedCost = costNum.toLocaleString("en-US");
-                        const suggestedNum = Math.ceil(costNum / 0.7 / 100) * 100;
+                        const suggestedNum = Math.ceil((costNum + operationsCost) / 0.55);
                         const formattedSuggested = suggestedNum.toLocaleString("en-US");
                         setForm(f => ({ ...f, vendor_cost: formattedCost, price: formattedSuggested }));
                       }} 

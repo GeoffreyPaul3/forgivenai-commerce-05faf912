@@ -43,6 +43,21 @@ const ProductsPage = () => {
     }
   });
 
+  // Fetch Operations Cost from Settings
+  const { data: operationsCostStr } = useQuery({
+    queryKey: ["settings", "operations_cost"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "operations_cost")
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data?.value || "5000";
+    },
+  });
+  const operationsCost = Number(operationsCostStr || "5000");
+
   const { data: vendorId } = useQuery({
     queryKey: ["user-vendor-id", profile?.id],
     enabled: profile?.role === "vendor",
@@ -318,14 +333,14 @@ const ProductsPage = () => {
         </Pagination>
       )}
 
-      <ProductDialog product={editProduct} open={!!editProduct} onClose={() => setEditProduct(null)} onSave={(p) => updateMutation.mutate(p as any)} categories={categories || []} />
-      <ProductDialog product={null} open={showAdd} onClose={() => setShowAdd(false)} onSave={(p) => insertMutation.mutate(p as any)} categories={categories || []} isNew />
+      <ProductDialog product={editProduct} open={!!editProduct} onClose={() => setEditProduct(null)} onSave={(p) => updateMutation.mutate(p as any)} categories={categories || []} operationsCost={operationsCost} />
+      <ProductDialog product={null} open={showAdd} onClose={() => setShowAdd(false)} onSave={(p) => insertMutation.mutate(p as any)} categories={categories || []} isNew operationsCost={operationsCost} />
     </div>
   );
 };
 
-function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
-  product: Product | null; open: boolean; onClose: () => void; onSave: (p: any) => void; categories: string[]; isNew?: boolean;
+function ProductDialog({ product, open, onClose, onSave, categories, isNew, operationsCost }: {
+  product: Product | null; open: boolean; onClose: () => void; onSave: (p: any) => void; categories: string[]; isNew?: boolean; operationsCost: number;
 }) {
   const [form, setForm] = useState({
     name: "",
@@ -492,7 +507,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew }: {
                       value={form.vendor_cost} 
                       onChange={e => {
                         const cost = e.target.value;
-                        const suggested = cost ? Math.ceil(parseFloat(cost) / 0.7 / 100) * 100 : "";
+                        const suggested = cost ? Math.ceil((parseFloat(cost) + operationsCost) / 0.55) : "";
                         setForm(f => ({ ...f, vendor_cost: cost, price: suggested.toString() }));
                       }} 
                       className="h-12 rounded-xl bg-background border-border/50 font-mono font-bold" 
