@@ -81,7 +81,7 @@ export default function AgentReferralsPage() {
     return { total, converted, rate, active };
   }, [myCustomers, myCommissions]);
 
-  const referralUrl = agent ? `${window.location.origin.replace("agents.", "")}/?ref=${agent.referral_code}` : "";
+  const referralUrl = agent ? `${window.location.origin.replace("agents.", "")}/shop?ref=${agent.referral_code}` : "";
 
   const copyReferral = () => {
     navigator.clipboard.writeText(referralUrl);

@@ -153,7 +153,7 @@ function ContentManager() {
     <div className="space-y-6">
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-gold" /> AI Content Generator
+           AI Content Generator
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Select value={genType} onValueChange={setGenType}>

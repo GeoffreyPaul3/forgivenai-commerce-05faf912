@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AuthPage from "./pages/Auth.tsx";
 import PaymentSuccess from "./pages/PaymentSuccess.tsx";
+import Shop from "./pages/Shop.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import { useEffect } from "react";
 import { getAppMode } from "@/lib/app-mode";
@@ -33,11 +34,30 @@ const RootRedirect = () => {
   
   useEffect(() => {
     console.log("RootRedirect: hostname =", window.location.hostname, "appMode =", appMode);
+    
+    // If there's a ?ref= parameter, redirect to the public shop page
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      window.location.assign(`/shop?ref=${encodeURIComponent(ref)}`);
+      return;
+    }
+    
     if (appMode !== "admin") {
-      // Use window.location.assign for a clean redirect within the same origin
       window.location.assign("/dashboard");
     }
   }, [appMode]);
+
+  // If referral code detected, show loading while redirecting to shop
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("ref")) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="w-8 h-8 text-gold animate-spin mb-4" />
+        <p className="text-white font-body">Taking you to the shop...</p>
+      </div>
+    );
+  }
 
   if (appMode !== "admin") {
     return (
@@ -69,6 +89,8 @@ const App = () => (
               </ProtectedRoute>
             } 
           />
+          {/* Public shop page — must be accessible without auth */}
+          <Route path="/shop" element={<Shop />} />
           {/* Payment callback landing page – must be public */}
           <Route path="/create-payment" element={<PaymentSuccess />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
