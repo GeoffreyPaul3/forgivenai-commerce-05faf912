@@ -392,6 +392,7 @@ function UGCStudio() {
         ethnicity: avatarEthnicity,
         setting: avatarSetting,
         productName: selectedProd?.name,
+        productCategory: selectedProd?.category,
         productImageUrl: selectedProd?.images?.[0] || null,
       };
 
@@ -429,13 +430,20 @@ function UGCStudio() {
         setScriptData(data.scriptData);
         const sd = data.scriptData;
         const lines = [`## ${sd.title || "UGC Script"}`, "", `**Hook:** ${sd.hook || ""}`, ""];
-        sd.scenes?.forEach((s: any) => {
-          lines.push(`### Scene ${s.scene} (${s.duration})`);
-          lines.push(`*${s.direction}*`);
-          lines.push(`**Creator:** "${s.dialogue}"`);
-          if (s.text_overlay) lines.push(`📝 Text overlay: ${s.text_overlay}`);
+        
+        sd.scenes?.forEach((s: any, i: number) => {
+          const sceneNum = s.scene || s.scene_number || (i + 1);
+          const duration = s.duration || s.time || "3s";
+          const direction = s.direction || s.visual || s.description || "Visual direction";
+          const dialogue = s.dialogue || s.script || s.content || "Script line";
+          
+          lines.push(`### Scene ${sceneNum} (${duration})`);
+          lines.push(`*${direction}*`);
+          lines.push(`**Creator:** "${dialogue}"`);
+          if (s.text_overlay || s.overlay) lines.push(`📝 Text overlay: ${s.text_overlay || s.overlay}`);
           lines.push("");
         });
+        
         if (sd.cta) lines.push(`**CTA:** ${sd.cta}`);
         if (sd.hashtags?.length) lines.push(`\n${sd.hashtags.map((h: string) => `#${h}`).join(" ")}`);
         setScript(lines.join("\n"));
@@ -470,7 +478,10 @@ function UGCStudio() {
     try {
       const body: any = {
         action: "generate-storyboard",
+        influencerId: currentAvatar,
+        productId: selectedProduct,
         productName: selectedProd.name,
+        productCategory: selectedProd.category,
         productImageUrl: selectedProd.images?.[0] || null,
         avatarDescription,
         avatarImageUrl: avatarUrl, // pass the generated avatar URL if exists
@@ -630,9 +641,12 @@ function UGCStudio() {
 
       const body: any = {
         action: "generate-frame",
+        influencerId: currentAvatar,
+        productId: selectedProduct,
         avatarDescription,
         avatarImageUrl: avatarUrl,
         productName: selectedProd.name,
+        productCategory: selectedProd.category,
         productImageUrl: selectedProd.images?.[0] || null,
         scene: frame.scene,
         camera: sceneInfo.camera,
@@ -695,6 +709,34 @@ function UGCStudio() {
 
   return (
     <div className="space-y-6">
+      {/* Locked Product Header */}
+      {selectedProd && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <img src={selectedProd.images?.[0]} alt="" className="w-16 h-16 rounded-lg object-cover border-2 border-primary" />
+              <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full p-1 shadow-md">
+                <Layers className="w-3 h-3" />
+              </div>
+            </div>
+            <div>
+              <h4 className="font-heading text-base font-bold text-foreground">LOCKED PRODUCT: {selectedProd.name}</h4>
+              <div className="flex items-center gap-3 mt-1">
+                <Badge variant="outline" className="text-[10px] font-body bg-background/50 border-primary/20">
+                  ID: {selectedProd.id.slice(0, 8)}...
+                </Badge>
+                <Badge className="bg-emerald-500/10 text-emerald-700 text-[10px]">
+                  100% VISUAL INTEGRITY ENFORCED
+                </Badge>
+              </div>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="text-xs text-muted-foreground hover:text-primary">
+            <RefreshCw className="w-3 h-3 mr-2" /> Change Product
+          </Button>
+        </div>
+      )}
+
       {/* Pipeline Steps */}
       <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/30 border border-border">
         {steps.map((s, i) => (
@@ -726,25 +768,53 @@ function UGCStudio() {
         {step === 1 && (
           <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
             <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-              <h3 className="font-heading text-lg font-semibold">🔒 Lock Product</h3>
-              <p className="text-sm text-muted-foreground font-body">Select a product — its exact images will be used in every frame for consistency.</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-primary" /> 🔒 Step 1: Product Lock
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-body">Select the real product you want to feature. Its images are the single source of truth.</p>
+                </div>
+                {selectedProd && (
+                  <Badge className="bg-emerald-500/10 text-emerald-700 gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Product Locked
+                  </Badge>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {products?.map(p => (
                   <button
                     key={p.id}
-                    onClick={() => { setSelectedProduct(p.id); setStep(2); }}
+                    onClick={() => { setSelectedProduct(p.id); }}
                     className={`rounded-xl border p-3 text-left transition-all hover:border-primary/30 hover:shadow-md ${
                       selectedProduct === p.id ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border bg-card"
                     }`}
                   >
-                    {p.images && p.images.length > 0 && (
-                      <img src={p.images[0]} alt={p.name} className="w-full h-28 object-cover rounded-lg mb-2" loading="lazy" />
-                    )}
+                    <div className="relative">
+                      {p.images && p.images.length > 0 && (
+                        <img src={p.images[0]} alt={p.name} className="w-full h-28 object-cover rounded-lg mb-2" loading="lazy" />
+                      )}
+                      {selectedProduct === p.id && (
+                        <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1 shadow-lg">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
                     <p className="font-heading text-sm font-semibold truncate">{p.name}</p>
                     <p className="text-xs text-muted-foreground">{p.currency} {p.price?.toLocaleString()}</p>
                   </button>
                 ))}
               </div>
+
+              {selectedProduct && (
+                <div className="flex justify-end">
+                  <Button onClick={() => setStep(2)} className="gap-2">
+                    Lock & Continue <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+
               {!products?.length && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Layers className="w-8 h-8 mx-auto mb-2 opacity-40" />
@@ -785,10 +855,15 @@ function UGCStudio() {
                     </div>
                   )}
                   {uploadedPreview && (
-                    <Button onClick={generateAvatar} disabled={generatingAvatar} className="w-full gap-2">
+                    <Button onClick={generateAvatar} disabled={generatingAvatar || !selectedProduct} className="w-full gap-2">
                       {generatingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                       Generate Avatar with Your Photo + Product
                     </Button>
+                  )}
+                  {!selectedProduct && (
+                    <p className="text-[10px] text-destructive text-center font-body mt-1">
+                      ! Select a product in Step 1 to enable generation
+                    </p>
                   )}
                 </div>
 
@@ -837,7 +912,7 @@ function UGCStudio() {
                 </div>
 
                 {!avatarUrl && !uploadedPreview && (
-                  <Button onClick={generateAvatar} disabled={generatingAvatar} className="w-full gap-2">
+                  <Button onClick={generateAvatar} disabled={generatingAvatar || !selectedProduct} className="w-full gap-2">
                     {generatingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                     Generate AI Avatar with Product
                   </Button>
@@ -960,7 +1035,7 @@ function UGCStudio() {
                   </div>
                 </div>
 
-                <Button onClick={generateStoryboard} disabled={generatingStoryboard || !currentAvatar || !script} className="w-full gap-2" size="lg">
+                <Button onClick={generateStoryboard} disabled={generatingStoryboard || !currentAvatar || !script || !selectedProduct} className="w-full gap-2" size="lg">
                   {generatingStoryboard ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clapperboard className="w-4 h-4" />}
                   {generatingStoryboard ? "Generating frames..." : `Generate ${frameCount} Video Frames`}
                 </Button>
@@ -1211,6 +1286,8 @@ function InfluencerManager() {
     style_profile: "High-End Editorial", pose_style: "Dynamic Fashion"
   });
   const [generatingIdentity, setGeneratingIdentity] = useState(false);
+  const [galleryPage, setGalleryPage] = useState(1);
+  const GALLERY_PAGE_SIZE = 8;
 
   const { data: influencers, isLoading: influencersLoading } = useQuery({
     queryKey: ["influencers"],
@@ -1308,6 +1385,27 @@ function InfluencerManager() {
       setGenerating(false);
       setGenerationStep(0);
     }
+  };
+
+  const handleDownload = async (url: string, title: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `${title.toLowerCase().replace(/\s+/g, "-")}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      window.open(url, "_blank");
+    }
+  };
+
+  const handleView = (url: string) => {
+    window.open(url, "_blank");
   };
 
   const createInfluencerIdentity = async () => {
@@ -1493,11 +1591,21 @@ function InfluencerManager() {
                     <p className="text-white/60 text-sm font-body">{generatedVisuals[0].body}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="icon" className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20">
-                      <Download className="w-4 h-4" />
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20"
+                      onClick={() => handleView(generatedVisuals[0].media_url)}
+                    >
+                      <Eye className="w-4 h-4" />
                     </Button>
-                    <Button variant="outline" size="icon" className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20">
-                      <Share2 className="w-4 h-4" />
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20"
+                      onClick={() => handleDownload(generatedVisuals[0].media_url, generatedVisuals[0].title)}
+                    >
+                      <Download className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -1539,17 +1647,31 @@ function InfluencerManager() {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {generatedVisuals?.slice(1).map((visual: any) => (
+            {generatedVisuals?.slice((galleryPage - 1) * GALLERY_PAGE_SIZE, galleryPage * GALLERY_PAGE_SIZE).map((visual: any) => (
               <div key={visual.id} className="group relative aspect-[3/4] rounded-xl overflow-hidden border border-border bg-muted cursor-pointer hover:shadow-xl transition-all">
                 <img src={visual.media_url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                 <div className="absolute inset-0 bg-charcoal/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                   <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full"><Eye className="w-4 h-4" /></Button>
-                   <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full"><Download className="w-4 h-4" /></Button>
+                   <Button 
+                    size="icon" 
+                    variant="secondary" 
+                    className="h-8 w-8 rounded-full"
+                    onClick={() => handleView(visual.media_url)}
+                   >
+                    <Eye className="w-4 h-4" />
+                   </Button>
+                   <Button 
+                    size="icon" 
+                    variant="secondary" 
+                    className="h-8 w-8 rounded-full"
+                    onClick={() => handleDownload(visual.media_url, visual.title)}
+                   >
+                    <Download className="w-4 h-4" />
+                   </Button>
                 </div>
               </div>
             ))}
             
-            {(!generatedVisuals || generatedVisuals.length <= 1) && (
+            {(!generatedVisuals || generatedVisuals.length === 0) && (
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="aspect-[3/4] rounded-xl border border-dashed border-border flex items-center justify-center opacity-20">
                   <Image className="w-8 h-8" />
@@ -1557,6 +1679,38 @@ function InfluencerManager() {
               ))
             )}
           </div>
+
+          {generatedVisuals && generatedVisuals.length > GALLERY_PAGE_SIZE && (
+            <div className="pt-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => setGalleryPage(p => Math.max(1, p - 1))}
+                      className={galleryPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: Math.ceil(generatedVisuals.length / GALLERY_PAGE_SIZE) }).map((_, i) => (
+                    <PaginationItem key={i}>
+                      <PaginationLink 
+                        onClick={() => setGalleryPage(i + 1)}
+                        isActive={galleryPage === i + 1}
+                        className="cursor-pointer"
+                      >
+                        {i + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => setGalleryPage(p => Math.min(Math.ceil(generatedVisuals.length / GALLERY_PAGE_SIZE), p + 1))}
+                      className={galleryPage === Math.ceil(generatedVisuals.length / GALLERY_PAGE_SIZE) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </div>
       </div>
 
