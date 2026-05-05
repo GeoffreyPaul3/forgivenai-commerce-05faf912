@@ -77,6 +77,14 @@ export default function VendorLayout({ children, title }: { children: React.Reac
   const [user, setUser] = useState<SupabaseUser | null>(null);
 
   useEffect(() => {
+    document.title = "Vendor Portal | Forgiven Shopping Centre";
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute("content", "Manage your inventory, fulfill orders, and track your revenue with our streamlined vendor toolkit.");
+    }
+  }, []);
+
+  useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);

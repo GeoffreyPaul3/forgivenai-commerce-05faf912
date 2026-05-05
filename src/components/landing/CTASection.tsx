@@ -18,15 +18,15 @@ const CTASection = () => {
         >
           <div className="mb-8 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gold/10 border border-gold/20 text-gold text-[10px] font-bold uppercase tracking-widest">
             <Mail className="w-3 h-3" />
-            Limited Access Membership
+            Join Our Exclusive Network
           </div>
 
           <h2 className="font-heading text-4xl md:text-6xl font-bold text-white mb-8">
-            Begin Your <span className="text-gradient-gold italic">Ascension</span>
+            Transform Your <span className="text-gradient-gold italic">Operations</span>
           </h2>
 
           <p className="text-cream/60 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-body font-light">
-            Join the elite fashion houses that have replaced manual chaos with intelligent cinematic automation.
+            Ready to elevate your retail brand? Join the network of premium fashion houses scaling with Forgiven Shopping Centre.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center">

@@ -14,39 +14,39 @@ import {
 const features = [
   {
     icon: ShoppingBag,
-    title: "Product Hub",
-    description: "Automated onboarding that extracts 200+ fabric, fit, and style attributes into sophisticated brand-aligned descriptors.",
-    benefit: "Precision Cataloging"
+    title: "Unified Inventory",
+    description: "Streamline your product catalog with detailed attributes and sophisticated descriptions that resonate with your target audience.",
+    benefit: "Cohesive Cataloging"
   },
   {
     icon: Video,
-    title: "UGC Studio",
-    description: "Convert flat imagery into cinematic high-conversion short-form videos featuring virtual avatars (fal.ai + Veo 3.1).",
-    benefit: "Zero Production Lag"
+    title: "Creative Studio",
+    description: "Transform standard product images into high-impact marketing visuals that capture attention and drive conversions.",
+    benefit: "Instant Visual Assets"
   },
   {
     icon: MessageSquare,
-    title: "WhatsApp Sales Agent",
-    description: "Multi-modal persistent intelligent agents that handle sales, support, and orders with the elegance of a personal shopper.",
-    benefit: "Twilio-Powered Concierge"
+    title: "Seamless Sales",
+    description: "Engage customers directly through intelligent messaging channels that provide a personalized shopping experience.",
+    benefit: "Direct Customer Engagement"
   },
   {
     icon: CreditCard,
-    title: "Order & Pay",
-    description: "Integrated global checkout with PayChangu. Automated order tracking and fulfillment synchronization.",
-    benefit: "Frictionless Settlement"
+    title: "Global Commerce",
+    description: "Secure, integrated payment solutions and automated order tracking for a frictionless customer journey.",
+    benefit: "Reliable Transactions"
   },
   {
     icon: Users,
-    title: "Agent Matrix",
-    description: "A high-performance multi-level referral and commission ecosystem for brand ambassadors and field agents.",
-    benefit: "Organic Growth Engine"
+    title: "Sales Network",
+    description: "Empower a scalable network of partners and ambassadors with an intuitive referral and performance tracking system.",
+    benefit: "Scalable Growth"
   },
   {
     icon: Zap,
-    title: "Event Architecture",
-    description: "A sophisticated event-driven backend that triggers marketing, inventory, and logistics in real-time.",
-    benefit: "Synchronized Operations"
+    title: "Operational Flow",
+    description: "Synchronize your entire business—from inventory to logistics—with a responsive and reliable core infrastructure.",
+    benefit: "Optimized Efficiency"
   }
 ];
 
@@ -62,8 +62,8 @@ const FeaturesSection = () => {
             className="max-w-2xl"
           >
             <h2 className="font-heading text-5xl md:text-6xl font-bold text-maroon-dark leading-[1.1]">
-              The Core <br />
-              <span className="italic">Systems of Success</span>
+              Engineered for <br />
+              <span className="italic">Sustainable Growth</span>
             </h2>
           </motion.div>
           <motion.p 
@@ -72,7 +72,7 @@ const FeaturesSection = () => {
             viewport={{ once: true }}
             className="text-maroon/60 text-lg max-w-md font-body"
           >
-            Forgiven Commerce Infrastructure provides the essential tools to automate every touchpoint of your fashion brand.
+            Our unified platform provides the essential tools to optimize every touchpoint of your fashion and lifestyle brand.
           </motion.p>
         </div>
 

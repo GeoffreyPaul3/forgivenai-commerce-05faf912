@@ -11,6 +11,7 @@ import {
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   SidebarProvider, SidebarTrigger, useSidebar,
 } from "@/components/ui/sidebar";
+import logo from "@/assets/forgiven.png";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -335,9 +336,9 @@ function OverviewPage() {
         </div>
         <div
           className="hidden md:flex w-14 h-14 rounded-2xl items-center justify-center font-heading font-bold text-2xl"
-          style={{ background: "hsl(var(--gold))", color: "hsl(var(--sidebar-background))" }}
+          style={{ background: "bg-white/80", color: "bg-white/80" }}
         >
-          F
+           <img src={logo} alt="Forgiven Shop Logo" width={40} height={40}/>
         </div>
       </div>
 

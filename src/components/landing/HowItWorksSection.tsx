@@ -3,18 +3,18 @@ import { motion } from "framer-motion";
 const steps = [
   {
     number: "01",
-    title: "Product Synthesis",
-    description: "Our Firecrawl engine extracts product data from any source, while Gemini AI synthesizes high-end attributes and brand-aligned catalog descriptors.",
+    title: "Inventory Integration",
+    description: "Seamlessly connect your product line to our platform. We refine and enhance your data to create a premium, brand-aligned catalog.",
   },
   {
     number: "02",
-    title: "Content Generation",
-    description: "fal.ai and Veo 3.1 automatically generate cinematic social media content and high-conversion marketings assets for your entire collection.",
+    title: "Brand Amplification",
+    description: "Empower your business with high-quality visual assets and creative marketing content that tells your brand's unique story.",
   },
   {
     number: "03",
-    title: "Sales Concierge",
-    description: "Launch your WhatsApp AI sales agent and commerce hub. Automate entire customer journeys from first inquiry to final payment.",
+    title: "Growth Acceleration",
+    description: "Deploy a scalable network of sales partners and intelligent commerce tools that drive sustainable revenue and reach.",
   },
 ];
 
@@ -29,7 +29,7 @@ const HowItWorksSection = () => {
             viewport={{ once: true }}
             className="text-gold font-bold uppercase tracking-[0.3em] text-[10px] mb-4"
           >
-            The Operating System
+            Our Methodology
           </motion.p>
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
@@ -37,7 +37,7 @@ const HowItWorksSection = () => {
             viewport={{ once: true }}
             className="font-heading text-5xl md:text-6xl font-bold text-maroon-dark"
           >
-            Bespoke <span className="italic underline decoration-gold/30 underline-offset-8">Automation</span>
+            Simplified <span className="italic underline decoration-gold/30 underline-offset-8">Scale</span>
           </motion.h2>
         </div>
 

@@ -36,7 +36,7 @@ function AgentSidebar() {
       <SidebarContent>
         <div className="px-4 py-4 flex items-center gap-2">
           <div className="rounded-lg bg-white/80 flex items-center justify-center shrink-0">
-          <img src={logo} alt="Forgiven Shop Logo" width={60} height={50}/>
+          <img src={logo} alt="Forgiven Shop Logo" width={50} height={50}/>
           </div>
           {!collapsed && (
             <div className="flex flex-col">
@@ -74,6 +74,14 @@ function AgentSidebar() {
 export default function AgentLayout({ children, title }: { children: React.ReactNode, title: string }) {
   const navigate = useNavigate();
   const [user, setUser] = useState<SupabaseUser | null>(null);
+
+  useEffect(() => {
+    document.title = "Agent Dashboard | Forgiven Shopping Centre";
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute("content", "Access your product catalog, track referrals, and monitor your commissions in real-time.");
+    }
+  }, []);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));

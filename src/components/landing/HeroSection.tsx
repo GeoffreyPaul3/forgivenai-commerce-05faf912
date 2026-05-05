@@ -72,7 +72,7 @@ const HeroSection = () => {
           >
             <Sparkles className="w-4 h-4 text-gold" />
             <span className="text-gold-light text-[10px] font-black tracking-[0.4em] uppercase">
-              Universal Commerce OS
+              Unified Retail Ecosystem
             </span>
           </motion.div>
 
@@ -82,8 +82,8 @@ const HeroSection = () => {
             transition={{ duration: 1.2, delay: 0.2, ease: [0.23, 1, 0.32, 1] }}
             className="font-heading text-6xl md:text-8xl lg:text-[9rem] font-bold text-white mb-10 tracking-tighter leading-[0.85]"
           >
-            Universal <br />
-            <span className="text-gradient-gold italic pr-4">Commerce</span>
+            The Future of <br />
+            <span className="text-gradient-gold italic pr-4">Retail</span>
           </motion.h1>
 
           <motion.p
@@ -92,8 +92,7 @@ const HeroSection = () => {
             transition={{ duration: 1, delay: 0.6 }}
             className="text-cream/60 text-lg md:text-2xl max-w-3xl mx-auto mb-14 font-body font-extralight tracking-wide leading-relaxed"
           >
-            A high-end commerce operating system for bespoke fashion brands. 
-            Automate product onboarding, cinematic logistics, and global sales end-to-end.
+            Scale your brand with an elegant, all-in-one platform built for ambitious fashion and lifestyle businesses. Expand your reach and streamline operations effortlessly.
           </motion.p>
 
           <motion.div
@@ -120,7 +119,7 @@ const HeroSection = () => {
               <div className="w-14 h-14 rounded-full border border-gold/30 flex items-center justify-center group-hover:bg-gold/10 transition-colors">
                 <Play className="w-5 h-5 fill-current" />
               </div>
-              <span className="font-bold text-sm tracking-[0.2em] uppercase">Explore OS</span>
+              <span className="font-bold text-sm tracking-[0.2em] uppercase">Explore Platform</span>
             </button>
           </motion.div>
         </div>
@@ -135,7 +134,7 @@ const HeroSection = () => {
       >
         <div className="flex flex-col gap-4">
           <div className="w-[1px] h-32 bg-gradient-to-t from-gold/50 to-transparent" />
-          <span className="text-[10px] text-gold/40 tracking-[0.5em] uppercase vertical-text">Bespoke Tech</span>
+          <span className="text-[10px] text-gold/40 tracking-[0.5em] uppercase vertical-text">Bespoke Solutions</span>
         </div>
         
         <motion.div 

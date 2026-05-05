@@ -10,6 +10,7 @@ import {
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   SidebarProvider, SidebarTrigger, useSidebar,
 } from "@/components/ui/sidebar";
+import logo from "@/assets/forgiven.png";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -43,8 +44,8 @@ function AdminSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent>
         <div className="px-4 py-4 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
-            <span className="font-heading font-bold text-sidebar-primary-foreground text-sm">F</span>
+          <div className="rounded-lg bg-white/80 flex items-center justify-center shrink-0">
+           <img src={logo} alt="Forgiven Shop Logo" width={40} height={40}/>
           </div>
           {!collapsed && (
             <span className="font-heading text-lg font-bold text-sidebar-foreground">Forgiven Admin</span>
@@ -75,6 +76,14 @@ function AdminSidebar() {
 export default function AdminLayout({ children, title }: { children: React.ReactNode, title: string }) {
   const navigate = useNavigate();
   const [user, setUser] = useState<SupabaseUser | null>(null);
+
+  useEffect(() => {
+    document.title = "Command Center | Forgiven Shopping Centre";
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute("content", "Centralized management for your entire retail supply chain, vendor network, and sales operations.");
+    }
+  }, []);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
