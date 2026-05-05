@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import logo from "@/assets/forgiven.png"
 
 const WHATSAPP_NUMBER = "+265997128899";
 
@@ -67,7 +68,7 @@ export default function Shop() {
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-100/80">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/shop" className="font-heading text-xl font-black tracking-tight text-gray-900">
-            Forgiven<span className="text-[#8B1A4A]">.</span>
+            <img src={logo} alt="Forgiven Shop Logo" width={60} height={60}/>
           </Link>
 
           <div className="hidden sm:flex flex-1 max-w-md mx-8 relative">

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { NavLink } from "@/components/NavLink";
 import { useState, useEffect } from "react";
+import logo from "@/assets/forgiven.png";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 const agentMenuItems = [
@@ -34,18 +35,18 @@ function AgentSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent>
         <div className="px-4 py-4 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center shrink-0">
-            <span className="font-heading font-bold text-white text-sm">A</span>
+          <div className="rounded-lg bg-white/80 flex items-center justify-center shrink-0">
+          <img src={logo} alt="Forgiven Shop Logo" width={60} height={50}/>
           </div>
           {!collapsed && (
             <div className="flex flex-col">
               <span className="font-heading text-lg font-bold text-sidebar-foreground leading-tight">Agent Portal</span>
-              <span className="text-[10px] uppercase tracking-wider font-bold text-primary opacity-80 leading-tight">Sales Partner</span>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-orange-500 opacity-80 leading-tight">Sales Partner</span>
             </div>
           )}
         </div>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/40">Sales Partner</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground/60">Sales Partner</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {agentMenuItems.map((item) => (
