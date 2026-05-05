@@ -94,8 +94,12 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
       <div className="flex-1 flex flex-col items-center justify-center p-6 lg:bg-white/5 lg:backdrop-blur-3xl lg:border-l lg:border-white/10 relative">
         <div className="lg:hidden absolute top-8 left-8">
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gold flex items-center justify-center">
-              <span className="font-heading font-black text-maroon-dark text-lg">F</span>
+            <div className="rounded-lg bg-white/80 flex items-center justify-center">
+               <img src={logo} alt="Forgiven Shop Logo" width={40} height={40}/>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-heading text-lg font-bold text-white tracking-tight leading-none uppercase">Forgiven Shopping Centre</span>
+              <span className="text-gold text-[8px] uppercase tracking-[0.4em] font-bold mt-1">{mode === 'agent' ? "Agent's Portal" : "Vendor's Portal"}</span>
             </div>
           </Link>
         </div>

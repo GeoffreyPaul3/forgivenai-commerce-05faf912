@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { useLandingActions } from "@/hooks/useLandingActions";
+import logo from "@/assets/forgiven.png";
+import {useLandingActions } from "@/hooks/useLandingActions";
 
 const Navbar = () => {
   const { openWhatsApp } = useLandingActions();
@@ -14,8 +15,8 @@ const Navbar = () => {
     >
       <div className="container mx-auto px-6 h-20 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 group shrink-0">
-          <div className="w-10 h-10 rounded-xl bg-gold flex items-center justify-center transition-transform duration-500 group-hover:rotate-[360deg] shrink-0">
-            <span className="font-heading font-black text-maroon-dark text-lg">F</span>
+          <div className="rounded-lg bg-white/80 flex items-center justify-center shrink-0">
+            <img src={logo} alt="Forgiven Shop Logo" width={50} height={50}/>
           </div>
           <div className="hidden sm:flex flex-col">
             <span className="font-heading text-xl font-bold text-white tracking-tight leading-none">Forgiven</span>

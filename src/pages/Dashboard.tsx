@@ -335,8 +335,7 @@ function OverviewPage() {
           </p>
         </div>
         <div
-          className="hidden md:flex w-14 h-14 rounded-2xl items-center justify-center font-heading font-bold text-2xl"
-          style={{ background: "bg-white/80", color: "bg-white/80" }}
+          className="hidden md:flex w-14 h-14 rounded-2xl items-center justify-center bg-white/80"
         >
            <img src={logo} alt="Forgiven Shop Logo" width={40} height={40}/>
         </div>
