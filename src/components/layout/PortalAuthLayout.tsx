@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import logo from "@/assets/forgiven.png";
 import { CheckCircle2, ShieldCheck, Zap, TrendingUp, Users, Globe } from "lucide-react";
 
 interface PortalAuthLayoutProps {
@@ -40,8 +41,8 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
         <div className="absolute inset-0 bg-gold/5 blur-[120px] -z-10" />
         
         <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-12 h-12 rounded-2xl bg-gold flex items-center justify-center shadow-lg shadow-gold/20">
-            <span className="font-heading font-black text-maroon-dark text-xl">F</span>
+          <div className="rounded-lg bg-white/80 flex items-center justify-center shadow-lg shadow-gold/20">
+             <img src={logo} alt="Forgiven Shop Logo" width={50} height={50}/>
           </div>
           <div className="flex flex-col">
             <span className="font-heading text-xl lg:text-2xl font-bold text-white tracking-tight leading-none uppercase">Forgiven Shopping Centre</span>
