@@ -192,7 +192,7 @@ export default function Shop() {
                       >
                         <div className="aspect-square rounded-xl overflow-hidden bg-gray-50 mb-2 relative shadow-sm group-hover:shadow-md transition-shadow duration-400">
                           {p.images?.[0] ? (
-                            <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                            <img src={p.images[0]} alt={p.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
                               <ShoppingBag className="w-6 h-6 text-gray-200" />
@@ -256,12 +256,12 @@ export default function Shop() {
                 <button onClick={() => setDetail(null)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"><X className="w-4 h-4 text-gray-500" /></button>
               </div>
               {detail.images?.[0] && (
-                <div className="p-5"><div className="aspect-square rounded-2xl overflow-hidden bg-gray-50"><img src={detail.images[0]} alt={detail.name} className="w-full h-full object-cover" /></div></div>
+                <div className="p-5"><div className="aspect-square rounded-2xl overflow-hidden bg-gray-50"><img src={detail.images[0]} alt={detail.name} className="w-full h-full object-contain" /></div></div>
               )}
               {detail.images?.length > 1 && (
                 <div className="flex gap-2 px-5 overflow-x-auto">
                   {detail.images.slice(1, 5).map((img: string, i: number) => (
-                    <div key={i} className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-gray-100"><img src={img} alt="" className="w-full h-full object-cover" /></div>
+                    <div key={i} className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-gray-100 bg-gray-50"><img src={img} alt="" className="w-full h-full object-contain" /></div>
                   ))}
                 </div>
               )}
