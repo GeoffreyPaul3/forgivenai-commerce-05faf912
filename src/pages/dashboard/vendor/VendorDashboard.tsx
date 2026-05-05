@@ -385,7 +385,7 @@ export default function VendorDashboard() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{product.name}</p>
-                      <p className="text-xs font-bold text-primary">MWK {product.price.toLocaleString()}</p>
+                      <p className="text-xs font-bold text-primary">MWK {(product.vendor_cost || 0).toLocaleString()}</p>
                     </div>
                     <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                       <ArrowRight className="w-4 h-4" />

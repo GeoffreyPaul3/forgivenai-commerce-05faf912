@@ -287,22 +287,13 @@ export default function VendorProductsPage() {
                       <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">{product.category || 'Uncategorized'}</p>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                       <p className="text-lg font-heading font-black text-primary">
-                         {product.currency || "MWK"} {(displayPrice || 0).toLocaleString()}
-                       </p>
-                       <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter border-border/50 text-muted-foreground">
-                         Selling Price
-                       </Badge>
-                    </div>
-                    
                     <div className="flex items-center justify-between pb-2 border-b border-border/50">
-                       <p className="text-sm font-bold text-foreground">
+                       <p className="text-lg font-heading font-black text-foreground">
                          {product.currency || "MWK"} {(product.vendor_cost || 0).toLocaleString()}
                        </p>
-                       <span className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground">
+                       <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter border-border/50 text-muted-foreground">
                          Your Cost
-                       </span>
+                       </Badge>
                     </div>
 
                     {product.inventory_mode === 'flexible' && (
@@ -595,7 +586,16 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Product Identity</label>
                 <div className="space-y-4">
                   <Input placeholder="Product name *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
-                  <Input placeholder="Category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
+                  <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
+                    <SelectTrigger className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all text-left">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['Bags', 'Clothing', 'Hat', 'Jewelry', 'Perfume', 'Shoes', 'Sunglass', 'Watch'].map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <div className="relative group/desc">
                     <Textarea 
                       placeholder="Full description..." 
@@ -682,16 +682,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
                       className="h-12 rounded-xl bg-background border-border/50 font-mono font-bold" 
                     />
                   </div>
-                  <div className="space-y-2 opacity-80 pointer-events-none">
-                    <label className="text-[10px] font-black text-primary uppercase px-1">Platform Selling Price</label>
-                    <Input 
-                      type="text" 
-                      placeholder="Auto-calculated" 
-                      value={form.price} 
-                      readOnly
-                      className="h-12 rounded-xl bg-background/50 border-primary/20 font-mono font-black text-primary text-lg" 
-                    />
-                  </div>
+
                 </div>
                 <div className="bg-primary/10 p-4 rounded-2xl flex gap-3 items-start border border-primary/20 shadow-inner">
                    <TrendingUp className="w-4 h-4 text-primary shrink-0 mt-0.5" />
