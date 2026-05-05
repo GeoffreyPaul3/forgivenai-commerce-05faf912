@@ -1320,6 +1320,31 @@ function InfluencerManager() {
     },
   });
 
+  const setCoverImage = useMutation({
+    mutationFn: async (visual: any) => {
+      const productId = visual.metadata?.product_id || visual.product_id;
+      if (!productId) throw new Error("This visual is not linked to a specific product.");
+      
+      const { data: prod } = await supabase.from("products").select("images").eq("id", productId).single();
+      if (!prod) throw new Error("Product not found.");
+      
+      const currentImages = prod.images || [];
+      const filtered = currentImages.filter((img: string) => img !== visual.media_url);
+      const newImages = [visual.media_url, ...filtered];
+      
+      const { error } = await supabase.from("products").update({ images: newImages }).eq("id", productId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["products-active-influencer"] });
+      toast({ title: "Cover Image Updated 🌟", description: "The AI mockup will now be the primary image across all storefronts and portals." });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Failed to update cover", description: error.message });
+    }
+  });
+
   const selectedProd = products?.find(p => p.id === selectedProduct);
 
   const generateCampaignVisual = async () => {
@@ -1656,14 +1681,26 @@ function InfluencerManager() {
                     variant="secondary" 
                     className="h-8 w-8 rounded-full"
                     onClick={() => handleView(visual.media_url)}
+                    title="View Full Size"
                    >
                     <Eye className="w-4 h-4" />
                    </Button>
                    <Button 
                     size="icon" 
                     variant="secondary" 
+                    className="h-8 w-8 rounded-full bg-gold/90 hover:bg-gold text-maroon-dark"
+                    onClick={(e) => { e.stopPropagation(); setCoverImage.mutate(visual); }}
+                    disabled={setCoverImage.isPending}
+                    title="Set as Product Cover Image"
+                   >
+                    {setCoverImage.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4 fill-maroon-dark" />}
+                   </Button>
+                   <Button 
+                    size="icon" 
+                    variant="secondary" 
                     className="h-8 w-8 rounded-full"
                     onClick={() => handleDownload(visual.media_url, visual.title)}
+                    title="Download"
                    >
                     <Download className="w-4 h-4" />
                    </Button>

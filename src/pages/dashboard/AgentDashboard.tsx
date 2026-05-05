@@ -139,6 +139,8 @@ const AgentDashboard = () => {
     );
   }
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const referralUrl = agent ? `${window.location.origin}/?ref=${agent.referral_code}` : "";
 
   return (
@@ -147,11 +149,10 @@ const AgentDashboard = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-muted-foreground font-body text-sm">GP</span>
-            <span className="font-heading font-bold text-lg">{agent?.name || "Geoffrey Paul"}</span>
+            <span className="font-heading font-bold text-lg">{agent?.name || "Agent"}</span>
           </div>
-          <h2 className="font-heading text-3xl font-bold tracking-tight">Good afternoon 👋</h2>
-          <p className="text-muted-foreground font-body">Welcome back to Forgiven Commerce OS</p>
+          <h2 className="font-heading text-3xl font-bold tracking-tight">{greeting} 👋</h2>
+          <p className="text-muted-foreground font-body">Welcome back to Forgiven Shopping Centre Agent's Portal</p>
           <p className="text-muted-foreground font-body text-sm mt-1">Here's what's happening in your store today.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -381,16 +382,6 @@ const AgentDashboard = () => {
               </Button>
               <Button 
                 variant="ghost" 
-                className="w-full justify-start gap-3 rounded-2xl hover:bg-emerald-500/5 hover:text-emerald-500 transition-all h-12"
-                onClick={() => navigate("/dashboard/assistant")}
-              >
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                  <MessageCircle className="w-4 h-4" />
-                </div>
-                <span className="font-semibold text-sm">Open WhatsApp Chat</span>
-              </Button>
-              <Button 
-                variant="ghost" 
                 className="w-full justify-start gap-3 rounded-2xl hover:bg-gold/5 hover:text-gold transition-all h-12"
                 onClick={() => navigate("/dashboard/agent/earnings")}
               >
@@ -402,20 +393,12 @@ const AgentDashboard = () => {
               <Button 
                 variant="ghost" 
                 className="w-full justify-start gap-3 rounded-2xl hover:bg-purple-500/5 hover:text-purple-500 transition-all h-12"
+                onClick={() => navigate("/dashboard/agent/products")}
               >
                 <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                  <Video className="w-4 h-4" />
+                  <ShoppingBag className="w-4 h-4" />
                 </div>
-                <span className="font-semibold text-sm">Create UGC Content</span>
-              </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start gap-3 rounded-2xl hover:bg-pink-500/5 hover:text-pink-500 transition-all h-12"
-              >
-                <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center">
-                  <BarChart3 className="w-4 h-4" />
-                </div>
-                <span className="font-semibold text-sm">View Analytics</span>
+                <span className="font-semibold text-sm">Product Catalog</span>
               </Button>
             </CardContent>
           </Card>

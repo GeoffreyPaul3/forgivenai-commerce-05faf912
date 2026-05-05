@@ -57,7 +57,7 @@ export default function VendorPerformancePage() {
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("orders")
-        .select("id, total, status, created_at, items")
+        .select("id, total, status, created_at, items, vendor_confirmation_status")
         .order("created_at", { ascending: true });
       return (data || []).filter((o: any) =>
         (o.items as any[]).some((item: any) => productIds.includes(item.product_id))
@@ -70,10 +70,22 @@ export default function VendorPerformancePage() {
     const revenue = orders.reduce((s: number, o: any) => s + (o.total || 0), 0);
     const delivered = orders.filter((o: any) => o.status === "delivered").length;
     const cancelled = orders.filter((o: any) => o.status === "cancelled").length;
+    const pending = orders.filter((o: any) => o.vendor_confirmation_status === "pending").length;
+    
     const conversionRate = orders.length > 0 ? ((delivered / orders.length) * 100).toFixed(1) : "0.0";
     const avgOrder = orders.length > 0 ? Math.round(revenue / orders.length) : 0;
-    return { revenue, totalOrders: orders.length, delivered, cancelled, conversionRate, avgOrder };
-  }, [allOrders]);
+    
+    const acceptanceRate = orders.length > 0 ? Math.round(((orders.length - cancelled) / orders.length) * 100) : 0;
+    const fulfillmentSuccess = (orders.length - cancelled) > 0 ? Math.round((delivered / (orders.length - cancelled)) * 100) : 0;
+    const confirmationSpeed = orders.length > 0 ? Math.round(((orders.length - pending) / orders.length) * 100) : 0;
+    const productQuality = vendor?.score ? Math.round((vendor.score / 5) * 100) : 0;
+
+    return { 
+      revenue, totalOrders: orders.length, delivered, cancelled, 
+      conversionRate, avgOrder, acceptanceRate, fulfillmentSuccess, 
+      confirmationSpeed, productQuality 
+    };
+  }, [allOrders, vendor?.score]);
 
   // Revenue over time
   const revenueTimeline = useMemo(() => {
@@ -154,10 +166,10 @@ export default function VendorPerformancePage() {
         <CardContent className="p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
-              { label: "Confirmation Speed", weight: "30%", val: 92, icon: Clock, color: "bg-emerald-500" },
-              { label: "Acceptance Rate", weight: "30%", val: 98, icon: CheckCircle2, color: "bg-blue-500" },
-              { label: "Fulfillment Success", weight: "25%", val: 88, icon: Package, color: "bg-purple-500" },
-              { label: "Product Quality", weight: "15%", val: 95, icon: Star, color: "bg-gold" },
+              { label: "Confirmation Speed", weight: "30%", val: kpis.confirmationSpeed, icon: Clock, color: "bg-emerald-500" },
+              { label: "Acceptance Rate", weight: "30%", val: kpis.acceptanceRate, icon: CheckCircle2, color: "bg-blue-500" },
+              { label: "Fulfillment Success", weight: "25%", val: kpis.fulfillmentSuccess, icon: Package, color: "bg-purple-500" },
+              { label: "Product Quality", weight: "15%", val: kpis.productQuality, icon: Star, color: "bg-gold" },
             ].map(m => (
               <div key={m.label} className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -191,7 +203,7 @@ export default function VendorPerformancePage() {
           { label: "Supply Volume", value: kpis.totalOrders, icon: ShoppingBag, color: "text-blue-500", bg: "bg-blue-500/5", border: "border-blue-500/20" },
           { label: "Average Item Payout", value: `MWK ${kpis.avgOrder.toLocaleString()}`, icon: TrendingUp, color: "text-gold", bg: "bg-gold/5", border: "border-gold/20" },
           { label: "Confirmed Delivery", value: kpis.delivered, icon: Package, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
-          { label: "Platform Percentile", value: `TOP 12%`, icon: BarChart3, color: "text-purple-500", bg: "bg-purple-500/5", border: "border-purple-500/20" },
+          { label: "Conversion Rate", value: `${kpis.conversionRate}%`, icon: BarChart3, color: "text-purple-500", bg: "bg-purple-500/5", border: "border-purple-500/20" },
           { label: "Escalated Delays", value: kpis.cancelled, icon: Zap, color: "text-red-500", bg: "bg-red-500/5", border: "border-red-500/20" },
         ].map((s, i) => (
           <motion.div

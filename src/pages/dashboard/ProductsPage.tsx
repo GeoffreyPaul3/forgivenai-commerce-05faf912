@@ -213,9 +213,12 @@ const ProductsPage = () => {
                   </div>
                 )}
                 {/* Status badge overlay */}
-                <div className="absolute top-3 left-3">
+                <div className="absolute top-3 left-3 flex flex-col gap-1 items-start">
                   <Badge variant="outline" className={`text-[10px] font-semibold backdrop-blur-sm ${statusColor(product.status)}`}>
                     {product.status || "draft"}
+                  </Badge>
+                  <Badge variant="secondary" className="text-[9px] font-bold uppercase backdrop-blur-sm bg-background/80">
+                    {product.vendor_id ? "Vendor" : "In-House"}
                   </Badge>
                 </div>
                 {/* Quick actions overlay */}
@@ -242,6 +245,11 @@ const ProductsPage = () => {
                     {product.currency} {product.price?.toLocaleString() || "—"}
                   </span>
                 </div>
+                {((product as any).metadata?.sku) && (
+                  <div className="text-[10px] font-mono font-bold text-muted-foreground bg-muted/30 px-2 py-1 rounded-md inline-block">
+                    {(product as any).metadata.sku}
+                  </div>
+                )}
 
                 {/* Bottom actions */}
                 <div className="flex items-center justify-between pt-2 border-t border-border/50">
@@ -371,6 +379,14 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
 
   const handleSave = () => {
     if (!form.name.trim()) return;
+    
+    let metadata = product?.metadata as any || {};
+    if (!product) {
+      const isVendor = form.vendor_id !== "none";
+      const prefix = isVendor ? "FSC-VEN-" : "FSC-";
+      metadata = { ...metadata, sku: `${prefix}${Math.random().toString(36).substring(2, 8).toUpperCase()}` };
+    }
+
     const data: any = {
       name: form.name,
       category: form.category || null,
@@ -384,6 +400,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
       stock_status: form.stock_status,
       sizes: form.sizes,
       colors: form.colors,
+      metadata: Object.keys(metadata).length > 0 ? metadata : null,
     };
     if (product) data.id = product.id;
     onSave(data);
@@ -451,6 +468,12 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Product Identity</label>
                 <div className="space-y-4">
+                  <Input 
+                    placeholder="SKU (Auto-generated on save)" 
+                    value={product ? ((product as any).metadata?.sku || "") : ""} 
+                    disabled 
+                    className="font-body h-12 rounded-xl bg-muted/50 border-border/50 text-muted-foreground font-mono disabled:opacity-70" 
+                  />
                   <Input placeholder="Product name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
                   <Input placeholder="Category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
                   <div className="relative group/desc">

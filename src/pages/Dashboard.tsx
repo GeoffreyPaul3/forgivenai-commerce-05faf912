@@ -37,6 +37,7 @@ import VendorPortal from "./dashboard/VendorPortal";
 import AgentReferralsPage from "./dashboard/agent/AgentReferralsPage";
 import AgentEarningsPage from "./dashboard/agent/AgentEarningsPage";
 import AgentOrdersPage from "./dashboard/agent/AgentOrdersPage";
+import AgentProductsPage from "./dashboard/agent/AgentProductsPage";
 import VendorDashboard from "./dashboard/vendor/VendorDashboard";
 import VendorProductsPage from "./dashboard/vendor/VendorProductsPage";
 import VendorOrdersPage from "./dashboard/vendor/VendorOrdersPage";
@@ -585,6 +586,7 @@ const DashboardPage = () => {
       <Route path="agent/referrals" element={<AgentReferralsPage />} />
       <Route path="agent/earnings" element={<AgentEarningsPage />} />
       <Route path="agent/orders" element={<AgentOrdersPage />} />
+      <Route path="agent/products" element={<AgentProductsPage />} />
       <Route path="assistant" element={<AIAssistantPage />} />
       <Route path="analytics" element={<AnalyticsPage />} />
       <Route path="settings" element={<SettingsPage />} />

@@ -121,8 +121,8 @@ export default function VendorPayoutsPage() {
             sub: "All orders combined", icon: DollarSign, color: "text-blue-500", bg: "bg-blue-500/5", border: "border-blue-500/20",
           },
           {
-            label: "Your Share (80%)", value: `MWK ${stats.vendorShare.toLocaleString()}`,
-            sub: "After platform fee", icon: TrendingUp, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20",
+            label: "Your Net Earnings", value: `MWK ${stats.vendorShare.toLocaleString()}`,
+            sub: "Total guaranteed payout", icon: TrendingUp, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20",
           },
           {
             label: "Total Paid Out", value: `MWK ${stats.totalPaid.toLocaleString()}`,
@@ -167,8 +167,8 @@ export default function VendorPayoutsPage() {
           <CardContent className="pt-5 space-y-4">
             {[
               { label: "Gross Marketplace Sales", value: stats.totalRevenue, color: "bg-blue-500" },
-              { label: "Platform Margin (30%)", value: Math.round(stats.totalRevenue - stats.vendorShare), color: "bg-red-400", negative: true },
-              { label: "My Net Earnings (Cost)", value: stats.vendorShare, color: "bg-primary" },
+              { label: "Platform Margin", value: Math.max(0, Math.round(stats.totalRevenue - stats.vendorShare)), color: "bg-red-400", negative: true },
+              { label: "My Net Earnings", value: stats.vendorShare, color: "bg-primary" },
               { label: "Successfully Withdrawn", value: stats.totalPaid, color: "bg-emerald-500", negative: true },
               { label: "Available for Payout", value: Math.max(0, stats.balance), color: "bg-gold" },
             ].map((row, i) => (
@@ -202,12 +202,19 @@ export default function VendorPayoutsPage() {
           </CardHeader>
           <CardContent className="p-6 space-y-4">
             {[
-              { label: "Automated Margin", value: "30% FSC" },
-              { label: "Vendor Remuneration", value: "Cost Price" },
-              { label: "Settlement Protocol", value: "Mobile Money" },
-              { label: "Verification Cycle", value: "Daily Sync" },
-              { label: "Min. Threshold", value: "MWK 5,000" },
-              { label: "Payment Status", value: "Verified Only" },
+              { label: "Total Withdrawals", value: (payouts || []).length.toString() },
+              { label: "Pending Requests", value: (payouts || []).filter((p: any) => p.status === 'pending').length.toString() },
+              { label: "Last Payout Amount", value: payouts && payouts[0] ? `MWK ${payouts[0].amount.toLocaleString()}` : "None" },
+              { label: "Last Payout Date", value: payouts && payouts[0] ? new Date(payouts[0].created_at).toLocaleDateString() : "None" },
+              { label: "Effective Margin", value: `${Math.round(((stats.totalRevenue - stats.vendorShare) / Math.max(stats.totalRevenue, 1)) * 100)}%` },
+              { label: "Payout Method", value: (() => {
+                try {
+                  const d = JSON.parse((vendor as any)?.payment_details || "{}");
+                  if (d.type === 'bank') return `Bank (${d.bank_name || 'Setup'})`;
+                  if (d.type === 'mobile') return `Mobile Money (${d.provider || 'Setup'})`;
+                } catch(e) {}
+                return (vendor as any)?.payment_details ? "Configured" : "Not Configured";
+              })() },
             ].map(row => (
               <div key={row.label} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
                 <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{row.label}</span>
@@ -307,7 +314,7 @@ export default function VendorPayoutsPage() {
         <AlertCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <p className="text-xs text-muted-foreground font-body">
           <strong className="text-foreground">Commission Policy:</strong>{" "}
-          Forgiven Shopping Centre retains a <strong>20% platform fee</strong> on all sales. Your net share of <strong>80%</strong> is available for withdrawal weekly. Minimum withdrawal is MWK 5,000.
+          Forgiven Shopping Centre dynamically calculates the platform margin per item to maintain competitive market pricing. Your displayed net earnings are entirely guaranteed for withdrawal.
         </p>
       </div>
     </div>

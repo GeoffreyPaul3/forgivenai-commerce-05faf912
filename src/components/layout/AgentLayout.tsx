@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, CreditCard, User, LogOut,
-  ChevronDown, Users, TrendingUp, PackageSearch
+  ChevronDown, Users, TrendingUp, PackageSearch, ShoppingBag
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -19,6 +19,7 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 const agentMenuItems = [
   { title: "Dashboard",      url: "/dashboard",                     icon: LayoutDashboard },
+  { title: "Products",       url: "/dashboard/agent/products",      icon: ShoppingBag },
   { title: "My Referrals",   url: "/dashboard/agent/referrals",     icon: Users },
   { title: "Earnings",       url: "/dashboard/agent/earnings",      icon: TrendingUp },
   { title: "Orders Tracking",url: "/dashboard/agent/orders",        icon: PackageSearch },
