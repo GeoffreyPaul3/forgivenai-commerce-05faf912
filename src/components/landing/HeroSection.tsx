@@ -1,6 +1,6 @@
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles, Play, ChevronDown } from "lucide-react";
+import { ArrowRight, Sparkles, Play, ChevronDown, ShoppingBasket } from "lucide-react";
 import { useRef } from "react";
 import { Link } from "react-router-dom";
 
@@ -60,18 +60,17 @@ const HeroSection = () => {
 
       {/* Content Container */}
       <motion.div 
-        style={{ opacity }}
-        className="relative z-20 container mx-auto px-6 h-full flex items-center justify-center"
+        className="relative z-20 container mx-auto px-6 h-full flex items-center justify-center pt-24"
       >
-        <div className="flex flex-col items-center text-center max-w-6xl">
+        <div className="flex flex-col items-center text-center max-w-5xl">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, ease: "backOut" }}
-            className="inline-flex items-center gap-3 px-6 py-2 rounded-full border border-gold/20 bg-white/5 backdrop-blur-xl mb-10 shadow-[0_0_30px_rgba(234,179,8,0.1)]"
+            className="inline-flex items-center gap-3 px-5 py-1.5 rounded-full border border-gold/20 bg-white/5 backdrop-blur-xl mb-6 shadow-[0_0_30px_rgba(234,179,8,0.1)]"
           >
-            <Sparkles className="w-4 h-4 text-gold" />
-            <span className="text-gold-light text-[10px] font-black tracking-[0.4em] uppercase">
+            <ShoppingBasket className="w-3.5 h-3.5 text-gold" />
+            <span className="text-gold-light text-[9px] font-black tracking-[0.4em] uppercase">
               Unified Retail Ecosystem
             </span>
           </motion.div>
@@ -80,7 +79,7 @@ const HeroSection = () => {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.2, delay: 0.2, ease: [0.23, 1, 0.32, 1] }}
-            className="font-heading text-6xl md:text-8xl lg:text-[9rem] font-bold text-white mb-10 tracking-tighter leading-[0.85]"
+            className="font-heading text-5xl md:text-7xl lg:text-[7rem] font-bold text-white mb-6 tracking-tighter leading-[0.9]"
           >
             The Future of <br />
             <span className="text-gradient-gold italic pr-4">Retail</span>
@@ -90,7 +89,7 @@ const HeroSection = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1, delay: 0.6 }}
-            className="text-cream/60 text-lg md:text-2xl max-w-3xl mx-auto mb-14 font-body font-extralight tracking-wide leading-relaxed"
+            className="text-cream/60 text-base md:text-xl max-w-2xl mx-auto mb-10 font-body font-extralight tracking-wide leading-relaxed"
           >
             Scale your brand with an elegant, all-in-one platform built for ambitious fashion and lifestyle businesses. Expand your reach and streamline operations effortlessly.
           </motion.p>
@@ -99,16 +98,16 @@ const HeroSection = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.9 }}
-            className="flex flex-col sm:flex-row gap-8 items-center"
+            className="flex flex-col sm:flex-row gap-6 items-center"
           >
             <Link to="/dashboard">
               <Button 
                 size="lg" 
-                className="h-20 px-12 rounded-full bg-gold hover:bg-gold-light text-maroon-dark font-black text-xl transition-all duration-700 hover:scale-105 hover:shadow-[0_0_50px_rgba(234,179,8,0.5)] group relative overflow-hidden"
+                className="h-16 px-10 rounded-full bg-gold hover:bg-gold-light text-maroon-dark font-black text-lg transition-all duration-700 hover:scale-105 hover:shadow-[0_0_50px_rgba(234,179,8,0.5)] group relative overflow-hidden"
               >
                 <span className="relative z-10 flex items-center gap-2">
                   Get Started
-                  <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-2" />
+                  <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-2" />
                 </span>
               </Button>
             </Link>
@@ -137,15 +136,6 @@ const HeroSection = () => {
           <span className="text-[10px] text-gold/40 tracking-[0.5em] uppercase vertical-text">Bespoke Solutions</span>
         </div>
         
-        <motion.div 
-          animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="flex flex-col items-center gap-4"
-        >
-          <span className="text-[10px] text-gold/40 tracking-[0.5em] uppercase font-bold">Scroll</span>
-          <ChevronDown className="w-5 h-5 text-gold/40" />
-        </motion.div>
-
         <div className="flex flex-col items-end gap-4 text-right">
           <span className="text-[10px] text-gold/40 tracking-[0.5em] uppercase">Powered by</span>
           <span className="font-heading text-lg text-cream/30 italic">Forgiven Shopping Centre</span>
