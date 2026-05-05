@@ -87,7 +87,8 @@ const OrdersPage = () => {
       if (search) q = q.or(`customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%`);
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
       
-      if (profile?.role === "agent" && agentId) {
+      if (profile?.role === "agent") {
+        if (!agentId) return [];
         q = q.eq("agent_id", agentId);
       }
       
@@ -95,7 +96,8 @@ const OrdersPage = () => {
       if (error) throw error;
       
       let filtered = data || [];
-      if (profile?.role === "vendor" && myProducts) {
+      if (profile?.role === "vendor") {
+        if (!myProducts) return [];
         filtered = filtered.filter((o: any) => 
           (o.items as any[]).some(item => myProducts.includes(item.product_id))
         );

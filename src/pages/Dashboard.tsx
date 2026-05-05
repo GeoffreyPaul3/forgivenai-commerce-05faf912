@@ -228,14 +228,16 @@ function OverviewPage() {
         .select("id, customer_name, customer_phone, total, status, channel, created_at, agent_id, items")
         .order("created_at", { ascending: false });
 
-      if (profile?.role === "agent" && agentId) {
+      if (profile?.role === "agent") {
+        if (!agentId) return [];
         q = q.eq("agent_id", agentId);
       }
 
       const { data } = await q.limit(profile?.role === "vendor" ? 100 : 6);
       let filtered = data || [];
 
-      if (profile?.role === "vendor" && myProducts) {
+      if (profile?.role === "vendor") {
+        if (!myProducts) return [];
         filtered = filtered.filter((o: any) => 
           (o.items as any[]).some(item => myProducts.includes(item.product_id))
         ).slice(0, 6);

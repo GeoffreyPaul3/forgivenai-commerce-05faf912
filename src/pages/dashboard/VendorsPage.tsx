@@ -73,7 +73,18 @@ const VendorsPage = () => {
         .eq("vendor_confirmation_status", "pending")
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return data;
+      
+      const { data: vendorProducts } = await supabase
+        .from("products")
+        .select("id")
+        .not("vendor_id", "is", null);
+        
+      const vendorProductIds = new Set((vendorProducts || []).map(p => p.id));
+      
+      return (data || []).filter(order => {
+        const items = Array.isArray(order.items) ? order.items : [];
+        return items.some((item: any) => vendorProductIds.has(item.product_id));
+      });
     },
   });
 
@@ -150,6 +161,33 @@ const VendorsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["admin-all-payouts"] });
       toast({ title: "Payout status updated!" });
     },
+  });
+
+  const resolveConfirmation = useMutation({
+    mutationFn: async ({ orderId, action }: { orderId: string, action: "accept" | "reject" }) => {
+      const updates: any = { vendor_confirmation_status: action === "accept" ? "accepted" : "rejected" };
+      if (action === "accept") {
+        updates.vendor_confirmed_at = new Date().toISOString();
+        updates.status = "confirmed";
+      } else {
+        updates.status = "cancelled";
+      }
+      
+      const { error } = await supabase.from("orders").update(updates).eq("id", orderId);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["pending-vendor-orders"] });
+      toast({ 
+        title: variables.action === "accept" ? "Order Force-Accepted" : "Order Rejected", 
+        description: variables.action === "accept" 
+          ? "The order has been confirmed on behalf of the vendor." 
+          : "The order has been rejected and cancelled." 
+      });
+    },
+    onError: (err: any) => {
+      toast({ variant: "destructive", title: "Action Failed", description: err.message });
+    }
   });
 
   const filteredVendors = useMemo(() => {
@@ -379,14 +417,54 @@ const VendorsPage = () => {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right pr-6">
-                            <div className="flex justify-end gap-2">
-                              <Button size="sm" variant="outline" className="text-xs h-8 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200">
-                                Manual Reject
-                              </Button>
-                              <Button size="sm" className="text-xs h-8 rounded-lg bg-primary hover:bg-primary/90 shadow-sm">
-                                Call Vendor
-                              </Button>
-                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-muted">
+                                  {resolveConfirmation.isPending && resolveConfirmation.variables?.orderId === order.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                                  ) : (
+                                    <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                                  )}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48 rounded-xl border-border/50 shadow-lg">
+                                <DropdownMenuItem 
+                                  className="gap-2 cursor-pointer font-medium"
+                                  onClick={() => resolveConfirmation.mutate({ orderId: order.id, action: "accept" })}
+                                >
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                  Force Accept
+                                </DropdownMenuItem>
+                                
+                                {(() => {
+                                  const firstItem = Array.isArray(order.items) ? (order.items as any)[0] : null;
+                                  const vendorId = firstItem?.vendor_id;
+                                  const vendor = vendors?.find(v => v.id === vendorId);
+                                  const vendorPhone = vendor?.phone?.replace(/\D/g, "");
+                                  
+                                  if (vendorPhone) {
+                                    const msg = encodeURIComponent(`Hello, your order #${order.id.slice(0,8)} is pending confirmation in your portal. Please confirm it as soon as possible.`);
+                                    return (
+                                      <DropdownMenuItem asChild className="gap-2 cursor-pointer font-medium">
+                                        <a href={`https://wa.me/${vendorPhone}?text=${msg}`} target="_blank" rel="noopener noreferrer">
+                                          <Phone className="w-4 h-4 text-primary" />
+                                          Contact Vendor
+                                        </a>
+                                      </DropdownMenuItem>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+
+                                <DropdownMenuItem 
+                                  className="gap-2 cursor-pointer text-red-600 focus:text-red-600 font-medium mt-1 border-t border-border/50 pt-2"
+                                  onClick={() => resolveConfirmation.mutate({ orderId: order.id, action: "reject" })}
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-500" />
+                                  Force Reject & Cancel
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       );
