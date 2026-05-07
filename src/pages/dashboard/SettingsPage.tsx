@@ -212,8 +212,8 @@ const SettingsPage = () => {
     toast({ title: "Crawl initiated", description: "This may take a minute as we discover and extract product data..." });
 
     try {
-      const { data, error } = await supabase.functions.invoke("firecrawl-products", {
-        body: { action: "sync", url: crawlUrl, limit: 10 }
+      const { data, error } = await supabase.functions.invoke("sync-catalog", {
+        body: { }
       });
 
       if (error) throw error;
@@ -269,9 +269,9 @@ const SettingsPage = () => {
           {/* Website Sync */}
           <div className="rounded-xl border border-border bg-card p-6 space-y-4">
             <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
-              <RefreshCw className="w-5 h-5 text-gold" /> Website Data Sync
+              <RefreshCw className="w-5 h-5 text-gold" /> High-Speed Catalog Sync
             </h3>
-            <p className="text-sm text-muted-foreground font-body">Re-crawl your website to refresh product data in the knowledge base.</p>
+            <p className="text-sm text-muted-foreground font-body">Instantly pull all products from forgivenshoppingcentre.com via the direct API.</p>
             <div className="flex gap-2">
               <Input value={crawlUrl} onChange={e => setCrawlUrl(e.target.value)} className="flex-1" />
               <Button onClick={handleCrawl} disabled={crawling} className="gap-2">

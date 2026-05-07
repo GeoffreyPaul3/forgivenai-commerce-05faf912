@@ -8,6 +8,16 @@ const corsHeaders = {
 
 const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID") || "";
 const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
+const MESSAGING_SERVICE_SID = Deno.env.get("MESSAGING_SERVICE_SID") || "";
+
+const TEMPLATES = {
+  GENERAL_RESPONSE: "HX3f4272c07d1cacefdba31d2105e4a673",
+  REENGAGEMENT: "HX39a275e1cb9bb272e0a2ad0f8bebbf3b",
+  ORDER_CONFIRMATION: "HX5666afd4161a3eea9cb78e1343ae5107",
+  ORDER_STATUS: "HX7f92e1e88e48643c35d41e78b21dbadf",
+  SUPPORT_FOLLOWUP: "HX9d273c5d75f7e5d73402f090afd5f99c",
+  ORDER_TRACKING: "HX1931643177fbfd2fe579809f4a99060b",
+};
 
 function getSupabase() {
   return createClient(
@@ -102,40 +112,155 @@ async function validateTwilioRequest(req: Request, bodyText: string): Promise<bo
   return matched;
 }
 
-async function sendWhatsApp(to: string, body: string, mediaUrl?: string, fromOverride?: string) {
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
-    throw new Error("Twilio credentials not configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)");
+async function sendWhatsApp(to: string, body: string, mediaUrl?: string, templateSid?: string) {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !MESSAGING_SERVICE_SID) {
+    throw new Error("Twilio credentials not configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, MESSAGING_SERVICE_SID)");
   }
 
-  const defaultWhatsappNumber = Deno.env.get("TWILIO_WHATSAPP_NUMBER") || "";
-  const whatsappNumber = fromOverride || defaultWhatsappNumber;
+  // Use the smart message sender for reliability
+  return await sendSmartMessageWithRetry(
+    TWILIO_ACCOUNT_SID,
+    TWILIO_AUTH_TOKEN,
+    MESSAGING_SERVICE_SID,
+    to,
+    body,
+    { templateSid, mediaUrl }
+  );
+}
 
-  const params: Record<string, string> = {
-    To: to.startsWith("whatsapp:") ? to : `whatsapp:${to}`,
-    From: whatsappNumber.startsWith("whatsapp:") ? whatsappNumber : `whatsapp:${whatsappNumber}`,
-    Body: body,
+// Split long messages, send normally with exponential backoff retries, fallback to template if completely failing
+async function sendSmartMessageWithRetry(
+  accountSid: string, 
+  authToken: string, 
+  messagingServiceSid: string, 
+  to: string, 
+  body: string, 
+  options?: { templateSid?: string, templateVars?: Record<string, string>, mediaUrl?: string }
+) {
+  const chunkSize = 1000;
+  const chunks = [];
+  
+  if (body.length > chunkSize) {
+    const paragraphs = body.split('\n\n');
+    let currentChunk = "";
+    
+    for (const p of paragraphs) {
+      if ((currentChunk.length + p.length) > chunkSize && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = p + "\n\n";
+      } else {
+        currentChunk += (currentChunk ? "\n\n" : "") + p;
+      }
+    }
+    if (currentChunk.trim().length > 0) chunks.push(currentChunk.trim());
+  } else {
+    chunks.push(body);
+  }
+
+  const results = [];
+  for (const chunk of chunks) {
+    let attempts = 0;
+    const maxAttempts = 3;
+    let success = false;
+
+    while (attempts < maxAttempts && !success) {
+      attempts++;
+      try {
+        const res = await sendTwilioMessage(accountSid, authToken, messagingServiceSid, to, chunk, options?.mediaUrl);
+        results.push(res);
+        success = true;
+      } catch (error: any) {
+        console.warn(`Twilio attempt ${attempts} failed for ${to}: ${error.message}`);
+        
+        if (attempts >= maxAttempts) {
+          try {
+            console.log(`Max retries reached. Falling back to template message for ${to}`);
+            const finalTemplateSid = options?.templateSid || TEMPLATES.GENERAL_RESPONSE;
+            const vars = options?.templateVars || { "1": "We have an important update for you! Please reply to this message to continue." };
+            const res = await sendTwilioTemplateMessage(accountSid, authToken, messagingServiceSid, to, finalTemplateSid, vars);
+            results.push(res);
+            success = true;
+          } catch (templateError: any) {
+            console.error(`CRITICAL: Template fallback also failed for ${to}:`, templateError.message);
+            throw templateError;
+          }
+        } else {
+          // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 500));
+        }
+      }
+    }
+  }
+  return results;
+}
+
+async function sendTwilioMessage(accountSid: string, authToken: string, messagingServiceSid: string, to: string, body: string, mediaUrl?: string) {
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+  const params: Record<string, string> = { 
+    To: to.startsWith("whatsapp:") ? to : `whatsapp:${to}`, 
+    MessagingServiceSid: messagingServiceSid, 
+    Body: body 
   };
 
   if (mediaUrl) {
     params.MediaUrl = mediaUrl;
   }
-
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+  
   const response = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: "Basic " + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`),
+      Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams(params),
   });
-
-  const data = await response.json();
+  
   if (!response.ok) {
-    console.error("Twilio send error:", data);
-    throw new Error(`Twilio error: ${data.message || JSON.stringify(data)}`);
+    let errorMessage = await response.text();
+    let errorCode = "Unknown";
+    try {
+      const errorData = JSON.parse(errorMessage);
+      errorMessage = errorData.message || errorMessage;
+      errorCode = errorData.code || errorCode;
+    } catch (e) {
+      // Ignored
+    }
+    throw new Error(`Twilio error [${response.status}]: ${errorMessage} (Code: ${errorCode})`);
   }
-  return data;
+  return response.json();
+}
+
+async function sendTwilioTemplateMessage(accountSid: string, authToken: string, messagingServiceSid: string, to: string, contentSid: string, contentVariables: Record<string, string>) {
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+  const params: Record<string, string> = { 
+    To: to.startsWith("whatsapp:") ? to : `whatsapp:${to}`, 
+    MessagingServiceSid: messagingServiceSid,
+    ContentSid: contentSid,
+    ContentVariables: JSON.stringify(contentVariables)
+  };
+  
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(params),
+  });
+  
+  if (!response.ok) {
+    let errorMessage = await response.text();
+    let errorCode = "Unknown";
+    try {
+      const errorData = JSON.parse(errorMessage);
+      errorMessage = errorData.message || errorMessage;
+      errorCode = errorData.code || errorCode;
+    } catch (e) {
+      // Ignored
+    }
+    throw new Error(`Twilio template error [${response.status}]: ${errorMessage} (Code: ${errorCode})`);
+  }
+  return response.json();
 }
 
 serve(async (req) => {
@@ -306,7 +431,7 @@ ${productList}`;
         aiResponse = await callAI(QWEN_API_KEY, systemPrompt, history, body);
       } catch (aiErr) {
         console.error("AI call failed, sending fallback:", aiErr);
-        await sendWhatsApp(from, "Thank you for your message! 😊 Our team will get back to you shortly.");
+        await sendWhatsApp(from, "Thank you for your message! 😊 Our team will get back to you shortly.", undefined, TEMPLATES.SUPPORT_FOLLOWUP);
         await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: "Thank you for your message! Our team will get back to you shortly." });
         return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
       }
@@ -316,7 +441,7 @@ ${productList}`;
       if (orderJsonMatch) {
         try {
           const cleanText = aiResponse.replace(/###ORDER_JSON###[\s\S]*?###END_ORDER_JSON###/, "").trim();
-          await sendWhatsApp(from, cleanText);
+          await sendWhatsApp(from, cleanText, undefined, TEMPLATES.ORDER_CONFIRMATION);
           await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: cleanText });
 
           const orderData = JSON.parse(orderJsonMatch[1].trim());
@@ -365,18 +490,18 @@ ${productList}`;
 
             const payData = await payRes.json();
             if (payData.success && payData.checkout_url) {
-              await sendWhatsApp(from, `💳 Here is your secure payment link:\n${payData.checkout_url}\n\nYou can pay via Airtel Money, Mpamba, or Card. We'll start processing your order as soon as payment is confirmed! ✨`);
+              await sendWhatsApp(from, `💳 Here is your secure payment link:\n${payData.checkout_url}\n\nYou can pay via Airtel Money, Mpamba, or Card. We'll start processing your order as soon as payment is confirmed! ✨`, undefined, TEMPLATES.ORDER_CONFIRMATION);
             } else {
-              await sendWhatsApp(from, "⚠️ I encountered an issue generating the payment link. Our support team will contact you shortly to assist with your payment!");
+              await sendWhatsApp(from, "⚠️ I encountered an issue generating the payment link. Our support team will contact you shortly to assist with your payment!", undefined, TEMPLATES.SUPPORT_FOLLOWUP);
             }
           }
         } catch (e) {
           console.error("Order processing error:", e);
-          await sendWhatsApp(from, aiResponse.replace(/###ORDER_JSON###[\s\S]*?###END_ORDER_JSON###/, "").trim());
+          await sendWhatsApp(from, aiResponse.replace(/###ORDER_JSON###[\s\S]*?###END_ORDER_JSON###/, "").trim(), undefined, TEMPLATES.GENERAL_RESPONSE);
         }
       } else {
         // Normal response
-        await sendWhatsApp(from, aiResponse, undefined, to);
+        await sendWhatsApp(from, aiResponse, undefined, TEMPLATES.GENERAL_RESPONSE);
         await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: aiResponse });
       }
 
@@ -391,7 +516,7 @@ ${productList}`;
       const { conversationId, phone, message, mediaUrl } = jsonBody;
       if (!phone || !message) throw { status: 400, message: "Phone and message required" };
 
-      await sendWhatsApp(phone, message, mediaUrl);
+      await sendWhatsApp(phone, message, mediaUrl, TEMPLATES.GENERAL_RESPONSE);
 
       if (conversationId) {
         await supabase.from("messages").insert({ conversation_id: conversationId, role: "admin", content: message });

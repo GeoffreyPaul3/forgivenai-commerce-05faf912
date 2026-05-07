@@ -67,21 +67,55 @@ const ProductsPage = () => {
   });
 
   const { data: products, isLoading } = useQuery({
-    queryKey: ["products", search, categoryFilter, profile?.role, vendorId],
+    queryKey: ["products-all-synced", search, categoryFilter, profile?.role, vendorId],
     enabled: !!profile,
     queryFn: async () => {
+      // 1. Fetch local products
       let query = supabase.from("products").select("*").order("created_at", { ascending: false });
-      
       if (search) query = query.ilike("name", `%${search}%`);
       if (categoryFilter !== "all") query = query.eq("category", categoryFilter);
-      
       if (profile?.role === "vendor" && vendorId) {
         query = query.eq("vendor_id", vendorId);
       }
-
-      const { data, error } = await query;
+      const { data: local, error } = await query;
       if (error) throw error;
-      return data as Product[];
+
+      // 2. Fetch live website products
+      try {
+        const res = await fetch("https://www.forgivenshoppingcentre.com/api/products/all");
+        const live = await res.json();
+        if (live.success && Array.isArray(live.data)) {
+          const mappedLive = live.data.map((p: any) => ({
+            id: `live_${p.id}`,
+            name: `[LIVE] ${p.name}`,
+            category: p.category?.name || p.productType || "General",
+            price: p.salePrice || p.price,
+            currency: "MWK",
+            images: p.images || [],
+            description: p.description,
+            status: p.isActive ? "active" : "archived",
+            isLive: true,
+            created_at: p.createdAt,
+            vendor_id: null
+          }));
+          
+          let filteredLive = mappedLive;
+          if (search) {
+            filteredLive = mappedLive.filter((p: any) => p.name.toLowerCase().includes(search.toLowerCase()));
+          }
+          if (categoryFilter !== "all") {
+            filteredLive = filteredLive.filter((p: any) => p.category === categoryFilter);
+          }
+
+          // Only show live products to non-vendors or if they are "admin"
+          const allProducts = profile?.role === "vendor" ? (local || []) : [...(local || []), ...filteredLive];
+          return (allProducts as any[]).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+        }
+      } catch (e) {
+        console.warn("Could not fetch live products:", e);
+      }
+      
+      return local as Product[];
     },
   });
 
@@ -223,14 +257,20 @@ const ProductsPage = () => {
                 </div>
                 {/* Quick actions overlay */}
                 <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="h-7 w-7 backdrop-blur-sm bg-background/80 hover:bg-background"
-                    onClick={() => setEditProduct(product)}
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </Button>
+                  {!(product as any).isLive ? (
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="h-7 w-7 backdrop-blur-sm bg-background/80 hover:bg-background"
+                      onClick={() => setEditProduct(product)}
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                  ) : (
+                    <Badge variant="secondary" className="bg-primary text-white text-[10px] h-7 px-2 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> SYNCED
+                    </Badge>
+                  )}
                 </div>
               </div>
 
@@ -260,14 +300,16 @@ const ProductsPage = () => {
                       </a>
                     )}
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => deleteMutation.mutate(product.id)}
-                    className="h-7 w-7 text-destructive/60 hover:text-destructive"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
+                  {!(product as any).isLive && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => deleteMutation.mutate(product.id)}
+                      className="h-7 w-7 text-destructive/60 hover:text-destructive"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </motion.div>

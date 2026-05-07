@@ -15,6 +15,90 @@ function aiHeaders(apiKey: string) {
   return { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 }
 
+async function callElevenLabsTTS(apiKey: string, text: string, voiceId: string) {
+  console.log(`Calling ElevenLabs TTS for voice: ${voiceId}...`);
+  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      model_id: "eleven_multilingual_v2",
+      voice_settings: { stability: 0.5, similarity_boost: 0.8 }
+    }),
+  });
+  if (!res.ok) throw new Error(`ElevenLabs TTS failed: ${res.status} ${await res.text()}`);
+  return await res.blob();
+}
+
+async function generateAmbientAudio(apiKey: string, setting: string) {
+  console.log(`Generating ambient audio for setting: ${setting}...`);
+  const res = await fetch("https://queue.fal.run/fal-ai/stable-audio", {
+    method: "POST",
+    headers: { "Authorization": `Key ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ 
+      prompt: `Foley recording of ${setting} atmosphere, room tone, subtle background sounds, realistic, high quality, 44.1kHz`,
+      duration: 10
+    }),
+  });
+  if (!res.ok) return null;
+  const { request_id } = await res.json();
+  let attempts = 0;
+  while (attempts < 20) {
+    attempts++;
+    const statusRes = await fetch(`https://queue.fal.run/fal-ai/stable-audio/requests/${request_id}`, {
+      headers: { "Authorization": `Key ${apiKey}` }
+    });
+    const data = await statusRes.json();
+    if (data.status === "COMPLETED") return data.response.audio.url;
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  return null;
+}
+
+async function mixAudioLayers(apiKey: string, audioUrls: string[]) {
+  console.log("Mixing audio layers via Fal.ai FFmpeg...");
+  const res = await fetch("https://queue.fal.run/fal-ai/ffmpeg-api/merge-audios", {
+    method: "POST",
+    headers: { "Authorization": `Key ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ audio_urls: audioUrls.filter(u => !!u) }),
+  });
+  if (!res.ok) return audioUrls[0]; // Fallback to first track if mix fails
+  const { request_id } = await res.json();
+  let attempts = 0;
+  while (attempts < 30) {
+    attempts++;
+    const statusRes = await fetch(`https://queue.fal.run/fal-ai/ffmpeg-api/merge-audios/requests/${request_id}`, {
+      headers: { "Authorization": `Key ${apiKey}` }
+    });
+    const data = await statusRes.json();
+    if (data.status === "COMPLETED") return data.response.audio.url;
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  return audioUrls[0];
+}
+
+async function mergeAudioVideo(apiKey: string, videoUrl: string, audioUrl: string) {
+  console.log("Merging audio and video via Fal.ai FFmpeg...");
+  const res = await fetch("https://queue.fal.run/fal-ai/ffmpeg-api/merge-audio-video", {
+    method: "POST",
+    headers: { "Authorization": `Key ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ video_url: videoUrl, audio_url: audioUrl }),
+  });
+  if (!res.ok) return videoUrl;
+  const { request_id } = await res.json();
+  let attempts = 0;
+  while (attempts < 30) {
+    attempts++;
+    const statusRes = await fetch(`https://queue.fal.run/fal-ai/ffmpeg-api/merge-audio-video/requests/${request_id}`, {
+      headers: { "Authorization": `Key ${apiKey}` }
+    });
+    const data = await statusRes.json();
+    if (data.status === "COMPLETED") return data.response.video.url;
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  return videoUrl;
+}
+
 async function callTextAI(apiKey: string, prompt: string, model = "qwen-plus") {
   const res = await fetch(`${QWEN_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -279,34 +363,104 @@ async function generateTikTokMusic(apiKey: string, prompt: string) {
   return null;
 }
 
-async function callVeoAI(apiKey: string, imageUrl: string, prompt: string) {
-  console.log("Calling Google Veo 3 via Fal.ai...");
-  const res = await fetch("https://queue.fal.run/fal-ai/veo3", {
+async function generateTrueMotionVideo(apiKey: string, imageUrl: string, prompt: string) {
+  console.log("Calling Kling 1.5 Pro (True Motion Engine) via Fal.ai...");
+  const res = await fetch("https://queue.fal.run/fal-ai/kling-video/v1.5/pro/image-to-video", {
     method: "POST",
     headers: { "Authorization": `Key ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ 
       image_url: imageUrl,
-      prompt: `Cinematic fashion film, ${prompt}, 4k, high-end editorial lighting, fluid movement, photorealistic.` 
+      prompt: `Generate realistic TikTok-style influencer motion.
+      
+      The woman naturally:
+      - blinks
+      - breathes
+      - adjusts outfit
+      - shifts posture
+      - smiles subtly
+      - walks naturally
+      - touches product naturally
+      
+      Maintain:
+      - exact face
+      - exact clothing
+      - exact product details
+      
+      The video must feel like:
+      real iPhone creator footage. (${prompt})`,
+      negative_prompt: "slideshow, static, still image, blurry, distorted face, unnatural movement, warping, low resolution, jumping frames, generic background, robotic, zoom, pan",
+      aspect_ratio: "9:16",
+      duration: 5,
+      motion_score: 10,
+      camera_motion: "handheld",
+      mode: "pro", // Ensuring pro mode for high-motion
+      cfg_scale: 0.5
     }),
   });
 
-  if (!res.ok) throw new Error(`Veo error: ${await res.text()}`);
+  if (!res.ok) throw new Error(`Kling error: ${await res.text()}`);
   
   const { request_id } = await res.json();
   let attempts = 0;
-  while (attempts < 120) { // Video takes longer
+  while (attempts < 150) {
     attempts++;
-    const statusRes = await fetch(`https://queue.fal.run/fal-ai/veo3/requests/${request_id}`, {
+    const statusRes = await fetch(`https://queue.fal.run/fal-ai/kling-video/v1.5/pro/image-to-video/requests/${request_id}`, {
       headers: { "Authorization": `Key ${apiKey}` }
     });
     const data = await statusRes.json();
     if (data.status === "COMPLETED") return data.response.video.url;
-    if (data.status === "FAILED") throw new Error("Veo generation failed");
-    console.log(`Veo Video polling... status: ${data.status}`);
-    await new Promise(r => setTimeout(r, 3000));
+    if (data.status === "FAILED") throw new Error("Kling generation failed");
+    console.log(`Kling True Motion polling... status: ${data.status}`);
+    await new Promise(r => setTimeout(r, 4000));
   }
-  throw new Error("Veo timeout");
+  throw new Error("Kling timeout");
 }
+
+async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string) {
+  console.log("Calling Alibaba Wanx Video-v1...");
+  // Note: DashScope International endpoint for video synthesis
+  const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis", {
+    method: "POST",
+    headers: { ...aiHeaders(apiKey), "X-DashScope-Async": "enable" },
+    body: JSON.stringify({
+      model: "wanx-v1",
+      input: { img_url: imageUrl },
+      parameters: { 
+        prompt: `DYNAMIC UGC PERFORMANCE: ${prompt}. The model walks toward the camera with a joyful expression, performing a natural twirl, sways their hips, and adjusts their hair. Highly realistic 4k lifestyle video, handheld phone footage feel, fluid human motion.`,
+        duration: 5,
+        resolution: "1280*720",
+        motion_level: 10
+      }
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Wanx Video Submission Error:", res.status, errorText);
+    throw new Error(`Wanx Video error: ${errorText}`);
+  }
+  
+  const taskData = await res.json();
+  const taskId = taskData.output?.task_id;
+  console.log(`Wanx Video Task ID: ${taskId}`);
+  
+  let attempts = 0;
+  while (attempts < 120) { // Video generation can take 5-10 minutes
+    attempts++;
+    await new Promise(r => setTimeout(r, 5000));
+    const pollRes = await fetch(`https://dashscope-intl.aliyuncs.com/api/v1/tasks/${taskId}`, {
+      headers: aiHeaders(apiKey),
+    });
+    if (!pollRes.ok) continue;
+    const pollData = await pollRes.json();
+    const status = pollData.output?.task_status;
+    console.log(`Wanx Video Polling (${attempts}): ${status}`);
+    if (status === "SUCCEEDED") return pollData.output?.video_url;
+    if (status === "FAILED") throw new Error(`Wanx video failed: ${pollData.output?.message || "Unknown error"}`);
+  }
+  throw new Error("Wanx video timeout after 10 minutes");
+}
+
 
 async function segmentGarment(apiKey: string, imageUrl: string) {
   console.log(`Performing Semantic Segmentation on: ${imageUrl}...`);
@@ -417,7 +571,7 @@ async function verifyProductFidelity(apiKey: string, productImageUrl: string, ge
             content: [
               { image: productImageUrl },
               { image: generatedImageUrl },
-              { text: "Image 1 is the ORIGINAL PRODUCT. Image 2 is a generated image of a model wearing clothing/shoes. Compare them and answer:\n1. Is the model in Image 2 wearing the SAME product as shown in Image 1?\n2. Does the COLOR match exactly?\n3. Does the SHAPE/DESIGN match?\nRespond with ONLY: PASS or FAIL followed by a brief reason." }
+              { text: "Image 1 is the ORIGINAL PRODUCT. Image 2 is a generated image of a model wearing clothing/shoes. Compare them and answer:\n1. Is the model in Image 2 wearing the SAME product as shown in Image 1?\n2. Does the COLOR match exactly?\n3. Does the SHAPE/DESIGN match?\n4. Is the logo preserved accurately?\n\nRespond with ONLY: PASS or FAIL followed by a brief reason." }
             ]
           }]
         }
@@ -434,7 +588,41 @@ async function verifyProductFidelity(apiKey: string, productImageUrl: string, ge
   }
 }
 
-async function callTryOnAI(apiKey: string, personImageUrl: string, garmentImageUrl: string, category?: string) {
+async function verifyVideoFidelity(apiKey: string, productImageUrl: string, videoUrl: string): Promise<boolean> {
+  console.log("🔍 Verifying product fidelity in generated video...");
+  try {
+    const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "qwen-vl-plus",
+        input: {
+          messages: [{
+            role: "user",
+            content: [
+              { image: productImageUrl },
+              { video: [videoUrl] },
+              { text: "Image 1 is the ORIGINAL PRODUCT. The video is an AI-generated influencer video. Compare them and verify:\n1. PRODUCT: Does the garment in the video match Image 1 exactly in color, texture, and design?\n2. MOTION: Is the influencer's movement natural, human-like, and high-quality (not a slideshow)?\n3. IDENTITY: Is the influencer's face and body consistent throughout the video?\n\nRespond with ONLY: PASS or FAIL followed by a brief reason." }
+            ]
+          }]
+        }
+      })
+    });
+    if (!res.ok) {
+      console.warn(`Qwen VL Video verification returned ${res.status}, using fallback`);
+      return true;
+    }
+    const data = await res.json();
+    const verdict = data.output?.choices?.[0]?.message?.content?.[0]?.text || "PASS";
+    console.log(`🔍 Video Fidelity verdict: ${verdict}`);
+    return verdict.toUpperCase().includes("PASS");
+  } catch (e) {
+    console.warn("Video verification failed, allowing result:", e);
+    return true;
+  }
+}
+
+async function callTryOnAI(apiKey: string, personImageUrl: string, garmentImageUrl: string, category?: string, description?: string) {
   console.log(`Starting Virtual Try-On task for category: ${category}...`);
   
   const isBottom = category?.toLowerCase().includes("skirt") || 
@@ -456,8 +644,11 @@ async function callTryOnAI(apiKey: string, personImageUrl: string, garmentImageU
       "X-DashScope-Async": "enable"
     },
     body: JSON.stringify({
-      model: "aitryon-plus",
-      input,
+      model: "qwen-image-edit",
+      input: {
+        image_url: personImageUrl, // Base image (creator)
+        prompt: `High-fidelity fashion edit: Replace the model's current outfit with the exact product: ${category}. Product details: ${description || "matching garment"}. Photorealistic, 4k, seamless blend.`
+      },
       parameters: { watermark: false }
     }),
   });
@@ -498,7 +689,7 @@ async function callTryOnAI(apiKey: string, personImageUrl: string, garmentImageU
 
 async function callImageAI(apiKey: string, prompt: string, references: { type: 'influencer' | 'product', url: string }[]) {
   const body: any = {
-    model: "qwen-image-plus",
+    model: "qwen-image-plus", // Correct for Singapore/International
     input: { prompt },
     parameters: { size: "720*1280", n: 1, watermark: false }
   };
@@ -506,7 +697,12 @@ async function callImageAI(apiKey: string, prompt: string, references: { type: '
   const productRef = references.find(r => r.type === 'product');
   const influencerRef = references.find(r => r.type === 'influencer');
 
-  if (productRef) {
+  if (productRef && influencerRef) {
+    body.input.ref_img = influencerRef.url;
+    body.input.ref_mode = "style";
+    body.input.ref_img_2 = productRef.url;
+    body.input.ref_mode_2 = "content";
+  } else if (productRef) {
     body.input.ref_img = productRef.url;
   } else if (influencerRef) {
     body.input.ref_img = influencerRef.url;
@@ -639,6 +835,7 @@ Deno.serve(async (req) => {
     const HF_TOKEN = Deno.env.get("HF_TOKEN") || "";
     const PHOTTA_API_KEY = Deno.env.get("PHOTTA_API_KEY") || "";
     const FAL_KEY = Deno.env.get("FAL_KEY") || "";
+    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY") || "";
 
     if (!QWEN_API_KEY) throw { status: 500, message: "Missing QWEN_API_KEY" };
 
@@ -682,7 +879,14 @@ Deno.serve(async (req) => {
           const colorMatch = garmentDetails.match(/Color: ([^,]+)/);
           const color = colorMatch ? colorMatch[1] : "original";
           
-          let prompt = `High-end fashion portrait. MODEL: ${ethnicity} ${gender}. SETTING: ${setting}.`;
+          let prompt = "";
+          if (body.isUGC) {
+            prompt = `Authentic smartphone selfie. Lifestyle photography. MODEL: ${ethnicity} ${gender}. SETTING: ${setting || "natural city street"}. 
+            CRITICAL: Natural skin texture, realistic casual lighting, unedited look, raw lifestyle feel.`;
+          } else {
+            prompt = `High-end fashion portrait. MODEL: ${ethnicity} ${gender}. SETTING: ${setting || "studio"}.`;
+          }
+
           if (productImageUrl) {
             prompt += `
             WEARING THE EXACT PRODUCT FROM REFERENCE: ${productImageUrl}.
@@ -716,154 +920,132 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (action === "generate-storyboard") {
-      const { productName, frameCount = 4 } = body;
-      const frames: any[] = [];
-      const scenes = [
-        { scene: "Hook - Creator holding product", camera: "close-up" },
-        { scene: "Details - Showing product features", camera: "medium shot" },
-        { scene: "Usage - Demonstrating product", camera: "wide shot" },
-        { scene: "CTA - Closing recommendation", camera: "close-up" },
-      ];
 
-      const actualFrames = scenes.slice(0, Math.min(frameCount, scenes.length));
-      for (let i = 0; i < actualFrames.length; i++) {
-        const s = actualFrames[i];
-        
-        // --- CACHE CHECK ---
-        const cacheKey = await getCacheKey(referenceImage, productImageUrl, s.scene);
-        const cachedUrl = await checkCache(supabase, cacheKey);
-        if (cachedUrl) {
-          console.log(`Cache hit for frame ${i+1}`);
-          frames.push({ frame: i + 1, imageUrl: cachedUrl, scene: s.scene });
-          continue;
-        }
+    if (action === "generate-ugc-video") {
+      const { productName, productCategory, productDescription, avatarGender, avatarEthnicity, isUGC, avatarImageBase64, influencerId, voiceId, musicPrompt, scriptText } = body;
+      console.log(`🎬 STARTING HIGH-MOTION UGC PIPELINE: ${productName} (${avatarGender}, ${avatarEthnicity})...`);
+      
+      // --- STAGE 1: PRODUCT LOCK ENGINE ---
+      if (!productImageUrl) throw new Error("Generation blocked: no product image.");
+      console.log("Stage 1: Product Lock Engine verified.");
 
-        // --- PLATINUM PIPELINE: FAL.AI (KOLORS) + SEGMENTATION ---
-        const garmentDetails = await detectGarmentColor(QWEN_API_KEY, productImageUrl);
-        
-        let segmentedGarmentUrl = productImageUrl;
-        if (PHOTTA_API_KEY) {
-          segmentedGarmentUrl = await segmentGarment(PHOTTA_API_KEY, productImageUrl);
-        }
-
-        let url;
-        try {
-          if (FAL_KEY) {
-            // Step 1: Attempt the Platinum engine (Kolors-VTON)
-            url = await callFalAI(FAL_KEY, referenceImage, segmentedGarmentUrl, `${garmentDetails} ${productName}`);
-          } else {
-            throw new Error("FAL_KEY missing");
-          }
-        } catch (eFal) {
-          console.warn(`Fal.ai failed for frame ${i+1}, falling back to Photta`, eFal);
-          try {
-            if (PHOTTA_API_KEY) {
-              url = await callPhottaAI(PHOTTA_API_KEY, segmentedGarmentUrl, body.influencerId);
-            } else {
-              throw new Error("Photta key missing");
-            }
-          } catch (ePh) {
-            console.warn(`Photta failed for frame ${i+1}, falling back to IDM-VTON`, ePh);
-            try {
-              url = await callIDMVTON(HF_TOKEN, referenceImage, segmentedGarmentUrl, `${garmentDetails} ${productName}`);
-            } catch (e) {
-              console.warn(`IDM-VTON failed for frame ${i+1}, falling back to Alibaba`, e);
-              try {
-                url = await callTryOnAI(QWEN_API_KEY, referenceImage, segmentedGarmentUrl, body.productCategory);
-                if (!url) throw new Error("Alibaba Try-on unavailable");
-              } catch (e2) {
-                // Final fallback: Image Synthesis
-                const ethnicity = body.influencer?.ethnicity || body.avatarEthnicity || "African";
-                const gender = body.influencer?.gender || body.avatarGender || "female";
-                const colorMatch = garmentDetails.match(/Color: ([^,]+)/);
-                const color = colorMatch ? colorMatch[1] : "original";
-                const prompt = `High-end fashion editorial shot. MODEL: ${ethnicity} ${gender}. Identity Reference: ${referenceImage}. PRODUCT: ${productName}. ${garmentDetails}. Reference: ${segmentedGarmentUrl}. SCENE: ${s.scene}. STRICT RULES: 1. ABSOLUTE COLOR LOCK. Garment MUST be ${color.toUpperCase()}. 2. NO COLOR SHIFTING. Negative Prompt: beige, tan, cream, white, gray, neutral. 3. Match MATERIAL precisely.`;
-                url = await callImageAI(QWEN_API_KEY, prompt, [{ type: 'product', url: segmentedGarmentUrl }, { type: 'influencer', url: referenceImage }]);
-              }
-            }
-          }
-        }
-
-        // Verify fidelity before persisting
-        const fidelityOk = await verifyProductFidelity(QWEN_API_KEY, productImageUrl, url);
-        if (!fidelityOk) {
-          console.warn(`⚠️ Fidelity check FAILED for storyboard frame ${i+1}`);
-        }
-
-        const persistedUrl = await persistImage(supabase, url, "frames", HF_TOKEN);
-        await storeInCache(supabase, cacheKey, persistedUrl, body.influencerId, body.productId);
-        frames.push({ frame: i + 1, imageUrl: persistedUrl, scene: s.scene, fidelityVerified: fidelityOk });
-        if (i < actualFrames.length - 1) await new Promise(r => setTimeout(r, 1000));
+      let referenceImage = body.influencerImageUrl || body.avatarImageUrl;
+      if (avatarImageBase64 && !referenceImage) {
+        referenceImage = await persistImage(supabase, avatarImageBase64, "uploads");
       }
-      return new Response(JSON.stringify({ success: true, frames }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+      if (!referenceImage) throw new Error("Influencer identity or photo is required.");
 
-    if (action === "generate-frame") {
-      const { productName, avatarImageUrl, scene } = body;
-      const cacheKey = await getCacheKey(avatarImageUrl, productImageUrl, scene);
-      const cachedUrl = await checkCache(supabase, cacheKey);
-      if (cachedUrl) return new Response(JSON.stringify({ success: true, imageUrl: cachedUrl, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
+      // --- STAGE 2: VTON MASTER FRAME ---
+      console.log("Stage 2: Creating Luxury VTON Master Frame...");
       const garmentDetails = await detectGarmentColor(QWEN_API_KEY, productImageUrl);
       let segmentedGarmentUrl = productImageUrl;
       if (PHOTTA_API_KEY) {
         segmentedGarmentUrl = await segmentGarment(PHOTTA_API_KEY, productImageUrl);
       }
 
-      let url;
-      const MAX_VTON_RETRIES = 2;
+      let masterFrameUrl;
+      if (FAL_KEY) {
+        const engines = ["fal-ai/fashn/tryon", "fal-ai/kling/v1-5/kolors-virtual-try-on"];
+        const descriptionPrompt = `Generate a luxury influencer fashion photograph.
+        STRICT RULES:
+        - Use the EXACT product from the reference image
+        - Do NOT redesign the garment
+        - Maintain exact colors and textures
+        The model should look natural, have realistic skin texture, realistic hands, realistic hair, realistic fabric interaction.
+        Lighting: premium soft daylight, cinematic smartphone realism. ${productDescription || productName}. ${garmentDetails}`;
 
-      // --- PLATINUM PIPELINE: Same as storyboard for consistency ---
-      for (let attempt = 0; attempt < MAX_VTON_RETRIES && !url; attempt++) {
-        try {
-          if (FAL_KEY) {
-            url = await callFalAI(FAL_KEY, avatarImageUrl, segmentedGarmentUrl, `${garmentDetails} ${productName}`);
-          } else { throw new Error("FAL_KEY missing"); }
-        } catch (eFal) {
-          console.warn(`Fal.ai attempt ${attempt + 1} failed for frame, trying next...`, (eFal as Error).message);
-          if (attempt < MAX_VTON_RETRIES - 1) await new Promise(r => setTimeout(r, 2000));
+        for (const engine of engines) {
+          try {
+            masterFrameUrl = await callFalVTON(FAL_KEY, engine, referenceImage, segmentedGarmentUrl, descriptionPrompt);
+            if (masterFrameUrl) break;
+          } catch (e) {
+            console.warn(`VTON engine ${engine} failed, trying next...`);
+          }
         }
       }
 
-      if (!url) {
-        try {
-          url = await callIDMVTON(HF_TOKEN, avatarImageUrl, segmentedGarmentUrl, `${garmentDetails} ${productName}`);
-        } catch (eIdm) {
-          console.warn("IDM-VTON failed for frame", (eIdm as Error).message);
+      if (!masterFrameUrl) {
+        // Fallback to synthesis with strict lock
+        const prompt = `Luxury fashion influencer photograph. MODEL: ${avatarEthnicity} ${avatarGender}. Identity: ${referenceImage}.
+        WEARING THE EXACT PRODUCT: ${productName}. ${garmentDetails}. Reference: ${segmentedGarmentUrl}.
+        CRITICAL: 100% garment fidelity. No hallucinations.`;
+        masterFrameUrl = await callImageAI(QWEN_API_KEY, prompt, [{ type: 'product', url: segmentedGarmentUrl }, { type: 'influencer', url: referenceImage }]);
+      }
+
+      if (!masterFrameUrl) throw new Error("CRITICAL: Master Frame generation failed.");
+      const persistedMasterUrl = await persistImage(supabase, masterFrameUrl, "master_frames");
+      console.log(`✅ Master Frame created: ${persistedMasterUrl}`);
+
+      // --- STAGE 3: REAL MOTION GENERATION ---
+      console.log("Stage 3: Generating Real AI Video Motion...");
+      const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${garmentDetails}`;
+      let videoUrl;
+      if (FAL_KEY) {
+        videoUrl = await generateTrueMotionVideo(FAL_KEY, masterFrameUrl, videoPrompt);
+      } else {
+        throw new Error("FAL_KEY missing for High-Motion video engine.");
+      }
+      if (!videoUrl) throw new Error("CRITICAL: Video motion generation failed.");
+      console.log(`✅ Motion Video created: ${videoUrl}`);
+
+      // --- STAGE 4: CONSISTENCY VERIFICATION ---
+      console.log("Stage 4: Consistency Verification...");
+      const verificationOk = await verifyVideoFidelity(QWEN_API_KEY, productImageUrl, videoUrl);
+      if (!verificationOk) {
+        console.warn("⚠️ Video fidelity verification FAILED. Proceeding but with caution.");
+      }
+
+      // --- STAGE 5: AUDIO ENGINE ---
+      console.log("Stage 5: Audio Engine layers...");
+      let finalAudioUrl = null;
+      try {
+        const audioLayers = [];
+        
+        // Layer 1: Voice (ElevenLabs or fallback)
+        if (ELEVENLABS_API_KEY && (voiceId || body.influencerVoiceId) && scriptText) {
+          const voiceBlob = await callElevenLabsTTS(ELEVENLABS_API_KEY, scriptText, voiceId || body.influencerVoiceId);
+          const voiceUrl = await persistAudio(supabase, voiceBlob, "audio_voice");
+          audioLayers.push(voiceUrl);
+        } else if (scriptText) {
+          const voiceBlob = await callTTS(QWEN_API_KEY, scriptText);
+          const voiceUrl = await persistAudio(supabase, voiceBlob, "audio_voice");
+          audioLayers.push(voiceUrl);
         }
-      }
 
-      if (!url) {
-        try {
-          url = await callTryOnAI(QWEN_API_KEY, avatarImageUrl, segmentedGarmentUrl, body.productCategory);
-        } catch (eAlibaba) {
-          console.warn("Alibaba VTON failed for frame");
+        // Layer 2: Ambient
+        const ambientUrl = await generateAmbientAudio(FAL_KEY, body.setting || "natural lifestyle street");
+        if (ambientUrl) audioLayers.push(ambientUrl);
+
+        // Layer 3: Trend Music
+        const musicUrl = await generateTikTokMusic(FAL_KEY, musicPrompt || "fashion influencer vibe");
+        if (musicUrl) audioLayers.push(musicUrl);
+
+        if (audioLayers.length > 1) {
+          finalAudioUrl = await mixAudioLayers(FAL_KEY, audioLayers);
+        } else if (audioLayers.length === 1) {
+          finalAudioUrl = audioLayers[0];
         }
+      } catch (e) {
+        console.warn("Audio engine failed, skipping audio or using limited layers:", e);
       }
 
-      if (!url) {
-        // Final fallback: synthesis with strict product lock
-        const ethnicity = body.influencer?.ethnicity || body.avatarEthnicity || "African";
-        const gender = body.influencer?.gender || body.avatarGender || "female";
-        const colorMatch = garmentDetails.match(/Color: ([^,]+)/);
-        const color = colorMatch ? colorMatch[1] : "original";
-        const prompt = `High-end fashion editorial. MODEL: ${ethnicity} ${gender}. Identity: ${avatarImageUrl}.
-WEARING THE EXACT PRODUCT: ${productName}. ${garmentDetails}. Reference: ${segmentedGarmentUrl}.
-CRITICAL: The garment MUST be ${color.toUpperCase()}. Match product reference 100%. NO generic clothes. NO color shifts.`;
-        url = await callImageAI(QWEN_API_KEY, prompt, [{ type: 'product', url: segmentedGarmentUrl }, { type: 'influencer', url: avatarImageUrl }]);
+      // --- STAGE 6: FINAL VIDEO ASSEMBLY ---
+      console.log("Stage 6: Final Video Assembly (FFmpeg Polish)...");
+      let finalVideoUrl = videoUrl;
+      if (finalAudioUrl) {
+        finalVideoUrl = await mergeAudioVideo(FAL_KEY, videoUrl, finalAudioUrl);
       }
+      console.log(`🚀 Pipeline Complete: ${finalVideoUrl}`);
 
-      // Verify fidelity
-      const fidelityOk = await verifyProductFidelity(QWEN_API_KEY, productImageUrl, url);
-      if (!fidelityOk) {
-        console.warn("⚠️ Fidelity check FAILED for frame — result may not match product perfectly");
-      }
-
-      const persistedUrl = await persistImage(supabase, url, "frames", HF_TOKEN);
-      await storeInCache(supabase, cacheKey, persistedUrl, body.influencerId, body.productId);
-      return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl, fidelityVerified: fidelityOk }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ 
+        success: true, 
+        videoUrl: finalVideoUrl, 
+        masterFrameUrl: persistedMasterUrl,
+        fidelityVerified: verificationOk,
+        audioUrl: finalAudioUrl
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+
 
     if (action === "generate-campaign-shot") {
       const { influencer, product, scene } = body;
@@ -992,8 +1174,8 @@ Ensure there are 4-6 scenes in total.`;
       const { imageUrl, prompt, musicPrompt } = body;
       if (!FAL_KEY) throw new Error("FAL_KEY missing for video generation");
       
-      console.log("Generating cinematic video with Veo 3...");
-      const videoUrl = await callVeoAI(FAL_KEY, imageUrl, prompt);
+      console.log("Generating High-Motion UGC video via True Motion Engine...");
+      const videoUrl = await generateTrueMotionVideo(FAL_KEY, imageUrl, prompt);
       
       let audioUrl = null;
       if (musicPrompt) {

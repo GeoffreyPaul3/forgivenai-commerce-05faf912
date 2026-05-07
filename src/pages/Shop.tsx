@@ -27,10 +27,34 @@ export default function Shop() {
   }, [refCode]);
 
   const { data: products, isLoading } = useQuery({
-    queryKey: ["shop-products"],
+    queryKey: ["shop-products-synced"],
     queryFn: async () => {
-      const { data } = await supabase.from("products").select("*").eq("status", "active").order("created_at", { ascending: false });
-      return data || [];
+      // 1. Fetch local products
+      const { data: local } = await supabase.from("products").select("*").eq("status", "active").order("created_at", { ascending: false });
+      
+      // 2. Fetch live website products
+      try {
+        const res = await fetch("https://www.forgivenshoppingcentre.com/api/products/all");
+        const live = await res.json();
+        if (live.success && Array.isArray(live.data)) {
+          const mappedLive = live.data.map((p: any) => ({
+            id: `live_${p.id}`,
+            name: p.name,
+            category: p.category?.name || p.productType || "General",
+            price: p.salePrice || p.price,
+            currency: "MWK",
+            images: p.images || [],
+            description: p.description,
+            isLive: true,
+            created_at: p.createdAt
+          }));
+          const all = [...(local || []), ...mappedLive];
+          return all.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+        }
+      } catch (e) {
+        console.warn("Could not fetch live products:", e);
+      }
+      return local || [];
     },
   });
 
