@@ -364,8 +364,8 @@ async function generateTikTokMusic(apiKey: string, prompt: string) {
 }
 
 async function generateTrueMotionVideo(apiKey: string, imageUrl: string, prompt: string) {
-  console.log("Calling Kling 1.5 Pro (True Motion Engine) via Fal.ai...");
-  const res = await fetch("https://queue.fal.run/fal-ai/kling-video/v1.5/pro/image-to-video", {
+  console.log("Calling Kling 3.0 Pro (True Motion Engine) via Fal.ai...");
+  const res = await fetch("https://queue.fal.run/fal-ai/kling-video/v3/pro/image-to-video", {
     method: "POST",
     headers: { "Authorization": `Key ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ 
@@ -390,27 +390,30 @@ async function generateTrueMotionVideo(apiKey: string, imageUrl: string, prompt:
       real iPhone creator footage. (${prompt})`,
       negative_prompt: "slideshow, static, still image, blurry, distorted face, unnatural movement, warping, low resolution, jumping frames, generic background, robotic, zoom, pan",
       aspect_ratio: "9:16",
-      duration: 5,
+      duration: 15,
       motion_score: 10,
       camera_motion: "handheld",
-      mode: "pro", // Ensuring pro mode for high-motion
       cfg_scale: 0.5
     }),
   });
 
-  if (!res.ok) throw new Error(`Kling error: ${await res.text()}`);
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Kling V3 Submission Error:", res.status, errorText);
+    throw new Error(`Kling error: ${errorText}`);
+  }
   
   const { request_id } = await res.json();
   let attempts = 0;
-  while (attempts < 150) {
+  while (attempts < 200) {
     attempts++;
-    const statusRes = await fetch(`https://queue.fal.run/fal-ai/kling-video/v1.5/pro/image-to-video/requests/${request_id}`, {
+    const statusRes = await fetch(`https://queue.fal.run/fal-ai/kling-video/v3/pro/image-to-video/requests/${request_id}`, {
       headers: { "Authorization": `Key ${apiKey}` }
     });
     const data = await statusRes.json();
     if (data.status === "COMPLETED") return data.response.video.url;
     if (data.status === "FAILED") throw new Error("Kling generation failed");
-    console.log(`Kling True Motion polling... status: ${data.status}`);
+    console.log(`Kling True Motion V3 polling... status: ${data.status}`);
     await new Promise(r => setTimeout(r, 4000));
   }
   throw new Error("Kling timeout");
@@ -423,13 +426,14 @@ async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string) {
     method: "POST",
     headers: { ...aiHeaders(apiKey), "X-DashScope-Async": "enable" },
     body: JSON.stringify({
-      model: "wanx-v1",
-      input: { img_url: imageUrl },
+      model: "wan2.1-i2v-turbo",
+      input: { 
+        img_url: imageUrl,
+        prompt: `DYNAMIC UGC PERFORMANCE: ${prompt}. The model walks toward the camera with a joyful expression, performing a natural twirl, sways their hips, and adjusts their hair. Highly realistic 4k lifestyle video, handheld phone footage feel, fluid human motion.`
+      },
       parameters: { 
-        prompt: `DYNAMIC UGC PERFORMANCE: ${prompt}. The model walks toward the camera with a joyful expression, performing a natural twirl, sways their hips, and adjusts their hair. Highly realistic 4k lifestyle video, handheld phone footage feel, fluid human motion.`,
         duration: 5,
-        resolution: "1280*720",
-        motion_level: 10
+        size: "1280*720",
       }
     }),
   });
@@ -459,6 +463,37 @@ async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string) {
     if (status === "FAILED") throw new Error(`Wanx video failed: ${pollData.output?.message || "Unknown error"}`);
   }
   throw new Error("Wanx video timeout after 10 minutes");
+}
+
+
+async function callVeoVideo(apiKey: string, imageUrl: string, prompt: string) {
+  console.log("Calling Google Veo 3.1 Lite via Fal.ai...");
+  const res = await fetch("https://queue.fal.run/fal-ai/veo3.1/image-to-video", {
+    method: "POST",
+    headers: { "Authorization": `Key ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompt: `Cinematic UGC performance: ${prompt}. Natural human motion, walking, smiling, 4k high fidelity.`,
+      image_url: imageUrl,
+      aspect_ratio: "9:16",
+      duration: "10s"
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Veo error: ${await res.text()}`);
+  
+  const { request_id } = await res.json();
+  let attempts = 0;
+  while (attempts < 100) {
+    attempts++;
+    const statusRes = await fetch(`https://queue.fal.run/fal-ai/veo3.1/image-to-video/requests/${request_id}`, {
+      headers: { "Authorization": `Key ${apiKey}` }
+    });
+    const data = await statusRes.json();
+    if (data.status === "COMPLETED") return data.response.video.url;
+    if (data.status === "FAILED") throw new Error("Veo generation failed");
+    await new Promise(r => setTimeout(r, 5000));
+  }
+  throw new Error("Veo timeout");
 }
 
 
@@ -688,8 +723,10 @@ async function callTryOnAI(apiKey: string, personImageUrl: string, garmentImageU
 }
 
 async function callImageAI(apiKey: string, prompt: string, references: { type: 'influencer' | 'product', url: string }[]) {
+  // Try image models in order of preference for DashScope International
+  const imageModels = ["wan2.6-t2i", "wan2.1-t2i-turbo", "qwen-image-plus"];
+  
   const body: any = {
-    model: "qwen-image-plus", // Correct for Singapore/International
     input: { prompt },
     parameters: { size: "720*1280", n: 1, watermark: false }
   };
@@ -708,38 +745,45 @@ async function callImageAI(apiKey: string, prompt: string, references: { type: '
     body.input.ref_img = influencerRef.url;
   }
 
-  const res = await fetch(WANX_API_URL, {
-    method: "POST",
-    headers: {
-      ...aiHeaders(apiKey),
-      "X-DashScope-Async": "enable"
-    },
-    body: JSON.stringify(body),
-  });
+  for (const model of imageModels) {
+    try {
+      console.log(`Trying image model: ${model}...`);
+      const res = await fetch(WANX_API_URL, {
+        method: "POST",
+        headers: { ...aiHeaders(apiKey), "X-DashScope-Async": "enable" },
+        body: JSON.stringify({ ...body, model }),
+      });
 
-  if (!res.ok) {
-    const t = await res.text();
-    console.error("Image AI error:", res.status, t);
-    throw { status: 500, message: "Image generation failed" };
+      if (!res.ok) {
+        const t = await res.text();
+        console.warn(`Model ${model} failed (${res.status}): ${t}`);
+        continue;
+      }
+
+      const taskData = await res.json();
+      const taskId = taskData.output?.task_id;
+      if (!taskId) continue;
+
+      let attempts = 0;
+      while (attempts < 30) {
+        attempts++;
+        await new Promise(r => setTimeout(r, 2000));
+        const pollRes = await fetch(`https://dashscope-intl.aliyuncs.com/api/v1/tasks/${taskId}`, {
+          headers: aiHeaders(apiKey),
+        });
+        if (!pollRes.ok) continue;
+        const pollData = await pollRes.json();
+        const status = pollData.output?.task_status;
+        if (status === "SUCCEEDED") return pollData.output?.results?.[0]?.url;
+        if (status === "FAILED") break;
+      }
+    } catch (e) {
+      console.warn(`Model ${model} threw error:`, e);
+    }
   }
 
-  const taskData = await res.json();
-  const taskId = taskData.output?.task_id;
-
-  let attempts = 0;
-  while (attempts < 30) {
-    attempts++;
-    await new Promise(r => setTimeout(r, 2000));
-    const pollRes = await fetch(`https://dashscope-intl.aliyuncs.com/api/v1/tasks/${taskId}`, {
-      headers: aiHeaders(apiKey),
-    });
-    if (!pollRes.ok) continue;
-    const pollData = await pollRes.json();
-    const status = pollData.output?.task_status;
-    if (status === "SUCCEEDED") return pollData.output?.results?.[0]?.url;
-    if (status === "FAILED") throw new Error(`Image task failed: ${pollData.output?.message}`);
-  }
-  throw new Error("Image generation timed out");
+  console.error("Image AI error: all models exhausted");
+  throw { status: 500, message: "Image generation failed" };
 }
 
 async function persistImage(supabaseClient: any, imageUrl: string, folder: string, hfToken?: string) {
@@ -980,11 +1024,32 @@ Deno.serve(async (req) => {
       console.log("Stage 3: Generating Real AI Video Motion...");
       const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${garmentDetails}`;
       let videoUrl;
-      if (FAL_KEY) {
-        videoUrl = await generateTrueMotionVideo(FAL_KEY, masterFrameUrl, videoPrompt);
-      } else {
-        throw new Error("FAL_KEY missing for High-Motion video engine.");
+      
+      try {
+        if (FAL_KEY) {
+          console.log("Calling Kling 1.5 Pro (True Motion Engine) via Fal.ai...");
+          videoUrl = await generateTrueMotionVideo(FAL_KEY, masterFrameUrl, videoPrompt);
+        } else {
+          throw new Error("FAL_KEY missing");
+        }
+      } catch (e) {
+        console.warn("Kling failed, trying Veo 3.1 Lite...", e);
+        try {
+          if (FAL_KEY) {
+            videoUrl = await callVeoVideo(FAL_KEY, masterFrameUrl, videoPrompt);
+          } else {
+            throw new Error("FAL_KEY missing");
+          }
+        } catch (veoError) {
+          console.warn("Veo failed, falling back to Wanx...", veoError);
+          if (QWEN_API_KEY) {
+            videoUrl = await callWanxVideo(QWEN_API_KEY, masterFrameUrl, videoPrompt);
+          } else {
+            throw new Error("All high-motion engines failed.");
+          }
+        }
       }
+
       if (!videoUrl) throw new Error("CRITICAL: Video motion generation failed.");
       console.log(`✅ Motion Video created: ${videoUrl}`);
 
@@ -1172,14 +1237,39 @@ Ensure there are 4-6 scenes in total.`;
 
     if (action === "generate-video") {
       const { imageUrl, prompt, musicPrompt } = body;
-      if (!FAL_KEY) throw new Error("FAL_KEY missing for video generation");
-      
-      console.log("Generating High-Motion UGC video via True Motion Engine...");
-      const videoUrl = await generateTrueMotionVideo(FAL_KEY, imageUrl, prompt);
+      let videoUrl;
+      try {
+        if (FAL_KEY) {
+          console.log("Generating High-Motion UGC video via True Motion Engine...");
+          videoUrl = await generateTrueMotionVideo(FAL_KEY, imageUrl, prompt);
+        } else {
+          throw new Error("FAL_KEY missing");
+        }
+      } catch (e) {
+        console.warn("Kling failed, trying Veo...", e);
+        try {
+          if (FAL_KEY) {
+            videoUrl = await callVeoVideo(FAL_KEY, imageUrl, prompt);
+          } else {
+            throw new Error("FAL_KEY missing");
+          }
+        } catch (veoError) {
+          console.warn("Veo failed, falling back to Wanx...", veoError);
+          if (QWEN_API_KEY) {
+            videoUrl = await callWanxVideo(QWEN_API_KEY, imageUrl, prompt);
+          } else {
+            throw new Error("Video engines unavailable.");
+          }
+        }
+      }
       
       let audioUrl = null;
-      if (musicPrompt) {
-        audioUrl = await generateTikTokMusic(FAL_KEY, musicPrompt);
+      if (musicPrompt && FAL_KEY) {
+        try {
+          audioUrl = await generateTikTokMusic(FAL_KEY, musicPrompt);
+        } catch (e) {
+          console.warn("Music generation failed:", e);
+        }
       }
       
       return new Response(JSON.stringify({ success: true, videoUrl, audioUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
