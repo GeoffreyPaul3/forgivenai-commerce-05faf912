@@ -19,7 +19,7 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
     const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
-    const TWILIO_WHATSAPP_NUMBER = Deno.env.get("TWILIO_WHATSAPP_NUMBER") ?? "";
+    const MESSAGING_SERVICE_SID = Deno.env.get("MESSAGING_SERVICE_SID") ?? "";
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const requestUrl = new URL(req.url);
@@ -40,7 +40,7 @@ serve(async (req) => {
         twilio: {
           accountSid: TWILIO_ACCOUNT_SID,
           authToken: TWILIO_AUTH_TOKEN,
-          from: TWILIO_WHATSAPP_NUMBER,
+          messagingServiceSid: MESSAGING_SERVICE_SID,
         },
       });
 
@@ -134,7 +134,7 @@ serve(async (req) => {
         twilio: {
           accountSid: TWILIO_ACCOUNT_SID,
           authToken: TWILIO_AUTH_TOKEN,
-          from: TWILIO_WHATSAPP_NUMBER,
+          messagingServiceSid: MESSAGING_SERVICE_SID,
         },
       });
 
@@ -171,7 +171,7 @@ async function verifyAndSyncPayment({
   redirectUrl?: string;
   paychanguSecretKey: string;
   supabase: any;
-  twilio: { accountSid: string; authToken: string; from: string };
+  twilio: { accountSid: string; authToken: string; messagingServiceSid: string };
 }) {
   const response = await fetch(`https://api.paychangu.com/verify-payment/${txRef}`, {
     method: "GET",
@@ -206,10 +206,15 @@ async function verifyAndSyncPayment({
       })
       .eq("id", existingOrder.id);
 
-    if (paymentStatus === "paid" && !wasPaid && existingOrder.customer_phone && twilio.accountSid && twilio.authToken && twilio.from) {
-      const customerName = existingOrder.customer_name ? ` ${existingOrder.customer_name}` : "";
-      const confirmationMessage = `Hi${customerName} 😊\n\nYour payment for your Forgiven Shopping Centre order has been confirmed.\n\n✅ Amount received: MK ${Number(existingOrder.total).toLocaleString()}\n📦 Status: paid\n\nThank you for shopping with us! We'll keep you updated on delivery.`;
-      await sendTwilioMessage(twilio.accountSid, twilio.authToken, twilio.from, existingOrder.customer_phone, confirmationMessage);
+    if (paymentStatus === "paid" && !wasPaid && existingOrder.customer_phone && twilio.accountSid && twilio.authToken && twilio.messagingServiceSid) {
+      const customerName = existingOrder.customer_name ? ` ${existingOrder.customer_name.split(" ")[0]}` : "";
+      const confirmationMessage = `Hi${customerName}! 🎉\n\nYour payment for *${(existingOrder.items?.[0]?.name || "your order")}* has been confirmed!\n\n✅ Amount paid: MWK ${Number(existingOrder.total).toLocaleString()}\n📦 Status: Processing\n\nThank you for shopping with Forgiven Shopping Centre! We'll keep you updated on your delivery. 🚀`;
+      try {
+        await sendTwilioMessage(twilio.accountSid, twilio.authToken, twilio.messagingServiceSid, existingOrder.customer_phone, confirmationMessage);
+        console.log(`✅ WhatsApp confirmation sent to ${existingOrder.customer_phone}`);
+      } catch (twilioErr: any) {
+        console.error(`❌ WhatsApp confirmation failed: ${twilioErr.message}`);
+      }
     }
   }
 
@@ -361,7 +366,7 @@ function htmlResponse(title: string, message: string, tone: "success" | "pending
   });
 }
 
-async function sendTwilioMessage(accountSid: string, authToken: string, from: string, to: string, body: string) {
+async function sendTwilioMessage(accountSid: string, authToken: string, messagingServiceSid: string, to: string, body: string) {
   const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
   const response = await fetch(url, {
     method: "POST",
@@ -369,7 +374,11 @@ async function sendTwilioMessage(accountSid: string, authToken: string, from: st
       Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ To: `whatsapp:${to}`, From: `whatsapp:${from}`, Body: body }),
+    body: new URLSearchParams({
+      To: to.startsWith("whatsapp:") ? to : `whatsapp:${to}`,
+      MessagingServiceSid: messagingServiceSid,
+      Body: body,
+    }),
   });
 
   if (!response.ok) {

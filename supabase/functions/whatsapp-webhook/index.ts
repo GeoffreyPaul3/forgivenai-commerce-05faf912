@@ -329,12 +329,17 @@ serve(async (req) => {
       if (!convo) {
         const { data: newConvo } = await supabase
           .from("conversations")
-          .insert({ customer_phone: customerPhone, channel: "whatsapp", status: "open", last_message_at: new Date().toISOString() })
+          .insert({ customer_phone: customerPhone, channel: "whatsapp", status: "open", last_message_at: new Date().toISOString(), agent_id: agentId })
           .select()
           .single();
         convo = newConvo;
       } else {
-        await supabase.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", convo.id);
+        // Persist agent_id on the conversation if we just detected one (referral code in this message)
+        const updatePayload: Record<string, any> = { last_message_at: new Date().toISOString() };
+        if (agentId && !convo.agent_id) updatePayload.agent_id = agentId;
+        await supabase.from("conversations").update(updatePayload).eq("id", convo.id);
+        // Fall back to the stored agent_id if the current message has no referral code
+        if (!agentId && convo.agent_id) agentId = convo.agent_id;
       }
 
       if (!convo) return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
