@@ -26,7 +26,7 @@ serve(async (req) => {
 
     if (req.method === "GET") {
       const txRef = requestUrl.searchParams.get("tx_ref") ?? "";
-      const redirectUrl = requestUrl.searchParams.get("redirect_url") ?? "";
+      const redirectUrl = requestUrl.searchParams.get("redirect_url") ?? "https://agents-forgiven-ai-commerce.vercel.app/create-payment";
 
       if (!txRef) {
         return htmlResponse("Payment reference missing", "We could not verify this payment because the transaction reference was not provided.", "error");
@@ -44,17 +44,7 @@ serve(async (req) => {
         },
       });
 
-      if (result.redirectTarget) {
-        return Response.redirect(result.redirectTarget, 302);
-      }
-
-      return htmlResponse(
-        result.status === "paid" ? "Payment successful" : "Payment pending",
-        result.status === "paid"
-          ? "Your payment has been confirmed and your order is now being processed."
-          : `Your payment status is currently ${result.status}. Please return to WhatsApp if you need help.`,
-        result.status === "paid" ? "success" : "pending",
-      );
+      return Response.redirect(result.redirectTarget, 302);
     }
 
     const rawBody = await req.text();
@@ -78,7 +68,7 @@ serve(async (req) => {
 
       // callback_url  → server-side webhook (this edge function verifies + syncs the order)
       // return_url    → where the USER'S BROWSER lands after payment (Vercel frontend)
-      const FRONTEND_URL = "https://forgiven-ai-commerce.vercel.app";
+      const FRONTEND_URL = "https://agents-forgiven-ai-commerce.vercel.app";
       const callbackUrl = `${SUPABASE_URL}/functions/v1/create-payment`;
       const browserReturnUrl = `${FRONTEND_URL}/create-payment?tx_ref=${generatedTxRef}`;
 
@@ -245,7 +235,7 @@ function withQueryParams(target: string, params: Record<string, string>) {
 function htmlResponse(title: string, message: string, tone: "success" | "pending" | "error") {
   const isSuccess = tone === "success";
   const accentHsl = isSuccess ? "152, 60%, 42%" : tone === "pending" ? "38, 92%, 50%" : "0, 72%, 51%";
-  const redirectUrl = "https://forgiven-ai-commerce.vercel.app";
+  const redirectUrl = "https://agents-forgiven-ai-commerce.vercel.app";
   
   return new Response(`<!doctype html>
 <html lang="en">
