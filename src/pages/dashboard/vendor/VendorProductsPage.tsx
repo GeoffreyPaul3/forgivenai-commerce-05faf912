@@ -199,7 +199,7 @@ export default function VendorProductsPage() {
         <div className="space-y-1">
           <p className="text-sm font-black text-primary uppercase tracking-tighter">Forgiven Pricing Engine</p>
           <p className="text-xs text-muted-foreground font-body leading-relaxed">
-            As an FSC Vendor, you set the <strong className="text-foreground">Vendor Cost</strong> for your items. The platform automatically calculates and manages the final selling price. You are responsible for ensuring your <strong className="text-foreground">Stock Status</strong> is accurate to prevent unfulfillable orders.
+            As an FSC Vendor, you set the <strong className="text-foreground">Vendor Cost</strong> for your items. You are responsible for ensuring your <strong className="text-foreground">Stock Status</strong> is accurate to prevent unfulfillable orders.
           </p>
         </div>
       </div>

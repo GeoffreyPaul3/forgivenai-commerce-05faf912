@@ -106,8 +106,8 @@ export default function VendorOrdersPage() {
   });
 
   const kpis = [
-    { label: "Confirmed Payouts", value: `MWK ${(vendorPayouts || []).filter((p: any) => p.status === 'paid').reduce((s: number, p: any) => s + (p.amount || 0), 0).toLocaleString()}`, icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },
-    { label: "Pending Settlement", value: `MWK ${(orders || []).filter((o: any) => o.status === 'delivered' && o.vendor_confirmation_status === 'accepted').reduce((s: number, o: any) => s + (o.vendor_amount || 0), 0).toLocaleString()}`, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/5", border: "border-amber-500/20" },
+    { label: "Confirmed Orders", value: `MWK ${(vendorPayouts || []).filter((p: any) => p.status === 'paid').reduce((s: number, p: any) => s + (p.amount || 0), 0).toLocaleString()}`, icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },
+    { label: "Pending Orders", value: `MWK ${(orders || []).filter((o: any) => o.status === 'delivered' && o.vendor_confirmation_status === 'accepted').reduce((s: number, o: any) => s + (o.vendor_amount || 0), 0).toLocaleString()}`, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/5", border: "border-amber-500/20" },
     { label: "Total Orders", value: orders?.length ?? 0, icon: ShoppingBag, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
     { label: "Performance Class", value: `Class ${vendor?.class || '—'}`, icon: Star, color: "text-gold", bg: "bg-gold/5", border: "border-gold/20" },
   ];

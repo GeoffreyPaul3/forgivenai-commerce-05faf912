@@ -161,13 +161,12 @@ export default function VendorPayoutsPage() {
         <Card className="lg:col-span-2 rounded-2xl border-border bg-card shadow-sm">
           <CardHeader className="border-b border-border/50">
             <CardTitle className="font-heading flex items-center gap-2 text-base">
-              <BarChart3 className="w-4 h-4 text-primary" /> Commission Breakdown
+              <BarChart3 className="w-4 h-4 text-primary" /> Payouts Breakdown
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-5 space-y-4">
             {[
               { label: "Gross Marketplace Sales", value: stats.totalRevenue, color: "bg-blue-500" },
-              { label: "Platform Margin", value: Math.max(0, Math.round(stats.totalRevenue - stats.vendorShare)), color: "bg-red-400", negative: true },
               { label: "My Net Earnings", value: stats.vendorShare, color: "bg-primary" },
               { label: "Successfully Withdrawn", value: stats.totalPaid, color: "bg-emerald-500", negative: true },
               { label: "Available for Payout", value: Math.max(0, stats.balance), color: "bg-gold" },
@@ -314,7 +313,7 @@ export default function VendorPayoutsPage() {
         <AlertCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <p className="text-xs text-muted-foreground font-body">
           <strong className="text-foreground">Commission Policy:</strong>{" "}
-          Forgiven Shopping Centre dynamically calculates the platform margin per item to maintain competitive market pricing. Your displayed net earnings are entirely guaranteed for withdrawal.
+          Your displayed net earnings are entirely guaranteed for withdrawal.
         </p>
       </div>
     </div>
