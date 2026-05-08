@@ -346,12 +346,120 @@ serve(async (req) => {
       const { data: products } = await supabase.from("products").select("name, category, price, currency, description, images").eq("status", "active").limit(100);
       const productList = products?.map(p => `- ${p.name} (${p.category}) — ${p.currency} ${p.price}`).join("\n") || "No products available";
 
-      // Get conversation history
-      const { data: historyData } = await supabase.from("messages").select("role, content").eq("conversation_id", convo.id).order("created_at", { ascending: true }).limit(15);
-      const history = (historyData ?? []).map(m => ({
+      // Get conversation history (latest 15 messages, ordered chronologically)
+      const { data: rawHistory } = await supabase.from("messages").select("role, content").eq("conversation_id", convo.id).order("created_at", { ascending: false }).limit(15);
+      const historyData = (rawHistory ?? []).reverse();
+      const history = historyData.map(m => ({
         role: m.role === "customer" ? "user" : "assistant",
         content: m.content,
       }));
+
+      // ── YES Confirmation Intercept ──
+      // If the customer is confirming an order, bypass the AI entirely.
+      // Parse the order directly from the last bot summary message and send the link immediately.
+      const isConfirmation = /^\s*(yes|yeah|yep|yup|sure|confirm|ok|okay|y)\s*[.!]?\s*$/i.test(body.trim());
+
+      if (isConfirmation) {
+        const reversedHistory = [...(historyData ?? [])].reverse();
+        const summaryMsg = reversedHistory.find(m =>
+          m.role === "ai" &&
+          m.content.includes("*Product:*") &&
+          (m.content.includes("Reply **YES**") || m.content.includes("Reply YES") || m.content.includes("reply YES"))
+        );
+
+        if (summaryMsg) {
+          try {
+            const c = summaryMsg.content;
+            const productMatch  = c.match(/\*Product:\*\s*(.+)/);
+            const quantityMatch = c.match(/\*Quantity:\*\s*(\d+)/);
+            const priceMatch    = c.match(/\*(?:Price|Total):\*\s*MWK\s*([\d,]+)/);
+            const nameMatch     = c.match(/\*Name:\*\s*(.+)/);
+            const emailMatch    = c.match(/\*Email:\*\s*(.+)/);
+            const addressMatch  = c.match(/\*Address:\*\s*(.+)/);
+            const phoneMatch    = c.match(/\*Phone:\*\s*(.+)/);
+
+            const productName   = productMatch?.[1]?.trim() || "";
+            const quantity      = parseInt(quantityMatch?.[1] || "1");
+            const price         = parseInt((priceMatch?.[1] || "0").replace(/,/g, ""));
+            const custName      = nameMatch?.[1]?.trim()    || customer?.name    || "Guest";
+            const custEmail     = emailMatch?.[1]?.trim()   || customer?.email   || "";
+            const custAddress   = addressMatch?.[1]?.trim() || "";
+            const custPhone     = phoneMatch?.[1]?.trim()   || customerPhone;
+
+            if (productName && price > 0) {
+              console.log(`⚡ YES intercept: Processing order for ${productName} — MWK ${price}`);
+
+              const product = products?.find(p =>
+                p.name.toLowerCase() === productName.toLowerCase() ||
+                p.name.toLowerCase().includes(productName.toLowerCase())
+              );
+
+              // Update customer name in DB
+              if (custName && custName !== "Guest") {
+                await supabase.from("conversations").update({ customer_name: custName, pending_order: null }).eq("id", convo.id);
+                await supabase.from("customers").update({ name: custName }).eq("phone", customerPhone);
+              }
+
+              // Create order
+              const { data: newOrder, error: orderError } = await supabase.from("orders").insert({
+                customer_phone: customerPhone,
+                customer_name:  custName,
+                customer_email: custEmail,
+                items: [{ product_id: product?.id || null, name: productName, quantity, price }] as any,
+                total: price * quantity,
+                channel: "whatsapp",
+                agent_id: agentId,
+                notes: `Delivery Address: ${custAddress} | Contact: ${custPhone}`,
+                status: "pending",
+              }).select().single();
+
+              if (orderError || !newOrder) throw new Error(`Order creation failed: ${orderError?.message}`);
+              console.log(`✅ Order created (YES intercept): ${newOrder.id}`);
+
+              // Invoke create-payment
+              const SUPABASE_URL_INT            = Deno.env.get("SUPABASE_URL")!;
+              const SUPABASE_SERVICE_ROLE_KEY_INT = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+              const payRes = await fetch(`${SUPABASE_URL_INT}/functions/v1/create-payment`, {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY_INT}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  action:      "create_payment",
+                  order_id:    newOrder.id,
+                  amount:      newOrder.total,
+                  currency:    "MWK",
+                  email:       custEmail,
+                  first_name:  custName,
+                  title:       `Forgiven: ${productName}`,
+                }),
+              });
+
+              const payData = await payRes.json();
+              console.log("PayChangu response (YES intercept):", JSON.stringify(payData));
+
+              if (payData.success && payData.checkout_url) {
+                const linkMsg = `✅ Order confirmed, ${custName.split(" ")[0]}! 🎉\n\n💳 Here is your secure payment link:\n${payData.checkout_url}\n\nYou can pay via Airtel Money, Mpamba, or Card.\nWe'll start processing your *${productName}* as soon as payment is confirmed! 🚀✨`;
+                await sendWhatsApp(from, linkMsg, undefined, TEMPLATES.ORDER_CONFIRMATION);
+                await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: `Payment link sent: ${payData.checkout_url}` });
+                console.log(`✅ Payment link sent (YES intercept) to ${from}: ${payData.checkout_url}`);
+              } else {
+                const errDetail = payData.error || JSON.stringify(payData);
+                console.error("❌ PayChangu failed (YES intercept):", errDetail);
+                await sendWhatsApp(from, `⚠️ We're having a brief issue generating your payment link. Our team will send it to you within a few minutes. Sorry for the inconvenience! 🙏`, undefined, TEMPLATES.SUPPORT_FOLLOWUP);
+                await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: `Payment link generation failed: ${errDetail}` });
+              }
+
+              return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
+            }
+          } catch (interceptErr) {
+            console.error("YES intercept failed, falling through to AI:", interceptErr);
+            // Fall through to normal AI call below
+          }
+        }
+      }
 
       // ── AI Context Building ──
       const customerStatus = customer?.customer_status || "new";
@@ -414,7 +522,12 @@ ORDER CAPTURE PROCESS:
    - Email Address
    - Delivery Address (e.g., Kanjedza, Blantyre or Area 47, Lilongwe)
    - Preferred Contact Number
-3. Summarize the details EXACTLY as provided to ensure accuracy:
+3. When you have all details and are ready to show the order summary, you MUST include this hidden machine-readable block FIRST (it will be stripped before sending to the customer — do NOT mention it):
+###PENDING_ORDER###
+{"product_name":"exact product name","quantity":1,"price":25000,"customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number"}
+###END_PENDING_ORDER###
+
+   Then present the human-readable summary:
    *Product:* X
    *Quantity:* X
    *Total:* MWK X
@@ -454,87 +567,135 @@ ${productList}`;
         return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
       }
 
-      // Check for order JSON intent
+      // ── Phase 1: Detect ###PENDING_ORDER### (shown when AI presents order summary) ──
+      // This saves order data BEFORE the customer confirms, so we have a reliable fallback.
+      const pendingOrderMatch = aiResponse.match(/###PENDING_ORDER###\s*([\s\S]*?)\s*###END_PENDING_ORDER###/);
+      if (pendingOrderMatch) {
+        try {
+          const pendingOrderData = JSON.parse(pendingOrderMatch[1].trim());
+          await supabase.from("conversations").update({ pending_order: pendingOrderData }).eq("id", convo.id);
+          console.log("✅ Saved pending order to conversation:", JSON.stringify(pendingOrderData));
+        } catch (e) {
+          console.error("Failed to parse ###PENDING_ORDER### block:", e);
+        }
+        // Strip hidden block before sending to customer
+        aiResponse = aiResponse.replace(/###PENDING_ORDER###[\s\S]*?###END_PENDING_ORDER###\n?/, "").trim();
+      }
+
+      // ── Phase 2: Detect ###ORDER_JSON### (AI confirmation of YES) ──
       const orderJsonMatch = aiResponse.match(/###ORDER_JSON###\s*([\s\S]*?)\s*###END_ORDER_JSON###/);
+
+      // ── Helper: create order + send payment link ──
+      const processOrderAndSendPayment = async (orderData: any, cleanText: string) => {
+        const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+        const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const product = products?.find(p => p.name.toLowerCase() === orderData.product_name.toLowerCase());
+
+        // Update customer name
+        if (orderData.customer_name) {
+          await supabase.from("conversations").update({ customer_name: orderData.customer_name, pending_order: null }).eq("id", convo.id);
+          await supabase.from("customers").update({ name: orderData.customer_name }).eq("phone", customerPhone);
+        } else {
+          await supabase.from("conversations").update({ pending_order: null }).eq("id", convo.id);
+        }
+
+        // Send the "generating" confirmation text to customer first
+        await sendWhatsApp(from, cleanText, undefined, TEMPLATES.ORDER_CONFIRMATION);
+        await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: cleanText });
+
+        // Create order record
+        const { data: newOrder, error: orderError } = await supabase.from("orders").insert({
+          customer_phone: customerPhone,
+          customer_name: orderData.customer_name,
+          customer_email: orderData.customer_email,
+          items: [{ product_id: product?.id || null, name: orderData.product_name, quantity: orderData.quantity, price: orderData.price }] as any,
+          total: orderData.price * orderData.quantity,
+          channel: "whatsapp",
+          agent_id: agentId,
+          notes: `Delivery Address: ${orderData.address} | Contact: ${orderData.phone}`,
+          status: "pending",
+        }).select().single();
+
+        if (orderError) {
+          console.error("Failed to create order:", orderError);
+          throw new Error(`Order creation failed: ${orderError.message}`);
+        }
+
+        if (!newOrder) throw new Error("Order creation returned no data");
+
+        console.log(`✅ Order created: ${newOrder.id} for ${orderData.product_name} — MWK ${newOrder.total}`);
+
+        // Invoke create-payment
+        const payRes = await fetch(`${SUPABASE_URL}/functions/v1/create-payment`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "create_payment",
+            order_id: newOrder.id,
+            amount: newOrder.total,
+            currency: "MWK",
+            email: orderData.customer_email,
+            first_name: orderData.customer_name,
+            title: `Forgiven: ${orderData.product_name}`,
+          }),
+        });
+
+        const payData = await payRes.json();
+        console.log("PayChangu response:", JSON.stringify(payData));
+
+        if (payData.success && payData.checkout_url) {
+          await sendWhatsApp(
+            from,
+            `💳 Here is your secure payment link:\n${payData.checkout_url}\n\nYou can pay via Airtel Money, Mpamba, or Card. We'll start processing your order as soon as payment is confirmed! ✨`,
+            undefined,
+            TEMPLATES.ORDER_CONFIRMATION
+          );
+          await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: `Payment link sent: ${payData.checkout_url}` });
+          console.log(`✅ Payment link sent to ${from}: ${payData.checkout_url}`);
+        } else {
+          const errDetail = payData.error || JSON.stringify(payData);
+          console.error("❌ PayChangu did not return checkout_url:", errDetail);
+          await sendWhatsApp(
+            from,
+            `⚠️ We had a brief issue generating your payment link. Our support team has been notified and will send it to you within a few minutes. Sorry for the inconvenience! 🙏`,
+            undefined,
+            TEMPLATES.SUPPORT_FOLLOWUP
+          );
+          await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: `Payment link generation failed. Error: ${errDetail}` });
+        }
+      };
+
       if (orderJsonMatch) {
+        // ── AI correctly output the ORDER_JSON block ──
         try {
           const cleanText = aiResponse.replace(/###ORDER_JSON###[\s\S]*?###END_ORDER_JSON###/, "").trim();
-          await sendWhatsApp(from, cleanText, undefined, TEMPLATES.ORDER_CONFIRMATION);
-          await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: cleanText });
-
           const orderData = JSON.parse(orderJsonMatch[1].trim());
-          const product = products?.find(p => p.name.toLowerCase() === orderData.product_name.toLowerCase());
-          
-          // ── Update Name in Conversation & Customer ──
-          if (orderData.customer_name) {
-            await supabase.from("conversations").update({ customer_name: orderData.customer_name }).eq("id", convo.id);
-            await supabase.from("customers").update({ name: orderData.customer_name }).eq("phone", customerPhone);
-          }
-
-          // 1. Create the order in DB
-          const { data: newOrder } = await supabase.from("orders").insert({
-            customer_phone: customerPhone,
-            customer_name: orderData.customer_name,
-            customer_email: orderData.customer_email,
-            items: [{ product_id: product?.id || orderData.product_name, name: orderData.product_name, quantity: orderData.quantity, price: orderData.price }] as any,
-            total: orderData.price * orderData.quantity,
-            channel: "whatsapp",
-            agent_id: agentId, // Pass detected agent if available
-            notes: `Delivery Address: ${orderData.address} | Contact: ${orderData.phone}`,
-            status: "pending",
-          }).select().single();
-
-          if (newOrder) {
-            // 2. Invoke create-payment function
-            const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-            const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-            
-            const payRes = await fetch(`${SUPABASE_URL}/functions/v1/create-payment`, {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                action: "create_payment",
-                order_id: newOrder.id,
-                amount: newOrder.total,
-                currency: "MWK",
-                email: orderData.customer_email,
-                first_name: orderData.customer_name,
-                title: `Forgiven: ${orderData.product_name}`,
-              }),
-            });
-
-            const payData = await payRes.json();
-            console.log("PayChangu response:", JSON.stringify(payData));
-            
-            if (payData.success && payData.checkout_url) {
-              await sendWhatsApp(
-                from,
-                `💳 Here is your secure payment link:\n${payData.checkout_url}\n\nYou can pay via Airtel Money, Mpamba, or Card. We'll start processing your order as soon as payment is confirmed! ✨`,
-                undefined,
-                TEMPLATES.ORDER_CONFIRMATION
-              );
-              await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: `Payment link sent: ${payData.checkout_url}` });
-            } else {
-              const errDetail = payData.error || JSON.stringify(payData);
-              console.error("PayChangu did not return checkout_url:", errDetail);
-              await sendWhatsApp(
-                from,
-                `⚠️ We had a brief issue generating your payment link. Our support team has been notified and will send it to you within a few minutes. Sorry for the inconvenience! 🙏`,
-                undefined,
-                TEMPLATES.SUPPORT_FOLLOWUP
-              );
-              await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: `Payment link generation failed. Error: ${errDetail}` });
-            }
-          }
+          await processOrderAndSendPayment(orderData, cleanText);
         } catch (e) {
-          console.error("Order processing error:", e);
+          console.error("Order processing error (from ORDER_JSON):", e);
           await sendWhatsApp(from, aiResponse.replace(/###ORDER_JSON###[\s\S]*?###END_ORDER_JSON###/, "").trim(), undefined, TEMPLATES.GENERAL_RESPONSE);
         }
+      } else if (
+        // ── Fallback: AI said "generating" but forgot the JSON block ──
+        // Use the pending_order stored when the summary was shown
+        (aiResponse.includes("generating your PayChangu") || aiResponse.includes("generating your secure payment")) &&
+        convo.pending_order
+      ) {
+        console.log("⚡ Fallback triggered: AI omitted ORDER_JSON block. Using stored pending_order.");
+        try {
+          const orderData = convo.pending_order;
+          const cleanText = aiResponse.trim();
+          await processOrderAndSendPayment(orderData, cleanText);
+        } catch (e) {
+          console.error("Order processing error (from pending_order fallback):", e);
+          await sendWhatsApp(from, aiResponse, undefined, TEMPLATES.GENERAL_RESPONSE);
+          await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: aiResponse });
+        }
       } else {
-        // Normal response
+        // ── Normal conversational response ──
         await sendWhatsApp(from, aiResponse, undefined, TEMPLATES.GENERAL_RESPONSE);
         await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: aiResponse });
       }

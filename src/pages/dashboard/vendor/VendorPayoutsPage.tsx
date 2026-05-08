@@ -312,7 +312,7 @@ export default function VendorPayoutsPage() {
       <div className="p-4 rounded-2xl border border-border bg-muted/20 flex items-start gap-3">
         <AlertCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <p className="text-xs text-muted-foreground font-body">
-          <strong className="text-foreground">Commission Policy:</strong>{" "}
+          <strong className="text-foreground">Payout Policy:</strong>{" "}
           Your displayed net earnings are entirely guaranteed for withdrawal.
         </p>
       </div>
