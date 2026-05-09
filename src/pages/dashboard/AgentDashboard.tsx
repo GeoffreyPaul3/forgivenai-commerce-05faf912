@@ -10,7 +10,8 @@ import {
   Plus, Eye, MessageCircle, UserPlus, Video, 
   BarChart3, ArrowRight, Star, Clock, 
   Phone, Copy, Share2,
-  Package
+  Package,
+  Wallet, Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
@@ -86,7 +87,6 @@ const AgentDashboard = () => {
   });
 
 
-
   // 5. Get Top Products (Demo selection)
   const { data: products } = useQuery({
     queryKey: ["featured-products-overview"],
@@ -99,16 +99,35 @@ const AgentDashboard = () => {
     },
   });
 
+  const { data: myPayouts } = useQuery({
+    queryKey: ["agent-payouts-overview", agent?.id],
+    enabled: !!agent?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("agent_payouts")
+        .select("*")
+        .eq("agent_id", agent.id);
+      return data || [];
+    },
+  });
+
   const stats = useMemo(() => {
     const totalEarnings = (myCommissions || []).reduce((acc, c) => acc + (c.amount || 0), 0);
+    const totalPaidPayouts = (myPayouts || [])
+      .filter((p: any) => p.status === "paid" || p.status === "pending")
+      .reduce((acc: number, p: any) => acc + (p.amount || 0), 0);
+    
+    const balance = Math.max(0, totalEarnings - totalPaidPayouts);
     const pendingOrders = (myOrders || []).filter(o => o.status === "pending").length;
+
     return {
       totalRevenue: totalEarnings,
+      balance,
       totalOrders: myOrders?.length || 0,
       pendingOrders,
       customers: myCustomers?.length || 0,
     };
-  }, [myOrders, myCustomers, myCommissions]);
+  }, [myOrders, myCustomers, myCommissions, myPayouts]);
 
   if (agentLoading) {
     return (
@@ -162,13 +181,13 @@ const AgentDashboard = () => {
         <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                <DollarSign className="w-5 h-5" />
+              <div className="p-2 rounded-xl bg-gold/10 text-gold">
+                <Wallet className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Total Revenue</p>
-            <h3 className="text-2xl font-heading font-black">MWK {stats.totalRevenue.toLocaleString()}</h3>
-            <p className="text-[10px] text-muted-foreground mt-2 font-body">From paid & delivered orders</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Available Balance</p>
+            <h3 className="text-2xl font-heading font-black">MWK {stats.balance.toLocaleString() ?? 0}</h3>
+            <p className="text-[10px] text-muted-foreground mt-2 font-body">Ready for withdrawal</p>
           </CardContent>
         </Card>
 
@@ -198,10 +217,9 @@ const AgentDashboard = () => {
           </CardContent>
         </Card>
 
-
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column: Recent Orders & Top Products */}
         <div className="lg:col-span-2 space-y-6">
           {/* Recent Orders */}
@@ -292,9 +310,8 @@ const AgentDashboard = () => {
           </Card>
         </div>
 
-        {/* Right Column: Live Conversations & Quick Actions */}
+        {/* Right Column: Quick Actions */}
         <div className="space-y-6">
-
 
           {/* Quick Actions */}
           <Card className="rounded-3xl border-border bg-card shadow-sm overflow-hidden">

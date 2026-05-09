@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,15 +11,24 @@ import {
   DollarSign, TrendingUp, Clock, CheckCircle2, ArrowDownToLine,
   Wallet, Zap, AlertCircle, BarChart3, ArrowUpRight
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function AgentEarningsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [session, setSession] = useState<any>(null);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [showPayoutDialog, setShowPayoutDialog] = useState(false);
+  const [payoutMethod, setPayoutMethod] = useState<any>(null);
 
   useQuery({
     queryKey: ["session-earnings"],
@@ -58,8 +67,8 @@ export default function AgentEarningsPage() {
     },
   });
 
-  const { data: myPayouts } = useQuery({
-    queryKey: ["agent-my-payouts", agent?.id],
+  const { data: payouts, refetch: refetchPayouts } = useQuery({
+    queryKey: ["agent-payouts", agent?.id],
     enabled: !!agent?.id,
     queryFn: async () => {
       const { data } = await supabase
@@ -68,23 +77,28 @@ export default function AgentEarningsPage() {
         .eq("agent_id", agent.id)
         .order("created_at", { ascending: false });
       return data || [];
-    },
+    }
   });
 
   const stats = useMemo(() => {
-    if (!commissions) return { total: 0, available: 0, paid: 0, pendingPayouts: 0, count: 0 };
-    const totalEarned = commissions.reduce((acc, c) => acc + (c.amount || 0), 0);
-    const totalPaidOut = (myPayouts || []).filter(p => p.status === "paid").reduce((acc, p) => acc + (p.amount || 0), 0);
-    const totalPendingPayouts = (myPayouts || []).filter(p => p.status === "pending").reduce((acc, p) => acc + (p.amount || 0), 0);
+    if (!commissions) return { total: 0, pending: 0, paid: 0, count: 0, balance: 0 };
+    const totals = commissions.reduce((acc, c) => {
+      acc.total += c.amount || 0;
+      if (c.status === "pending") acc.pending += c.amount || 0;
+      if (c.status === "paid") acc.paid += c.amount || 0;
+      acc.count++;
+      return acc;
+    }, { total: 0, pending: 0, paid: 0, count: 0 });
+
+    // Calculate actual withdrawal balance
+    const totalPaidPayouts = (payouts || [])
+      .filter((p: any) => p.status === "paid" || p.status === "pending")
+      .reduce((acc: number, p: any) => acc + (p.amount || 0), 0);
     
-    return { 
-      total: totalEarned, 
-      available: totalEarned - totalPaidOut - totalPendingPayouts, 
-      paid: totalPaidOut, 
-      pendingPayouts: totalPendingPayouts,
-      count: commissions.length 
-    };
-  }, [commissions, myPayouts]);
+    const balance = Math.max(0, totals.total - totalPaidPayouts);
+
+    return { ...totals, balance };
+  }, [commissions, payouts]);
 
   const chartData = useMemo(() => {
     return [...(commissions || [])]
@@ -97,58 +111,50 @@ export default function AgentEarningsPage() {
   }, [commissions]);
 
   const handleWithdraw = async () => {
-    if (!agent) return;
-    
-    if (!agent.payout_details) {
+    if (stats.balance <= 0) return;
+    if (!agent.payment_details) {
       toast({
-        title: "Payout Method Required",
-        description: "Please set your payout details below before withdrawing.",
         variant: "destructive",
+        title: "Payout Method Required",
+        description: "Please configure your payout method first.",
       });
+      setShowPayoutDialog(true);
       return;
     }
 
     setWithdrawing(true);
-    try {
-      const { data, error } = await supabase.rpc('request_agent_payout', {
-        p_agent_id: agent.id,
-        p_amount: stats.available
-      });
+    const { error } = await supabase.from("agent_payouts").insert({
+      agent_id: agent.id,
+      amount: stats.balance,
+      status: "pending"
+    });
 
-      if (error) throw error;
-
-      await queryClient.invalidateQueries({ queryKey: ["agent-payouts"] });
-      await queryClient.invalidateQueries({ queryKey: ["agent-my-payouts"] });
-      await queryClient.invalidateQueries({ queryKey: ["agent-commissions-earnings"] });
-
+    setWithdrawing(false);
+    if (error) {
+      toast({ variant: "destructive", title: "Request Failed", description: error.message });
+    } else {
       toast({
         title: "Withdrawal Request Submitted 🎉",
-        description: "Your request has been sent to admin for processing. You'll be notified within 24 hours.",
+        description: "Your request has been sent to admin for processing.",
       });
-    } catch (err: any) {
-      console.error("Withdrawal error:", err);
-      toast({
-        title: "Withdrawal Failed",
-        description: err.message || "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setWithdrawing(false);
+      refetchPayouts();
     }
   };
 
-  const updatePayoutSettings = async (method: string, details: string) => {
-    try {
-      const { error } = await supabase
-        .from("agents")
-        .update({ payout_method: method, payout_details: details })
-        .eq("id", agent?.id);
-      
-      if (error) throw error;
-      
-      toast({ title: "Settings Saved", description: "Your payout details have been updated." });
-    } catch (err: any) {
-      toast({ title: "Update Failed", description: err.message, variant: "destructive" });
+  const handleSavePayoutMethod = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { error } = await supabase
+      .from("agents")
+      .update({ payment_details: JSON.stringify(payoutMethod) })
+      .eq("id", agent.id);
+    
+    if (error) {
+      toast({ variant: "destructive", title: "Save Failed", description: error.message });
+    } else {
+      toast({ title: "Payout Method Saved!", description: "Your details have been updated." });
+      setShowPayoutDialog(false);
+      // Invalidate agent query to get new payment_details
+      queryClient.invalidateQueries({ queryKey: ["agent-profile-earnings"] });
     }
   };
 
@@ -189,7 +195,7 @@ export default function AgentEarningsPage() {
         </div>
         <Button
           onClick={handleWithdraw}
-          disabled={withdrawing || stats.available < 2000}
+          disabled={withdrawing || stats.balance <= 0}
           className="gap-2 bg-gold hover:bg-gold/90 text-maroon-dark font-bold h-11 px-6 rounded-2xl shadow-lg shadow-gold/20 disabled:opacity-50"
         >
           {withdrawing ? (
@@ -197,7 +203,7 @@ export default function AgentEarningsPage() {
           ) : (
             <ArrowDownToLine className="w-4 h-4" />
           )}
-          {stats.available < 2000 ? "Min. MWK 2,000" : "Request Withdrawal"}
+          Request Withdrawal
         </Button>
       </div>
 
@@ -215,13 +221,13 @@ export default function AgentEarningsPage() {
             highlight: true,
           },
           {
-            label: "Available Balance",
-            value: `MWK ${stats.available.toLocaleString()}`,
-            icon: Wallet,
-            color: "text-emerald-500",
-            bg: "bg-emerald-500/5",
-            border: "border-emerald-500/20",
-            sub: stats.pendingPayouts > 0 ? `MWK ${stats.pendingPayouts.toLocaleString()} pending` : "Ready to withdraw",
+            label: "Available for Payout",
+            value: `MWK ${stats.balance.toLocaleString()}`,
+            icon: Clock,
+            color: "text-amber-500",
+            bg: "bg-amber-500/5",
+            border: "border-amber-500/20",
+            sub: "Ready to withdraw",
           },
           {
             label: "Total Paid Out",
@@ -317,45 +323,183 @@ export default function AgentEarningsPage() {
         <Card className="rounded-3xl border-border bg-card shadow-sm">
           <CardHeader className="border-b border-border/50">
             <CardTitle className="font-heading text-base flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-gold" /> Payout Settings
+              <Wallet className="w-4 h-4 text-gold" /> Payout Info
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-5 space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground uppercase">Method</label>
-              <select 
-                className="w-full bg-muted/20 border border-border rounded-xl px-3 py-2 text-sm outline-none focus:border-primary transition-colors"
-                defaultValue={agent.payout_method || "Airtel Money"}
-                id="payout_method"
-              >
-                <option value="Airtel Money">Airtel Money</option>
-                <option value="TNM Mpamba">TNM Mpamba</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground uppercase">Details (Phone/Account)</label>
-              <input 
-                type="text"
-                className="w-full bg-muted/20 border border-border rounded-xl px-3 py-2 text-sm outline-none focus:border-primary transition-colors"
-                placeholder="099... or Account No."
-                defaultValue={agent.payout_details || ""}
-                id="payout_details"
-              />
-            </div>
+            {[
+              { label: "Payment Method", value: (() => {
+                try {
+                  const d = JSON.parse(agent?.payment_details || "{}");
+                  if (d.type === 'bank') return `Bank (${d.bank_name})`;
+                  if (d.type === 'mobile') return `Mobile (${d.provider})`;
+                } catch(e) {}
+                return agent?.payment_details ? "Configured" : "Not Setup";
+              })() },
+              { label: "Payout Cycle", value: "Instant Request" },
+              { label: "Min. Withdrawal", value: "MWK 100" },
+              { label: "Processing Time", value: "1–24 hours" },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+                <span className="text-xs text-muted-foreground font-body">{row.label}</span>
+                <span className="text-xs font-bold">{row.value}</span>
+              </div>
+            ))}
             <Button
-              className="w-full mt-2 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-xl"
+              className="w-full mt-2 gap-2 bg-gold hover:bg-gold/90 text-maroon-dark font-bold rounded-xl"
               onClick={() => {
-                const method = (document.getElementById('payout_method') as HTMLSelectElement).value;
-                const details = (document.getElementById('payout_details') as HTMLInputElement).value;
-                updatePayoutSettings(method, details);
+                if (!agent.payment_details) setShowPayoutDialog(true);
+                else handleWithdraw();
+              }}
+              disabled={withdrawing || stats.balance <= 0}
+            >
+              <ArrowDownToLine className="w-4 h-4" />
+              {stats.balance > 0 ? `Withdraw MWK ${stats.balance.toLocaleString()}` : "Nothing to Withdraw"}
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full mt-2 text-[10px] uppercase font-black tracking-widest h-8 border-border/50"
+              onClick={() => {
+                try { setPayoutMethod(JSON.parse(agent?.payment_details || '{"type":"bank"}')); } catch(e) { setPayoutMethod({type:'bank'}); }
+                setShowPayoutDialog(true);
               }}
             >
-              Save Payout Details
+              Edit Payout Method
             </Button>
           </CardContent>
         </Card>
       </div>
+
+      {/* Payout History */}
+      {payouts && payouts.length > 0 && (
+        <Card className="rounded-3xl border-border bg-card shadow-sm overflow-hidden">
+          <CardHeader className="border-b border-border/50">
+            <CardTitle className="font-heading text-lg flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" /> Withdrawal History
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 border-0">
+                  <TableHead className="pl-6">Date</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="pr-6 text-right">Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {payouts.map((p: any) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="pl-6 py-4 text-xs font-medium">
+                      {new Date(p.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="font-bold text-sm">
+                      MWK {p.amount.toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={p.status === 'paid' ? 'default' : 'secondary'} className="text-[9px] font-black uppercase">
+                        {p.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="pr-6 text-right text-xs text-muted-foreground italic">
+                      {p.notes || (p.status === 'pending' ? "Processing..." : "Settled")}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payout Method Dialog */}
+      <Dialog open={showPayoutDialog} onOpenChange={setShowPayoutDialog}>
+        <DialogContent className="sm:max-w-[425px] rounded-3xl border-0 shadow-2xl overflow-hidden p-0">
+          <div className="bg-gradient-to-br from-primary/10 via-background to-background p-6 border-b border-border/50">
+            <DialogTitle className="font-heading font-black text-xl tracking-tight">Payout Configuration</DialogTitle>
+            <DialogDescription className="font-body text-xs">Choose how you'd like to receive your earnings.</DialogDescription>
+          </div>
+          <form onSubmit={handleSavePayoutMethod} className="p-6 space-y-5">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Transfer Type</Label>
+              <Select 
+                value={payoutMethod?.type || "bank"} 
+                onValueChange={(v) => setPayoutMethod({ ...payoutMethod, type: v })}
+              >
+                <SelectTrigger className="rounded-xl bg-muted/30 border-border/50">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-border/50">
+                  <SelectItem value="bank">Bank Transfer</SelectItem>
+                  <SelectItem value="mobile">Mobile Money (Airtel/Mpamba)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {payoutMethod?.type === 'bank' ? (
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Bank Name</Label>
+                  <Input 
+                    value={payoutMethod?.bank_name || ""} 
+                    onChange={e => setPayoutMethod({...payoutMethod, bank_name: e.target.value})}
+                    placeholder="e.g. Standard Bank" required className="rounded-xl"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Account Number</Label>
+                  <Input 
+                    value={payoutMethod?.account_number || ""} 
+                    onChange={e => setPayoutMethod({...payoutMethod, account_number: e.target.value})}
+                    placeholder="Account #" required className="rounded-xl"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Branch</Label>
+                  <Input 
+                    value={payoutMethod?.branch_name || ""} 
+                    onChange={e => setPayoutMethod({...payoutMethod, branch_name: e.target.value})}
+                    placeholder="Branch name" required className="rounded-xl"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Service Provider</Label>
+                  <Select 
+                    value={payoutMethod?.provider || ""} 
+                    onValueChange={(v) => setPayoutMethod({ ...payoutMethod, provider: v })}
+                  >
+                    <SelectTrigger className="rounded-xl bg-muted/30 border-border/50">
+                      <SelectValue placeholder="Select provider" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-border/50">
+                      <SelectItem value="airtel">Airtel Money</SelectItem>
+                      <SelectItem value="tnm">TNM Mpamba</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mobile Number</Label>
+                  <Input 
+                    value={payoutMethod?.phone_number || ""} 
+                    onChange={e => setPayoutMethod({...payoutMethod, phone_number: e.target.value})}
+                    placeholder="099 / 088 ..." required className="rounded-xl"
+                  />
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="pt-2">
+              <Button type="submit" className="w-full bg-primary font-bold rounded-xl shadow-lg shadow-primary/20 h-11">
+                Save & Update Details
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Commission History Table */}
       <Card className="rounded-3xl border-border bg-card shadow-sm overflow-hidden">
@@ -458,50 +602,6 @@ export default function AgentEarningsPage() {
           </p>
         </div>
       </div>
-
-      {/* Payout History */}
-      <Card className="rounded-3xl border-border bg-card shadow-sm overflow-hidden">
-        <CardHeader className="border-b border-border/50">
-          <CardTitle className="font-heading flex items-center gap-2">
-            <Clock className="w-5 h-5 text-primary" /> Payout History
-          </CardTitle>
-          <CardDescription>Status of your withdrawal requests</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30 border-0">
-                <TableHead className="pl-6">Date</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right pr-6">Processed At</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!myPayouts || myPayouts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No payout history.</TableCell>
-                </TableRow>
-              ) : myPayouts.map((p: any) => (
-                <TableRow key={p.id}>
-                  <TableCell className="pl-6 text-sm">{new Date(p.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell className="font-bold">MWK {p.amount.toLocaleString()}</TableCell>
-                  <TableCell className="text-xs">{p.payout_method}</TableCell>
-                  <TableCell>
-                    <Badge variant={p.status === 'paid' ? 'default' : p.status === 'rejected' ? 'destructive' : 'secondary'}>
-                      {p.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right pr-6 text-xs text-muted-foreground">
-                    {p.processed_at ? new Date(p.processed_at).toLocaleDateString() : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
     </div>
   );
 }
