@@ -44,15 +44,9 @@ export default function AgentOrdersPage() {
           .select("*")
           .eq("user_id", session.user.id)
           .maybeSingle();
-        if (data) return data;
+        return data;
       }
-      const { data } = await supabase
-        .from("agents")
-        .select("*")
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      return data;
+      return null;
     },
   });
 

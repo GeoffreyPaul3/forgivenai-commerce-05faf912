@@ -109,9 +109,9 @@ serve(async (req) => {
           .from("orders")
           .update({
             payment_reference: data.data?.data?.tx_ref || data.data?.tx_ref || generatedTxRef,
-            status: "pending",
           })
-          .eq("id", order_id);
+          .eq("id", order_id)
+          .throwOnError();
       }
 
       return new Response(JSON.stringify({
@@ -204,11 +204,14 @@ async function verifyAndSyncPayment({
       .update({
         status: paymentStatus === "paid" ? "paid" : existingOrder.status,
       })
-      .eq("id", existingOrder.id);
+      .eq("id", existingOrder.id)
+      .throwOnError();
+      
+      console.log(`✅ Order ${existingOrder.id} status synced to: ${paymentStatus === "paid" ? "paid" : existingOrder.status}`);
 
     if (paymentStatus === "paid" && !wasPaid && existingOrder.customer_phone && twilio.accountSid && twilio.authToken && twilio.messagingServiceSid) {
       const customerName = existingOrder.customer_name ? ` ${existingOrder.customer_name.split(" ")[0]}` : "";
-      const confirmationMessage = `Hi${customerName}! 🎉\n\nYour payment for *${(existingOrder.items?.[0]?.name || "your order")}* has been confirmed!\n\n✅ Amount paid: MWK ${Number(existingOrder.total).toLocaleString()}\n📦 Status: Processing\n\nThank you for shopping with Forgiven Shopping Centre! We'll keep you updated on your delivery. 🚀`;
+      const confirmationMessage = `Hi ${customerName}! 🎉\n\nYour payment for *${(existingOrder.items?.[0]?.name || "your order")}* has been confirmed!\n\n✅ Amount paid: MWK ${Number(existingOrder.total).toLocaleString()}\n📦 Status: Paid\n\nThank you for shopping with Forgiven Shopping Centre! We'll keep you updated on your delivery. 🚀`;
       try {
         await sendTwilioMessage(twilio.accountSid, twilio.authToken, twilio.messagingServiceSid, existingOrder.customer_phone, confirmationMessage);
         console.log(`✅ WhatsApp confirmation sent to ${existingOrder.customer_phone}`);

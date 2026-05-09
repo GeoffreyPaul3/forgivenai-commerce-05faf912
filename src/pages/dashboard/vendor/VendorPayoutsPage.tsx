@@ -55,13 +55,10 @@ export default function VendorPayoutsPage() {
     queryKey: ["vendor-orders-payouts", vendorProductIds],
     enabled: !!vendorProductIds && vendorProductIds.length > 0,
     queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from("orders")
-        .select("id, total, vendor_amount, status, created_at, items")
-        .order("created_at", { ascending: false });
-      return (data || []).filter((o: any) =>
-        (o.items as any[]).some((item: any) => vendorProductIds?.includes(item.product_id))
-      );
+      const { data, error } = await (supabase as any)
+        .rpc("get_vendor_orders", { p_vendor_id: vendor.id });
+      if (error) console.error(error);
+      return data || [];
     },
   });
 

@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID") || "";
 const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
-const TWILIO_WHATSAPP_NUMBER = Deno.env.get("TWILIO_WHATSAPP_NUMBER") || "";
+const TWILIO_MESSAGING_SERVICE_SID = Deno.env.get("MESSAGING_SERVICE_SID") || Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") || "";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -20,7 +20,7 @@ async function sendWhatsApp(to: string, body: string, mediaUrl?: string) {
   
   const formData: Record<string, string> = {
     To: `whatsapp:${to}`,
-    From: `whatsapp:${TWILIO_WHATSAPP_NUMBER}`,
+    MessagingServiceSid: TWILIO_MESSAGING_SERVICE_SID,
     Body: body,
   };
 

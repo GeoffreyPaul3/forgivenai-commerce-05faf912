@@ -55,13 +55,10 @@ export default function VendorPerformancePage() {
     queryKey: ["vendor-orders-perf", productIds],
     enabled: productIds.length > 0,
     queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from("orders")
-        .select("id, total, status, created_at, items, vendor_confirmation_status")
-        .order("created_at", { ascending: true });
-      return (data || []).filter((o: any) =>
-        (o.items as any[]).some((item: any) => productIds.includes(item.product_id))
-      );
+      const { data, error } = await (supabase as any)
+        .rpc("get_vendor_orders", { p_vendor_id: vendor.id });
+      if (error) console.error(error);
+      return (data || []).reverse();
     },
   });
 

@@ -305,7 +305,7 @@ serve(async (req) => {
         const { data: agent } = await supabase
           .from("agents")
           .select("id, referral_code")
-          .or(`referral_code.eq.${referralCode},referral_code.ilike.%${refMatch?.[1] ?? ""}%`)
+          .or(`referral_code.eq.${referralCode},referral_code.ilike.*${refMatch?.[1] ?? ""}*`)
           .single();
         if (agent) {
           agentId = agent.id;
@@ -336,10 +336,15 @@ serve(async (req) => {
       } else {
         // Persist agent_id on the conversation if we just detected one (referral code in this message)
         const updatePayload: Record<string, any> = { last_message_at: new Date().toISOString() };
-        if (agentId && !convo.agent_id) updatePayload.agent_id = agentId;
+        if (agentId) updatePayload.agent_id = agentId;
         await supabase.from("conversations").update(updatePayload).eq("id", convo.id);
         // Fall back to the stored agent_id if the current message has no referral code
         if (!agentId && convo.agent_id) agentId = convo.agent_id;
+        // Ultimate fallback: check if the customer already has a first_agent_id assigned
+        if (!agentId && customer?.first_agent_id) {
+          agentId = customer.first_agent_id;
+          console.log(`[DEBUG] No code/convo agent found. Falling back to customer's first_agent_id: ${agentId}`);
+        }
       }
 
       if (!convo) return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
@@ -348,7 +353,7 @@ serve(async (req) => {
       await supabase.from("messages").insert({ conversation_id: convo.id, role: "customer", content: body });
 
       // Get products for AI context
-      const { data: products } = await supabase.from("products").select("name, category, price, currency, description, images").eq("status", "active").limit(100);
+      const { data: products } = await supabase.from("products").select("id, name, category, price, currency, description, images").eq("status", "active").limit(100);
       const productList = products?.map(p => `- ${p.name} (${p.category}) — ${p.currency} ${p.price}`).join("\n") || "No products available";
 
       // Get conversation history (latest 15 messages, ordered chronologically)
@@ -406,6 +411,8 @@ serve(async (req) => {
               }
 
               // Create order
+              console.log(`[DEBUG] Creating order for ${customerPhone}. agentId: ${agentId}, convo.agent_id: ${convo?.agent_id}`);
+              const isFirstOrder = customer ? (customer.total_orders === 0) : true;
               const { data: newOrder, error: orderError } = await supabase.from("orders").insert({
                 customer_phone: customerPhone,
                 customer_name:  custName,
@@ -414,6 +421,7 @@ serve(async (req) => {
                 total: price * quantity,
                 channel: "whatsapp",
                 agent_id: agentId,
+                is_first_order: isFirstOrder,
                 notes: `Delivery Address: ${custAddress} | Contact: ${custPhone}`,
                 status: "pending",
               }).select().single();
@@ -609,6 +617,7 @@ ${productList}`;
         await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: cleanText });
 
         // Create order record
+        const isFirstOrder = customer ? (customer.total_orders === 0) : true;
         const { data: newOrder, error: orderError } = await supabase.from("orders").insert({
           customer_phone: customerPhone,
           customer_name: orderData.customer_name,
@@ -617,6 +626,7 @@ ${productList}`;
           total: orderData.price * orderData.quantity,
           channel: "whatsapp",
           agent_id: agentId,
+          is_first_order: isFirstOrder,
           notes: `Delivery Address: ${orderData.address} | Contact: ${orderData.phone}`,
           status: "pending",
         }).select().single();

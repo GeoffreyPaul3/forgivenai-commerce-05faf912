@@ -40,6 +40,28 @@ const AgentsPage = () => {
   const [viewAgent, setViewAgent] = useState<Agent | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [showPayouts, setShowPayouts] = useState(false);
+  
+  const { data: payouts, error: payoutsError } = useQuery({
+    queryKey: ["agent-payouts"],
+    queryFn: async () => {
+      console.log("[DEBUG] Fetching agent payouts...");
+      const { data, error } = await supabase
+        .from("agent_payouts")
+        .select(`
+          *,
+          agent:agents(name, phone)
+        `)
+        .order("created_at", { ascending: false });
+      
+      if (error) {
+        console.error("[DEBUG] Payouts fetch error:", error);
+        throw error;
+      }
+      console.log("[DEBUG] Payouts data:", data);
+      return data;
+    },
+  });
 
   const { data: agents, isLoading } = useQuery({
     queryKey: ["agents"],
@@ -135,6 +157,20 @@ const AgentsPage = () => {
     },
   });
 
+  const updatePayoutStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase
+        .from("agent_payouts")
+        .update({ status, processed_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agent-payouts"] });
+      toast({ title: "Payout status updated!" });
+    },
+  });
+
   const generateCode = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let code = "FGV-";
@@ -188,23 +224,46 @@ const AgentsPage = () => {
         <Button onClick={() => setShowAdd(true)} className="gap-2"><Plus className="w-4 h-4" /> Add Agent</Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { label: "Total Agents", value: agents?.length || 0, icon: Users, color: "text-primary" },
-          { label: "Active", value: agents?.filter(a => a.status === "active").length || 0, icon: UserCheck, color: "text-emerald-600" },
-          { label: "Total Sales", value: `MWK ${totalSales.toLocaleString()}`, icon: TrendingUp, color: "text-blue-600" },
-          { label: "Commissions Earned", value: `MWK ${totalCommission.toLocaleString()}`, icon: DollarSign, color: "text-gold" },
-        ].map(s => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 rounded-xl border border-border bg-card">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm text-muted-foreground font-body">{s.label}</span>
-              <s.icon className={`w-4 h-4 ${s.color}`} />
-            </div>
-            <p className="text-2xl font-heading font-bold">{s.value}</p>
-          </motion.div>
-        ))}
+      {/* Tabs */}
+      <div className="flex border-b border-border mb-6">
+        <button 
+          className={`px-4 py-2 font-bold text-sm transition-colors border-b-2 ${!showPayouts ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+          onClick={() => setShowPayouts(false)}
+        >
+          Agents List
+        </button>
+        <button 
+          className={`px-4 py-2 font-bold text-sm transition-colors border-b-2 ${showPayouts ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+          onClick={() => setShowPayouts(true)}
+        >
+          Payout Requests
+          {payouts?.filter(p => p.status === 'pending').length > 0 && (
+            <Badge className="ml-2 bg-primary text-primary-foreground h-5 min-w-[20px] px-1 justify-center">
+              {payouts.filter(p => p.status === 'pending').length}
+            </Badge>
+          )}
+        </button>
       </div>
+
+      {!showPayouts ? (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[
+              { label: "Total Agents", value: agents?.length || 0, icon: Users, color: "text-primary" },
+              { label: "Active", value: agents?.filter(a => a.status === "active").length || 0, icon: UserCheck, color: "text-emerald-600" },
+              { label: "Total Sales", value: `MWK ${totalSales.toLocaleString()}`, icon: TrendingUp, color: "text-blue-600" },
+              { label: "Commissions Earned", value: `MWK ${totalCommission.toLocaleString()}`, icon: DollarSign, color: "text-gold" },
+            ].map(s => (
+              <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 rounded-xl border border-border bg-card">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-muted-foreground font-body">{s.label}</span>
+                  <s.icon className={`w-4 h-4 ${s.color}`} />
+                </div>
+                <p className="text-2xl font-heading font-bold">{s.value}</p>
+              </motion.div>
+            ))}
+          </div>
 
       {/* Agent Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -296,6 +355,53 @@ const AgentsPage = () => {
           ))}
           <PaginationItem><PaginationNext href="#" onClick={e => { e.preventDefault(); setPage(p => Math.min(totalPages, p + 1)); }} /></PaginationItem>
         </PaginationContent></Pagination>
+      )}
+      </>
+      ) : (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead>Agent</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Method</TableHead>
+                <TableHead>Details</TableHead>
+                <TableHead>Requested</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!payouts || payouts.length === 0 ? (
+                <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground font-body">No payout requests.</TableCell></TableRow>
+              ) : payouts.map((p: any) => (
+                <TableRow key={p.id}>
+                  <TableCell>
+                    <p className="font-semibold">{p.agent?.name || "Unknown Agent"}</p>
+                    <p className="text-xs text-muted-foreground">{p.agent?.phone}</p>
+                  </TableCell>
+                  <TableCell className="font-bold">MWK {p.amount.toLocaleString()}</TableCell>
+                  <TableCell>{p.payout_method}</TableCell>
+                  <TableCell className="text-xs font-mono">{p.payout_details}</TableCell>
+                  <TableCell className="text-xs">{new Date(p.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    <Badge variant={p.status === 'paid' ? 'default' : p.status === 'rejected' ? 'destructive' : 'secondary'}>
+                      {p.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {p.status === 'pending' && (
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" className="h-8 text-emerald-600 border-emerald-600/20 hover:bg-emerald-600/10" onClick={() => updatePayoutStatus.mutate({ id: p.id, status: 'paid' })}>Approve</Button>
+                        <Button size="sm" variant="ghost" className="h-8 text-destructive" onClick={() => updatePayoutStatus.mutate({ id: p.id, status: 'rejected' })}>Reject</Button>
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       {/* View Agent */}

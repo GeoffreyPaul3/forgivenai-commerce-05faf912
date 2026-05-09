@@ -41,15 +41,9 @@ const AgentDashboard = () => {
           .select("*")
           .eq("user_id", session.user.id)
           .maybeSingle();
-        if (data) return data;
+        return data;
       }
-      const { data } = await supabase
-        .from("agents")
-        .select("*")
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      return data;
+      return null;
     },
   });
 
@@ -91,21 +85,7 @@ const AgentDashboard = () => {
     },
   });
 
-  // 4. Get Conversations (Linked to agent's customers)
-  const customerPhones = useMemo(() => (myCustomers || []).map(c => c.phone), [myCustomers]);
-  const { data: conversations } = useQuery({
-    queryKey: ["agent-conversations-overview", customerPhones],
-    enabled: customerPhones.length > 0,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("conversations")
-        .select("*")
-        .in("customer_phone", customerPhones)
-        .order("last_message_at", { ascending: false })
-        .limit(5);
-      return data || [];
-    },
-  });
+
 
   // 5. Get Top Products (Demo selection)
   const { data: products } = useQuery({
@@ -123,13 +103,12 @@ const AgentDashboard = () => {
     const totalEarnings = (myCommissions || []).reduce((acc, c) => acc + (c.amount || 0), 0);
     const pendingOrders = (myOrders || []).filter(o => o.status === "pending").length;
     return {
-      totalRevenue: totalEarnings, // In agent context, revenue is their earnings
+      totalRevenue: totalEarnings,
       totalOrders: myOrders?.length || 0,
       pendingOrders,
       customers: myCustomers?.length || 0,
-      conversations: conversations?.length || 0
     };
-  }, [myOrders, myCustomers, myCommissions, conversations]);
+  }, [myOrders, myCustomers, myCommissions]);
 
   if (agentLoading) {
     return (
@@ -166,7 +145,13 @@ const AgentDashboard = () => {
           >
             <Copy className="w-4 h-4" /> Copy Referral Link
           </Button>
-          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+          <Button 
+            className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+            onClick={() => {
+              const text = `🛍️ Shop premium fashion at Forgiven Shopping Centre!\nUse my referral link and discover amazing deals:\n${referralUrl}`;
+              window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+            }}
+          >
             <Share2 className="w-4 h-4" /> Share to WhatsApp
           </Button>
         </div>
@@ -213,18 +198,7 @@ const AgentDashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
-                <MessageSquare className="w-5 h-5" />
-              </div>
-            </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Conversations</p>
-            <h3 className="text-2xl font-heading font-black">{stats.conversations}</h3>
-            <p className="text-[10px] text-muted-foreground mt-2 font-body">WhatsApp threads</p>
-          </CardContent>
-        </Card>
+
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -320,39 +294,7 @@ const AgentDashboard = () => {
 
         {/* Right Column: Live Conversations & Quick Actions */}
         <div className="space-y-6">
-          {/* Live Conversations */}
-          <Card className="rounded-3xl border-border bg-card shadow-sm overflow-hidden">
-            <CardHeader className="border-b border-border/50 pb-4">
-              <CardTitle className="font-heading text-xl flex items-center gap-2">
-                Live Conversations
-              </CardTitle>
-              <CardDescription>WhatsApp</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4 space-y-3">
-              {(!conversations || conversations.length === 0) ? (
-                <div className="py-10 text-center text-muted-foreground font-body text-sm">No active conversations.</div>
-              ) : (conversations.map(conv => (
-                <div key={conv.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-muted/20 transition-colors cursor-pointer group">
-                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center font-heading font-bold text-emerald-500 shrink-0">
-                    {conv.customer_name?.[0] || <Phone className="w-4 h-4" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-sm truncate">{conv.customer_name || conv.customer_phone}</span>
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                        {conv.last_message_at ? new Date(conv.last_message_at).toLocaleDateString("en-GB", { day: 'numeric', month: 'short' }) : ""}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <Badge variant="outline" className="p-0 h-auto border-0 text-[10px] text-muted-foreground font-normal bg-transparent shadow-none">
-                        whatsapp · {conv.status || "open"}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              )))}
-            </CardContent>
-          </Card>
+
 
           {/* Quick Actions */}
           <Card className="rounded-3xl border-border bg-card shadow-sm overflow-hidden">

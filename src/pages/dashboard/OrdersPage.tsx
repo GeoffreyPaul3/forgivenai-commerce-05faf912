@@ -186,7 +186,10 @@ const OrdersPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-heading text-sm font-semibold">{order.customer_name || "Unknown Customer"}</h4>
-                  <p className="text-xs text-muted-foreground font-body">{order.customer_phone || order.customer_email || "No contact"} • {order.channel} • {new Date(order.created_at).toLocaleDateString()}</p>
+                  <p className="text-xs text-muted-foreground font-body">
+                    {order.customer_phone || order.customer_email || "No contact"} • {order.channel} 
+                    {order.agent_id ? " • Agent Referral" : " • In-house"} • {new Date(order.created_at).toLocaleDateString()}
+                  </p>
                 </div>
                 <div className="flex items-center gap-3">
                   {/* Confirmation delay flag */}
@@ -240,7 +243,7 @@ const OrdersPage = () => {
                 <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
                   <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-2">Order Value</p>
                   <p className="font-black text-xl text-primary">{selectedOrder.currency} {selectedOrder.total.toLocaleString()}</p>
-                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter mt-1">{selectedOrder.channel} channel</p>
+                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter mt-1">{selectedOrder.channel} channel {selectedOrder.agent_id ? " • Agent Referral" : " • In-house"}</p>
                 </div>
               </div>
 

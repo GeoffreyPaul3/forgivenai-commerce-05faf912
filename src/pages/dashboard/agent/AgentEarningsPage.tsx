@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 export default function AgentEarningsPage() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<any>(null);
   const [withdrawing, setWithdrawing] = useState(false);
 
@@ -38,15 +39,9 @@ export default function AgentEarningsPage() {
           .select("*")
           .eq("user_id", session.user.id)
           .maybeSingle();
-        if (data) return data;
+        return data;
       }
-      const { data } = await supabase
-        .from("agents")
-        .select("*")
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      return data;
+      return null;
     },
   });
 
@@ -63,16 +58,33 @@ export default function AgentEarningsPage() {
     },
   });
 
+  const { data: myPayouts } = useQuery({
+    queryKey: ["agent-my-payouts", agent?.id],
+    enabled: !!agent?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("agent_payouts")
+        .select("*")
+        .eq("agent_id", agent.id)
+        .order("created_at", { ascending: false });
+      return data || [];
+    },
+  });
+
   const stats = useMemo(() => {
-    if (!commissions) return { total: 0, pending: 0, paid: 0, count: 0 };
-    return commissions.reduce((acc, c) => {
-      acc.total += c.amount || 0;
-      if (c.status === "pending") acc.pending += c.amount || 0;
-      if (c.status === "paid") acc.paid += c.amount || 0;
-      acc.count++;
-      return acc;
-    }, { total: 0, pending: 0, paid: 0, count: 0 });
-  }, [commissions]);
+    if (!commissions) return { total: 0, available: 0, paid: 0, pendingPayouts: 0, count: 0 };
+    const totalEarned = commissions.reduce((acc, c) => acc + (c.amount || 0), 0);
+    const totalPaidOut = (myPayouts || []).filter(p => p.status === "paid").reduce((acc, p) => acc + (p.amount || 0), 0);
+    const totalPendingPayouts = (myPayouts || []).filter(p => p.status === "pending").reduce((acc, p) => acc + (p.amount || 0), 0);
+    
+    return { 
+      total: totalEarned, 
+      available: totalEarned - totalPaidOut - totalPendingPayouts, 
+      paid: totalPaidOut, 
+      pendingPayouts: totalPendingPayouts,
+      count: commissions.length 
+    };
+  }, [commissions, myPayouts]);
 
   const chartData = useMemo(() => {
     return [...(commissions || [])]
@@ -84,15 +96,60 @@ export default function AgentEarningsPage() {
       }));
   }, [commissions]);
 
-  const handleWithdraw = () => {
+  const handleWithdraw = async () => {
+    if (!agent) return;
+    
+    if (!agent.payout_details) {
+      toast({
+        title: "Payout Method Required",
+        description: "Please set your payout details below before withdrawing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setWithdrawing(true);
-    setTimeout(() => {
-      setWithdrawing(false);
+    try {
+      const { data, error } = await supabase.rpc('request_agent_payout', {
+        p_agent_id: agent.id,
+        p_amount: stats.available
+      });
+
+      if (error) throw error;
+
+      await queryClient.invalidateQueries({ queryKey: ["agent-payouts"] });
+      await queryClient.invalidateQueries({ queryKey: ["agent-my-payouts"] });
+      await queryClient.invalidateQueries({ queryKey: ["agent-commissions-earnings"] });
+
       toast({
         title: "Withdrawal Request Submitted 🎉",
         description: "Your request has been sent to admin for processing. You'll be notified within 24 hours.",
       });
-    }, 1500);
+    } catch (err: any) {
+      console.error("Withdrawal error:", err);
+      toast({
+        title: "Withdrawal Failed",
+        description: err.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
+  const updatePayoutSettings = async (method: string, details: string) => {
+    try {
+      const { error } = await supabase
+        .from("agents")
+        .update({ payout_method: method, payout_details: details })
+        .eq("id", agent?.id);
+      
+      if (error) throw error;
+      
+      toast({ title: "Settings Saved", description: "Your payout details have been updated." });
+    } catch (err: any) {
+      toast({ title: "Update Failed", description: err.message, variant: "destructive" });
+    }
   };
 
   if (isLoading) {
@@ -132,7 +189,7 @@ export default function AgentEarningsPage() {
         </div>
         <Button
           onClick={handleWithdraw}
-          disabled={withdrawing || stats.pending === 0}
+          disabled={withdrawing || stats.available < 2000}
           className="gap-2 bg-gold hover:bg-gold/90 text-maroon-dark font-bold h-11 px-6 rounded-2xl shadow-lg shadow-gold/20 disabled:opacity-50"
         >
           {withdrawing ? (
@@ -140,7 +197,7 @@ export default function AgentEarningsPage() {
           ) : (
             <ArrowDownToLine className="w-4 h-4" />
           )}
-          Request Withdrawal
+          {stats.available < 2000 ? "Min. MWK 2,000" : "Request Withdrawal"}
         </Button>
       </div>
 
@@ -158,13 +215,13 @@ export default function AgentEarningsPage() {
             highlight: true,
           },
           {
-            label: "Pending Payout",
-            value: `MWK ${stats.pending.toLocaleString()}`,
-            icon: Clock,
-            color: "text-amber-500",
-            bg: "bg-amber-500/5",
-            border: "border-amber-500/20",
-            sub: "Awaiting confirmation",
+            label: "Available Balance",
+            value: `MWK ${stats.available.toLocaleString()}`,
+            icon: Wallet,
+            color: "text-emerald-500",
+            bg: "bg-emerald-500/5",
+            border: "border-emerald-500/20",
+            sub: stats.pendingPayouts > 0 ? `MWK ${stats.pendingPayouts.toLocaleString()} pending` : "Ready to withdraw",
           },
           {
             label: "Total Paid Out",
@@ -260,28 +317,41 @@ export default function AgentEarningsPage() {
         <Card className="rounded-3xl border-border bg-card shadow-sm">
           <CardHeader className="border-b border-border/50">
             <CardTitle className="font-heading text-base flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-gold" /> Payout Info
+              <Wallet className="w-4 h-4 text-gold" /> Payout Settings
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-5 space-y-4">
-            {[
-              { label: "Payment Method", value: "Mobile Money" },
-              { label: "Payout Cycle", value: "Weekly (Fridays)" },
-              { label: "Min. Withdrawal", value: "MWK 2,000" },
-              { label: "Processing Time", value: "1–24 hours" },
-            ].map(row => (
-              <div key={row.label} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-                <span className="text-xs text-muted-foreground font-body">{row.label}</span>
-                <span className="text-xs font-bold">{row.value}</span>
-              </div>
-            ))}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-muted-foreground uppercase">Method</label>
+              <select 
+                className="w-full bg-muted/20 border border-border rounded-xl px-3 py-2 text-sm outline-none focus:border-primary transition-colors"
+                defaultValue={agent.payout_method || "Airtel Money"}
+                id="payout_method"
+              >
+                <option value="Airtel Money">Airtel Money</option>
+                <option value="TNM Mpamba">TNM Mpamba</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-muted-foreground uppercase">Details (Phone/Account)</label>
+              <input 
+                type="text"
+                className="w-full bg-muted/20 border border-border rounded-xl px-3 py-2 text-sm outline-none focus:border-primary transition-colors"
+                placeholder="099... or Account No."
+                defaultValue={agent.payout_details || ""}
+                id="payout_details"
+              />
+            </div>
             <Button
-              className="w-full mt-2 gap-2 bg-gold hover:bg-gold/90 text-maroon-dark font-bold rounded-xl"
-              onClick={handleWithdraw}
-              disabled={withdrawing || stats.pending === 0}
+              className="w-full mt-2 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-xl"
+              onClick={() => {
+                const method = (document.getElementById('payout_method') as HTMLSelectElement).value;
+                const details = (document.getElementById('payout_details') as HTMLInputElement).value;
+                updatePayoutSettings(method, details);
+              }}
             >
-              <ArrowDownToLine className="w-4 h-4" />
-              {stats.pending > 0 ? `Withdraw MWK ${stats.pending.toLocaleString()}` : "Nothing to Withdraw"}
+              Save Payout Details
             </Button>
           </CardContent>
         </Card>
@@ -388,6 +458,50 @@ export default function AgentEarningsPage() {
           </p>
         </div>
       </div>
+
+      {/* Payout History */}
+      <Card className="rounded-3xl border-border bg-card shadow-sm overflow-hidden">
+        <CardHeader className="border-b border-border/50">
+          <CardTitle className="font-heading flex items-center gap-2">
+            <Clock className="w-5 h-5 text-primary" /> Payout History
+          </CardTitle>
+          <CardDescription>Status of your withdrawal requests</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30 border-0">
+                <TableHead className="pl-6">Date</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Method</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right pr-6">Processed At</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!myPayouts || myPayouts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No payout history.</TableCell>
+                </TableRow>
+              ) : myPayouts.map((p: any) => (
+                <TableRow key={p.id}>
+                  <TableCell className="pl-6 text-sm">{new Date(p.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="font-bold">MWK {p.amount.toLocaleString()}</TableCell>
+                  <TableCell className="text-xs">{p.payout_method}</TableCell>
+                  <TableCell>
+                    <Badge variant={p.status === 'paid' ? 'default' : p.status === 'rejected' ? 'destructive' : 'secondary'}>
+                      {p.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right pr-6 text-xs text-muted-foreground">
+                    {p.processed_at ? new Date(p.processed_at).toLocaleDateString() : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
