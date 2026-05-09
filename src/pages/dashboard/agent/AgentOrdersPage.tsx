@@ -80,7 +80,7 @@ export default function AgentOrdersPage() {
     return acc;
   }, {});
 
-  const allStatuses = ["all", "pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
+  const allStatuses = ["all", "pending", "paid", "confirmed", "processing", "shipped", "delivered", "cancelled"];
 
   const filtered = filterStatus === "all"
     ? (orders || [])
@@ -89,7 +89,7 @@ export default function AgentOrdersPage() {
   const kpis = [
     { label: "Total Orders", value: orders?.length ?? 0, icon: ShoppingBag, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
     { label: "Delivered", value: orders?.filter((o: any) => o.status === "delivered").length ?? 0, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },
-    { label: "In Transit", value: orders?.filter((o: any) => ["confirmed", "processing", "shipped"].includes(o.status)).length ?? 0, icon: Truck, color: "text-indigo-500", bg: "bg-indigo-500/5", border: "border-indigo-500/20" },
+    { label: "In Transit", value: orders?.filter((o: any) => ["paid", "confirmed", "processing", "shipped"].includes(o.status)).length ?? 0, icon: Truck, color: "text-indigo-500", bg: "bg-indigo-500/5", border: "border-indigo-500/20" },
     { label: "Total Revenue", value: `MWK ${(orders || []).reduce((s: number, o: any) => s + (o.total || 0), 0).toLocaleString()}`, icon: DollarSign, color: "text-gold", bg: "bg-gold/5", border: "border-gold/20" },
   ];
 

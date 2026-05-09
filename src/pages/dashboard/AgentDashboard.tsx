@@ -6,12 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
-  Users, DollarSign, ShoppingBag, MessageSquare, 
-  Plus, Eye, MessageCircle, UserPlus, Video, 
-  BarChart3, ArrowRight, Star, Clock, 
-  Phone, Copy, Share2,
-  Package,
-  Wallet, Clock
+  Users, DollarSign, ShoppingBag, 
+  Plus, UserPlus, 
+  ArrowRight, 
+  Copy, Share2,
+  Wallet
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
@@ -139,7 +138,7 @@ const AgentDashboard = () => {
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const referralUrl = agent ? `${window.location.origin}/?ref=${agent.referral_code}` : "";
+  const referralUrl = agent ? `${window.location.origin.replace("agents.", "")}/?ref=${agent.referral_code}` : "";
 
   return (
     <div className="space-y-6 pb-20">
@@ -177,7 +176,7 @@ const AgentDashboard = () => {
       </div>
 
       {/* KPI Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
