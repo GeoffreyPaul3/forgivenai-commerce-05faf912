@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Package, Clock, Truck, CheckCircle, DollarSign, AlertTriangle } from "lucide-react";
+import { Search, Plus, Package, Clock, Truck, CheckCircle, DollarSign, AlertTriangle, Upload, Image, Loader2, MapPin } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Order = Tables<"orders">;
@@ -40,6 +40,38 @@ const OrdersPage = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, orderId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${orderId}/${Math.random()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('delivery-proofs')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('delivery-proofs')
+        .getPublicUrl(filePath);
+
+      await supabase.from('orders').update({ delivery_proof_url: publicUrl } as any).eq('id', orderId);
+      
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      setSelectedOrder(prev => prev ? { ...prev, delivery_proof_url: publicUrl } as Order : null);
+      toast({ title: "Delivery proof uploaded" });
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const { data: profile } = useQuery({
     queryKey: ["user-profile"],
@@ -224,166 +256,191 @@ const OrdersPage = () => {
 
       {/* Order Detail Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={v => !v && setSelectedOrder(null)}>
-        <DialogContent className="w-[95vw] sm:max-w-xl overflow-y-auto max-h-[85vh] rounded-3xl p-0 border-0 shadow-2xl custom-scrollbar">
+        <DialogContent className="w-[95vw] lg:max-w-4xl overflow-y-auto max-h-[90vh] rounded-[2.5rem] p-0 border-0 shadow-2xl custom-scrollbar">
           <div className="bg-gradient-to-br from-primary/10 via-background to-background p-5 sm:p-8 pb-4 sm:pb-6 border-b border-border/50 relative">
-            <DialogTitle className="font-heading text-2xl font-black tracking-tight flex items-center gap-3">
-              <Package className="w-6 h-6 text-primary" /> Order Detail
-            </DialogTitle>
-            <p className="text-muted-foreground text-sm font-body mt-1">Order ID: #{selectedOrder?.id.slice(0, 8)}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="font-heading text-2xl font-black tracking-tight flex items-center gap-3">
+                  <Package className="w-6 h-6 text-primary" /> Order Detail
+                </DialogTitle>
+                <p className="text-muted-foreground text-sm font-body mt-1 uppercase tracking-tighter font-black">Order ID: #{selectedOrder?.id.slice(0, 8)}</p>
+              </div>
+              <div className={`px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest ${statusColors[selectedOrder?.status || "pending"]}`}>
+                {selectedOrder?.status}
+              </div>
+            </div>
           </div>
 
           {selectedOrder && (
-            <div className="p-5 sm:p-8 space-y-6 sm:space-y-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
-                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-2">Customer Info</p>
-                  <p className="font-black text-sm">{selectedOrder.customer_name}</p>
-                  <p className="text-xs text-muted-foreground font-body mt-0.5">{selectedOrder.customer_phone}</p>
-                  {(selectedOrder as any).courier_name && (
-                    <div className="mt-3 pt-3 border-t border-border/50">
-                      <p className="text-[9px] font-black uppercase text-primary/70 mb-1">Preferred Courier</p>
-                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[10px] font-black uppercase tracking-widest py-0">
-                        {(selectedOrder as any).courier_name}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-                <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
-                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-2">Order Value</p>
-                  <p className="font-black text-xl text-primary">{selectedOrder.currency} {selectedOrder.total.toLocaleString()}</p>
-                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter mt-1">{selectedOrder.channel} channel {selectedOrder.agent_id ? " • Agent Referral" : " • In-house"}</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Ordered Items</label>
-                <div className="space-y-2">
-                  {Array.isArray(selectedOrder.items) && (selectedOrder.items as any[]).map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-3 rounded-2xl bg-muted/20 border border-border/50">
-                      <div className="flex gap-3 items-center">
-                         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                           <Package className="w-4 h-4 text-primary" />
-                         </div>
-                         <div>
-                           <p className="text-sm font-bold">{item.name}</p>
-                           <p className="text-[10px] text-muted-foreground font-body">Qty: {item.quantity} × {selectedOrder.currency} {Number(item.price).toLocaleString()}</p>
-                         </div>
+            <div className="p-5 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Left Column: Info & Items */}
+              <div className="lg:col-span-7 space-y-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-5 rounded-[2rem] bg-muted/20 border border-border/50">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-3 flex items-center gap-2">
+                      <Clock className="w-3 h-3" /> Customer Info
+                    </p>
+                    <p className="font-black text-sm">{selectedOrder.customer_name}</p>
+                    <p className="text-xs text-muted-foreground font-body mt-0.5">{selectedOrder.customer_phone}</p>
+                    {(selectedOrder as any).courier_name && (
+                      <div className="mt-3 pt-3 border-t border-border/50">
+                        <p className="text-[9px] font-black uppercase text-primary/70 mb-1">Preferred Courier</p>
+                        <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[10px] font-black uppercase tracking-widest py-0">
+                          {(selectedOrder as any).courier_name}
+                        </Badge>
                       </div>
-                      <p className="text-sm font-black text-foreground">{selectedOrder.currency} {(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
-                    </div>
-                  ))}
-                  {(!Array.isArray(selectedOrder.items) || (selectedOrder.items as any[]).length === 0) && (
-                    <p className="text-xs text-muted-foreground italic px-1">No item details available for this order.</p>
-                  )}
+                    )}
+                  </div>
+                  <div className="p-5 rounded-[2rem] bg-muted/20 border border-border/50">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-3 flex items-center gap-2">
+                      <DollarSign className="w-3 h-3" /> Order Value
+                    </p>
+                    <p className="font-black text-2xl text-primary">{selectedOrder.currency} {selectedOrder.total.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter mt-1">{selectedOrder.channel} channel {selectedOrder.agent_id ? " • Agent Referral" : " • In-house"}</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Lifecycle Status</label>
-                <div className="flex flex-wrap gap-2">
-                  {statusSteps.map(s => (
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-2">Ordered Items</label>
+                  <div className="space-y-2">
+                    {Array.isArray(selectedOrder.items) && (selectedOrder.items as any[]).map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center p-4 rounded-[1.5rem] bg-muted/20 border border-border/50">
+                        <div className="flex gap-3 items-center">
+                           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                             <Package className="w-5 h-5 text-primary" />
+                           </div>
+                           <div>
+                             <p className="text-sm font-bold">{item.name}</p>
+                             <p className="text-[10px] text-muted-foreground font-body">Qty: {item.quantity} × {selectedOrder.currency} {Number(item.price).toLocaleString()}</p>
+                           </div>
+                        </div>
+                        <p className="text-sm font-black text-foreground">{selectedOrder.currency} {(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-2">Lifecycle Status</label>
+                  <div className="flex flex-wrap gap-2">
+                    {statusSteps.map(s => (
+                      <Button 
+                        key={s} 
+                        size="sm" 
+                        variant={selectedOrder.status === s ? "default" : "outline"} 
+                        onClick={() => { updateStatus.mutate({ id: selectedOrder.id, status: s }); setSelectedOrder({ ...selectedOrder, status: s } as Order); }} 
+                        className={`text-[10px] font-black uppercase tracking-tighter px-4 py-4 rounded-xl ${selectedOrder.status === s ? 'bg-primary' : 'border-border/50'}`}
+                      >
+                        {s}
+                      </Button>
+                    ))}
                     <Button 
-                      key={s} 
+                      variant={selectedOrder.status === 'cancelled' ? 'destructive' : 'outline'}
                       size="sm" 
-                      variant={selectedOrder.status === s ? "default" : "outline"} 
-                      onClick={() => { updateStatus.mutate({ id: selectedOrder.id, status: s }); setSelectedOrder({ ...selectedOrder, status: s } as Order); }} 
-                      className={`text-[10px] font-black uppercase tracking-tighter px-4 py-4 rounded-xl ${selectedOrder.status === s ? 'bg-primary' : 'border-border/50'}`}
+                      onClick={() => { updateStatus.mutate({ id: selectedOrder.id, status: 'cancelled' }); setSelectedOrder({ ...selectedOrder, status: 'cancelled' } as Order); }}
+                      className="text-[10px] font-black uppercase tracking-tighter px-4 py-4 rounded-xl"
                     >
-                      {s}
+                      Cancel
                     </Button>
-                  ))}
-                  <Button 
-                    variant={selectedOrder.status === 'cancelled' ? 'destructive' : 'outline'}
-                    size="sm" 
-                    onClick={() => { updateStatus.mutate({ id: selectedOrder.id, status: 'cancelled' }); setSelectedOrder({ ...selectedOrder, status: 'cancelled' } as Order); }}
-                    className="text-[10px] font-black uppercase tracking-tighter px-4 py-4 rounded-xl"
-                  >
-                    Cancel
-                  </Button>
+                  </div>
                 </div>
               </div>
 
-              {/* Fulfillment Panel */}
-              <div className="p-6 rounded-[2rem] bg-indigo-50/50 border border-indigo-100 space-y-5">
-                <div className="flex items-center justify-between">
-                   <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest inline-flex items-center gap-2">
-                     <Truck className="w-3.5 h-3.5" /> Fulfillment Logistics
-                   </p>
-                   {(selectedOrder as any).delivery_confirmed_at && (
-                     <Badge className="bg-emerald-500 text-white font-black text-[9px] uppercase">Delivered</Badge>
-                   )}
-                </div>
-                
-                <div className="grid grid-cols-1 gap-4">
-                   <div className="space-y-2">
-                     <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Assigned Rider Name / ID</label>
-                     <Input 
+              {/* Right Column: Fulfillment & Notes */}
+              <div className="lg:col-span-5 space-y-6">
+                <div className="p-6 rounded-[2.5rem] bg-indigo-50/50 border border-indigo-100 space-y-6">
+                  <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest inline-flex items-center gap-2">
+                    <Truck className="w-3.5 h-3.5" /> Fulfillment Logistics
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Assigned Rider Name / ID</label>
+                      <Input 
                         placeholder="e.g. Samuel (Rider 04)" 
                         defaultValue={(selectedOrder as any).rider_name}
                         onBlur={(e) => {
                           if (e.target.value !== (selectedOrder as any).rider_name) {
-                            updateStatus.mutate({ id: selectedOrder.id, status: selectedOrder.status || 'pending' }); // Mock update for now
                             supabase.from('orders').update({ rider_name: e.target.value } as any).eq('id', selectedOrder.id).then(() => {
                               toast({ title: "Rider assigned" });
                             });
                           }
                         }}
-                        className="bg-white border-indigo-200 h-11 rounded-xl" 
-                     />
-                   </div>
-                   
-                   <div className="space-y-2">
-                     <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Delivery Proof URL</label>
-                     <Input 
-                        placeholder="https://..." 
-                        defaultValue={(selectedOrder as any).delivery_proof_url}
-                        onBlur={(e) => {
-                          if (e.target.value !== (selectedOrder as any).delivery_proof_url) {
-                            supabase.from('orders').update({ delivery_proof_url: e.target.value } as any).eq('id', selectedOrder.id).then(() => {
-                              toast({ title: "Proof URL updated" });
-                            });
-                          }
-                        }}
-                        className="bg-white border-indigo-200 h-11 rounded-xl" 
-                     />
-                   </div>
-                </div>
+                        className="bg-white border-indigo-200 h-12 rounded-2xl" 
+                      />
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Delivery Proof Image</label>
+                      
+                      {selectedOrder.delivery_proof_url ? (
+                        <div className="relative group aspect-video rounded-3xl overflow-hidden border-2 border-indigo-200 bg-white">
+                          <img src={selectedOrder.delivery_proof_url} alt="Proof" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                             <Button size="sm" variant="secondary" className="rounded-xl font-black text-[10px] uppercase" onClick={() => window.open(selectedOrder.delivery_proof_url!, '_blank')}>
+                               <Image className="w-3 h-3 mr-1" /> View Full
+                             </Button>
+                             <label className="cursor-pointer bg-white text-indigo-600 px-3 py-1.5 rounded-xl font-black text-[10px] uppercase flex items-center gap-1 hover:bg-indigo-50 transition-colors">
+                               <Upload className="w-3 h-3" /> Change
+                               <input type="file" accept="image/*" className="hidden" onChange={e => handleUpload(e, selectedOrder.id)} disabled={uploading} />
+                             </label>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className={`flex flex-col items-center justify-center aspect-video rounded-3xl border-2 border-dashed transition-all cursor-pointer ${uploading ? 'bg-muted/10 border-muted animate-pulse' : 'bg-white border-indigo-100 hover:bg-indigo-50 hover:border-indigo-300'}`}>
+                          {uploading ? (
+                            <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+                          ) : (
+                            <>
+                              <Upload className="w-8 h-8 text-indigo-400 mb-2" />
+                              <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Upload Proof Image</p>
+                              <p className="text-[9px] text-indigo-400 mt-1">Tap to select photo</p>
+                            </>
+                          )}
+                          <input type="file" accept="image/*" className="hidden" onChange={e => handleUpload(e, selectedOrder.id)} disabled={uploading} />
+                        </label>
+                      )}
+                    </div>
+                  </div>
 
-                <div className="flex gap-3">
-                   <Button 
-                     variant="outline" 
-                     className="flex-1 border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-black text-xs h-12 rounded-2xl"
-                     onClick={() => {
+                  <div className="flex gap-3">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-black text-xs h-12 rounded-2xl"
+                      onClick={() => {
                         const now = new Date().toISOString();
                         supabase.from('orders').update({ fulfillment_collected_at: now, status: 'shipped' } as any).eq('id', selectedOrder.id).then(() => {
-                           queryClient.invalidateQueries({ queryKey: ["orders"] });
-                           toast({ title: "Marked as Collected" });
+                          queryClient.invalidateQueries({ queryKey: ["orders"] });
+                          toast({ title: "Marked as Collected" });
                         });
-                     }}
-                   >
-                     Mark Collected
-                   </Button>
-                   <Button 
-                     className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs h-12 rounded-2xl shadow-lg shadow-indigo-200"
-                     onClick={() => {
+                      }}
+                    >
+                      Mark Collected
+                    </Button>
+                    <Button 
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs h-12 rounded-2xl shadow-lg shadow-indigo-200"
+                      onClick={() => {
                         const now = new Date().toISOString();
                         supabase.from('orders').update({ delivery_confirmed_at: now, status: 'delivered' } as any).eq('id', selectedOrder.id).then(() => {
-                           queryClient.invalidateQueries({ queryKey: ["orders"] });
-                           toast({ title: "Delivery Confirmed" });
+                          queryClient.invalidateQueries({ queryKey: ["orders"] });
+                          toast({ title: "Delivery Confirmed" });
                         });
-                     }}
-                   >
-                     Confirm Delivery
-                   </Button>
+                      }}
+                    >
+                      Confirm Delivery
+                    </Button>
+                  </div>
                 </div>
-              </div>
 
-              {selectedOrder.notes && (
-                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100">
-                   <p className="text-[9px] font-black uppercase text-amber-600 mb-1">Internal Notes</p>
-                   <p className="text-sm font-body text-amber-900/80">{selectedOrder.notes}</p>
-                </div>
-              )}
+                {selectedOrder.notes && (
+                  <div className="p-6 rounded-[2.5rem] bg-amber-50 border border-amber-100">
+                    <p className="text-[9px] font-black uppercase text-amber-600 mb-2 flex items-center gap-2">
+                      <MapPin className="w-3 h-3" /> Delivery Notes
+                    </p>
+                    <p className="text-sm font-body text-amber-900/80 leading-relaxed">{selectedOrder.notes}</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
