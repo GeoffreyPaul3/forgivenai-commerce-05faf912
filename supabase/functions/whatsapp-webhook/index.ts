@@ -387,6 +387,7 @@ serve(async (req) => {
             const emailMatch    = c.match(/\*Email:\*\s*(.+)/);
             const addressMatch  = c.match(/\*Address:\*\s*(.+)/);
             const phoneMatch    = c.match(/\*Phone:\*\s*(.+)/);
+            const courierMatch  = c.match(/\*Courier:\*\s*(.+)/);
 
             const productName   = productMatch?.[1]?.trim() || "";
             const quantity      = parseInt(quantityMatch?.[1] || "1");
@@ -395,6 +396,7 @@ serve(async (req) => {
             const custEmail     = emailMatch?.[1]?.trim()   || customer?.email   || "";
             const custAddress   = addressMatch?.[1]?.trim() || "";
             const custPhone     = phoneMatch?.[1]?.trim()   || customerPhone;
+            const custCourier   = courierMatch?.[1]?.trim() || "Unspecified";
 
             if (productName && price > 0) {
               console.log(`⚡ YES intercept: Processing order for ${productName} — MWK ${price}`);
@@ -422,7 +424,8 @@ serve(async (req) => {
                 channel: "whatsapp",
                 agent_id: agentId,
                 is_first_order: isFirstOrder,
-                notes: `Delivery Address: ${custAddress} | Contact: ${custPhone}`,
+                notes: `Delivery Address: ${custAddress} | Contact: ${custPhone} | Courier: ${custCourier}`,
+                courier_name: custCourier,
                 status: "pending",
               }).select().single();
 
@@ -535,9 +538,10 @@ ORDER CAPTURE PROCESS:
    - Email Address
    - Delivery Address (e.g., Kanjedza, Blantyre or Area 47, Lilongwe)
    - Preferred Contact Number
+   - Preferred Courier Service (e.g., CTS, Smart Deliveries, Speed, etc.)
 3. When you have all details and are ready to show the order summary, you MUST include this hidden machine-readable block FIRST (it will be stripped before sending to the customer — do NOT mention it):
 ###PENDING_ORDER###
-{"product_name":"exact product name","quantity":1,"price":25000,"customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number"}
+{"product_name":"exact product name","quantity":1,"price":25000,"customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Preferred Courier"}
 ###END_PENDING_ORDER###
 
    Then present the human-readable summary:
@@ -548,11 +552,12 @@ ORDER CAPTURE PROCESS:
    *Email:* X
    *Address:* X
    *Phone:* X
+   *Courier:* X
    Ask: "Reply **YES** to confirm your order details and generate your secure payment link."
 
 4. CRITICAL: ONLY AFTER the customer replies with "YES" or explicit confirmation of the summary, respond with EXACTLY this JSON block:
 ###ORDER_JSON###
-{"product_name":"exact product name","quantity":1,"price":25000,"customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number"}
+{"product_name":"exact product name","quantity":1,"price":25000,"customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Preferred Courier"}
 ###END_ORDER_JSON###
 
 Followed by ONLY: "Perfect! I'm generating your PayChangu secure payment link right now... 🚀"
@@ -627,7 +632,8 @@ ${productList}`;
           channel: "whatsapp",
           agent_id: agentId,
           is_first_order: isFirstOrder,
-          notes: `Delivery Address: ${orderData.address} | Contact: ${orderData.phone}`,
+          notes: `Delivery Address: ${orderData.address} | Contact: ${orderData.phone} | Courier: ${orderData.courier || 'Unspecified'}`,
+          courier_name: orderData.courier || 'Unspecified',
           status: "pending",
         }).select().single();
 

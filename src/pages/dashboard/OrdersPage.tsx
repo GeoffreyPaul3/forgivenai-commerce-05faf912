@@ -239,11 +239,42 @@ const OrdersPage = () => {
                   <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-2">Customer Info</p>
                   <p className="font-black text-sm">{selectedOrder.customer_name}</p>
                   <p className="text-xs text-muted-foreground font-body mt-0.5">{selectedOrder.customer_phone}</p>
+                  {(selectedOrder as any).courier_name && (
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      <p className="text-[9px] font-black uppercase text-primary/70 mb-1">Preferred Courier</p>
+                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[10px] font-black uppercase tracking-widest py-0">
+                        {(selectedOrder as any).courier_name}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
                 <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
                   <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-2">Order Value</p>
                   <p className="font-black text-xl text-primary">{selectedOrder.currency} {selectedOrder.total.toLocaleString()}</p>
                   <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter mt-1">{selectedOrder.channel} channel {selectedOrder.agent_id ? " • Agent Referral" : " • In-house"}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Ordered Items</label>
+                <div className="space-y-2">
+                  {Array.isArray(selectedOrder.items) && (selectedOrder.items as any[]).map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-3 rounded-2xl bg-muted/20 border border-border/50">
+                      <div className="flex gap-3 items-center">
+                         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                           <Package className="w-4 h-4 text-primary" />
+                         </div>
+                         <div>
+                           <p className="text-sm font-bold">{item.name}</p>
+                           <p className="text-[10px] text-muted-foreground font-body">Qty: {item.quantity} × {selectedOrder.currency} {Number(item.price).toLocaleString()}</p>
+                         </div>
+                      </div>
+                      <p className="text-sm font-black text-foreground">{selectedOrder.currency} {(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                    </div>
+                  ))}
+                  {(!Array.isArray(selectedOrder.items) || (selectedOrder.items as any[]).length === 0) && (
+                    <p className="text-xs text-muted-foreground italic px-1">No item details available for this order.</p>
+                  )}
                 </div>
               </div>
 

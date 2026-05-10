@@ -32,19 +32,32 @@ serve(async (req) => {
         return htmlResponse("Payment reference missing", "We could not verify this payment because the transaction reference was not provided.", "error");
       }
 
-      const result = await verifyAndSyncPayment({
-        txRef,
-        redirectUrl,
-        paychanguSecretKey: PAYCHANGU_SECRET_KEY,
-        supabase,
-        twilio: {
-          accountSid: TWILIO_ACCOUNT_SID,
-          authToken: TWILIO_AUTH_TOKEN,
-          messagingServiceSid: MESSAGING_SERVICE_SID,
-        },
-      });
+      try {
+        const result = await verifyAndSyncPayment({
+          txRef,
+          redirectUrl,
+          paychanguSecretKey: PAYCHANGU_SECRET_KEY,
+          supabase,
+          twilio: {
+            accountSid: TWILIO_ACCOUNT_SID,
+            authToken: TWILIO_AUTH_TOKEN,
+            messagingServiceSid: MESSAGING_SERVICE_SID,
+          },
+        });
 
-      return Response.redirect(result.redirectTarget, 302);
+        return Response.redirect(result.redirectTarget, 302);
+      } catch (error) {
+        console.error("Verification error:", error);
+        const msg = error instanceof Error ? error.message : "Internal Server Error";
+        
+        // If it's a database trigger error, we still want to show a friendly page
+        // or potentially redirect to the success page anyway if the payment was actually confirmed
+        return htmlResponse(
+          "Payment Sync Issue", 
+          `Your payment was processed, but we encountered an error updating our records: ${msg}. Please contact support with your reference: ${txRef}`, 
+          "warning"
+        );
+      }
     }
 
     const rawBody = await req.text();
