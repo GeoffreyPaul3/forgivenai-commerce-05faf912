@@ -3,6 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationItem, 
+  PaginationLink, 
+  PaginationNext, 
+  PaginationPrevious 
+} from "@/components/ui/pagination";
 import { ShoppingBag, Copy, CheckCircle2, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
@@ -10,6 +18,8 @@ import { motion } from "framer-motion";
 export default function AgentProductsPage() {
   const { toast } = useToast();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 8;
 
   const { data: session } = useQuery({
     queryKey: ["session"],
@@ -41,6 +51,7 @@ export default function AgentProductsPage() {
         .from("products")
         .select("*")
         .eq("status", "active")
+        .eq("is_luxury", false)
         .order("created_at", { ascending: false });
       return data || [];
     },
@@ -97,62 +108,110 @@ export default function AgentProductsPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {products.map((p, i) => (
-            <motion.div
-              key={p.id}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="group rounded-3xl border border-border bg-card overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col"
-            >
-              <div className="aspect-[4/5] bg-muted relative overflow-hidden">
-                {p.images?.[0] ? (
-                  <img 
-                    src={p.images[0]} 
-                    alt={p.name} 
-                    className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center opacity-30">
-                    <ImageIcon className="w-12 h-12 mb-2" />
-                    <span className="text-xs font-body font-bold uppercase">No Image</span>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {products.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((p, i) => (
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="group rounded-3xl border border-border bg-card overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col"
+              >
+                <div className="aspect-[4/5] bg-muted relative overflow-hidden">
+                  {p.images?.[0] ? (
+                    <img 
+                      src={p.images[0]} 
+                      alt={p.name} 
+                      className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center opacity-30">
+                      <ImageIcon className="w-12 h-12 mb-2" />
+                      <span className="text-xs font-body font-bold uppercase">No Image</span>
+                    </div>
+                  )}
+                  <div className="absolute top-3 right-3 flex flex-col gap-2">
+                    <Badge className="bg-background/80 backdrop-blur-md text-foreground font-bold shadow-sm border-0">
+                      MWK {(p.price || 0).toLocaleString()}
+                    </Badge>
                   </div>
-                )}
-                <div className="absolute top-3 right-3 flex flex-col gap-2">
-                  <Badge className="bg-background/80 backdrop-blur-md text-foreground font-bold shadow-sm border-0">
-                    MWK {(p.price || 0).toLocaleString()}
-                  </Badge>
                 </div>
-              </div>
-              
-              <div className="p-5 flex-1 flex flex-col">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">{p.category || "General"}</p>
-                <h3 className="font-heading font-bold text-lg mb-2 line-clamp-2 leading-tight">{p.name}</h3>
                 
-                <div className="mt-auto pt-4">
-                  <Button 
-                    onClick={() => copyLink(p.id)}
-                    className="w-full gap-2 rounded-xl h-11 font-bold shadow-sm"
-                    variant={copiedId === p.id ? "default" : "secondary"}
-                  >
-                    {copiedId === p.id ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-white" />
-                        <span className="text-white">Copied Link!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        Copy Product Link
-                      </>
-                    )}
-                  </Button>
+                <div className="p-5 flex-1 flex flex-col">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">{p.category || "General"}</p>
+                  <h3 className="font-heading font-bold text-lg mb-2 line-clamp-2 leading-tight">{p.name}</h3>
+                  
+                  <div className="mt-auto pt-4">
+                    <Button 
+                      onClick={() => copyLink(p.id)}
+                      className="w-full gap-2 rounded-xl h-11 font-bold shadow-sm"
+                      variant={copiedId === p.id ? "default" : "secondary"}
+                    >
+                      {copiedId === p.id ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-white" />
+                          <span className="text-white">Copied Link!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          Copy Product Link
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {products.length > ITEMS_PER_PAGE && (
+            <div className="mt-10 flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      href="#" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(p => Math.max(1, p - 1));
+                      }}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  
+                  {Array.from({ length: Math.ceil(products.length / ITEMS_PER_PAGE) }).map((_, i) => (
+                    <PaginationItem key={i}>
+                      <PaginationLink 
+                        href="#" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(i + 1);
+                        }}
+                        isActive={currentPage === i + 1}
+                        className="cursor-pointer"
+                      >
+                        {i + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext 
+                      href="#" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(p => Math.min(Math.ceil(products.length / ITEMS_PER_PAGE), p + 1));
+                      }}
+                      className={currentPage === Math.ceil(products.length / ITEMS_PER_PAGE) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

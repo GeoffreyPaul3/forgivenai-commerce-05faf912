@@ -40,6 +40,10 @@ serve(async (req) => {
         systemPrompt = "You are the AI business assistant for Forgiven Shopping Centre, a fashion & lifestyle brand in Malawi. You help with business strategy, product recommendations, marketing ideas, inventory management, and customer engagement. Be concise, professional, and actionable.";
         userPrompt = context || "Hello";
         break;
+      case "profit-insights":
+        systemPrompt = "You are a senior AI business strategist for Forgiven Shopping Centre. Analyze the provided profit metrics (Revenue, Base Profit, Surplus) and provide exactly 2 distinct, highly strategic business insights. Each insight must be a JSON object in this format: { \"title\": \"...\", \"content\": \"...\", \"type\": \"positive\" | \"warning\" }. Return ONLY a JSON array containing these 2 objects.";
+        userPrompt = `Metrics Analysis Request: ${context}`;
+        break;
       default:
         throw new Error(`Unknown content type: ${type}`);
     }

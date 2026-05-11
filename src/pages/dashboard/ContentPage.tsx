@@ -244,6 +244,11 @@ function ContentManager() {
                     <DropdownMenuContent align="end" className="w-36">
                       <DropdownMenuItem onClick={() => setViewItem(item)}><Eye className="w-4 h-4 mr-2" /> View</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setEditItem(item)}><Pencil className="w-4 h-4 mr-2" /> Edit</DropdownMenuItem>
+                      {item.status !== "published" && (
+                        <DropdownMenuItem onClick={() => updateMutation.mutate({ id: item.id, status: "published" })} className="text-emerald-600 focus:text-emerald-600">
+                          <CheckCircle2 className="w-4 h-4 mr-2" /> Publish
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteItem(item)}><Trash2 className="w-4 h-4 mr-2" /> Delete</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

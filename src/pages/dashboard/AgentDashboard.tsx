@@ -10,8 +10,9 @@ import {
   Plus, UserPlus, 
   ArrowRight, 
   Copy, Share2,
-  Wallet
+  Wallet, TrendingUp, Trophy, Star
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -110,6 +111,18 @@ const AgentDashboard = () => {
     },
   });
 
+  // 6. Get All Agents for Ranking
+  const { data: allAgents } = useQuery({
+    queryKey: ["all-agents-ranking"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("agents")
+        .select("id, total_sales")
+        .order("total_sales", { ascending: false });
+      return data || [];
+    },
+  });
+
   const stats = useMemo(() => {
     const totalEarnings = (myCommissions || []).reduce((acc, c) => acc + (c.amount || 0), 0);
     const totalPaidPayouts = (myPayouts || [])
@@ -117,7 +130,45 @@ const AgentDashboard = () => {
       .reduce((acc: number, p: any) => acc + (p.amount || 0), 0);
     
     const balance = Math.max(0, totalEarnings - totalPaidPayouts);
-    const pendingOrders = (myOrders || []).filter(o => o.status === "pending").length;
+    const pendingOrders = (myOrders || []).filter(o => o.status !== "delivered" && o.status !== "cancelled").length;
+
+    // Monthly Sales Calculation
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const monthlyDeliveredSales = (myOrders || [])
+      .filter(o => o.status === "delivered" && new Date(o.created_at) >= startOfMonth)
+      .reduce((acc, o) => acc + (o.total || 0), 0);
+
+    // Tier Logic
+    let currentTier = "Tier 1";
+    let nextTier = "Tier 2";
+    let nextThreshold = 200000;
+    let nextRate = "10%";
+    
+    if (monthlyDeliveredSales >= 1000000) {
+      currentTier = "Tier 4";
+      nextTier = "Max Tier";
+      nextThreshold = 1000000;
+      nextRate = "15%";
+    } else if (monthlyDeliveredSales >= 500000) {
+      currentTier = "Tier 3";
+      nextTier = "Tier 4";
+      nextThreshold = 1000000;
+      nextRate = "15%";
+    } else if (monthlyDeliveredSales >= 200000) {
+      currentTier = "Tier 2";
+      nextTier = "Tier 3";
+      nextThreshold = 500000;
+      nextRate = "12%";
+    }
+
+    const progress = Math.min(100, (monthlyDeliveredSales / nextThreshold) * 100);
+    const remaining = Math.max(0, nextThreshold - monthlyDeliveredSales);
+
+    // Ranking Logic
+    const myRank = (allAgents || []).findIndex(a => a.id === agent?.id) + 1;
 
     return {
       totalRevenue: totalEarnings,
@@ -125,8 +176,15 @@ const AgentDashboard = () => {
       totalOrders: myOrders?.length || 0,
       pendingOrders,
       customers: myCustomers?.length || 0,
+      monthlyDeliveredSales,
+      currentTier,
+      nextTier,
+      nextRate,
+      progress,
+      remaining,
+      rank: myRank > 0 ? myRank : "—"
     };
-  }, [myOrders, myCustomers, myCommissions, myPayouts]);
+  }, [myOrders, myCustomers, myCommissions, myPayouts, allAgents, agent?.id]);
 
   if (agentLoading) {
     return (
@@ -176,7 +234,7 @@ const AgentDashboard = () => {
       </div>
 
       {/* KPI Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
@@ -207,15 +265,49 @@ const AgentDashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="p-2 rounded-xl bg-gold/10 text-gold">
-                <Users className="w-5 h-5" />
+                <Trophy className="w-5 h-5" />
               </div>
+              <Badge variant="outline" className="bg-emerald-500/5 text-emerald-600 border-emerald-500/20 font-bold">
+                {agent?.commission_rate || 8}% Rate
+              </Badge>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Customers</p>
-            <h3 className="text-2xl font-heading font-black">{stats.customers}</h3>
-            <p className="text-[10px] text-muted-foreground mt-2 font-body">Registered profiles</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{stats.currentTier} Progress</p>
+            <h3 className="text-xl font-heading font-black mb-3">MWK {stats.monthlyDeliveredSales.toLocaleString()}</h3>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-[10px] font-bold uppercase">
+                <span className="text-muted-foreground">Monthly Goal</span>
+                <span className="text-primary">{Math.round(stats.progress)}%</span>
+              </div>
+              <Progress value={stats.progress} className="h-1.5" />
+              {stats.remaining > 0 ? (
+                <p className="text-[10px] text-muted-foreground font-body">
+                  Need <span className="font-bold text-primary">MWK {stats.remaining.toLocaleString()}</span> more to reach {stats.nextRate} tier.
+                </p>
+              ) : (
+                <p className="text-[10px] text-emerald-600 font-bold font-body">
+                  🚀 You've reached the maximum commission tier!
+                </p>
+              )}
+            </div>
           </CardContent>
         </Card>
 
+        <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              {stats.rank === 1 && (
+                <Badge className="bg-gold text-white border-none text-[10px]">#1 TOP AGENT</Badge>
+              )}
+            </div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Leaderboard Rank</p>
+            <h3 className="text-2xl font-heading font-black">#{stats.rank}</h3>
+            <p className="text-[10px] text-muted-foreground mt-2 font-body">Out of {(allAgents || []).length} active agents</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -11,8 +11,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const COLORS = ["hsl(350, 72%, 21%)", "hsl(40, 60%, 50%)", "hsl(0, 0%, 15%)", "hsl(35, 30%, 60%)"];
 
@@ -22,10 +23,15 @@ const ProfitDashboard = () => {
   const { data: profitData, isLoading } = useQuery({
     queryKey: ["profit-intelligence", timeRange],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const days = parseInt(timeRange);
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+
+      const { data, error } = await supabase
         .from("orders")
         .select("total, gross_margin, base_profit, surplus_profit, surplus_type, status, created_at")
-        .eq("status", "delivered");
+        .eq("status", "delivered")
+        .gte("created_at", cutoffDate.toISOString());
       
       if (error) throw error;
       return data || [];
@@ -71,30 +77,53 @@ const ProfitDashboard = () => {
       grouped[date].surplus += Number(order.surplus_profit || 0);
     });
     
-    return Object.values(grouped).slice(-14);
-  }, [profitData]);
+    const limit = timeRange === "7" ? 7 : timeRange === "30" ? 15 : 30;
+    return Object.values(grouped).slice(-limit);
+  }, [profitData, timeRange]);
 
-  const aiInsights = useMemo(() => {
-    const isAgentStrong = metrics.agentSurplus > metrics.directSurplus;
-    const surplusRatio = (metrics.totalSurplus / metrics.totalRevenue) * 100;
-    
-    return [
-      {
-        title: isAgentStrong ? "Strong Agent Margin" : "High Direct Demand",
-        content: isAgentStrong 
-          ? "Your agent network is generating significant surplus profit. Consider increasing commission caps to drive even higher volume."
-          : "Organic direct sales are outperforming agent-led growth. This is a great time to scale your Facebook & Google Ads campaigns.",
-        type: "positive"
-      },
-      {
-        title: surplusRatio > 10 ? "Optimal Efficiency" : "Tightening Margins",
-        content: surplusRatio > 10 
-          ? `Your surplus ratio is ${surplusRatio.toFixed(1)}%, which is excellent. You have room to offer flash discounts without hurting core profit.`
-          : "Your surplus retention is lower than the 15% target. Review operations costs or vendor pricing to engineer higher margins.",
-        type: surplusRatio > 10 ? "positive" : "warning"
+  // Real AI Insights
+  const { data: realAiInsights, isLoading: insightsLoading } = useQuery({
+    queryKey: ["real-profit-insights", metrics],
+    enabled: !!metrics.totalRevenue,
+    queryFn: async () => {
+      const context = JSON.stringify({
+        revenue: metrics.totalRevenue,
+        baseProfit: metrics.totalBaseProfit,
+        surplus: metrics.totalSurplus,
+        agentSurplus: metrics.agentSurplus,
+        directSurplus: metrics.directSurplus,
+        surplusRatio: ((metrics.totalSurplus / metrics.totalRevenue) * 100).toFixed(1) + "%"
+      });
+
+      const { data, error } = await supabase.functions.invoke("ai-generate", {
+        body: {
+          type: "profit-insights",
+          context
+        }
+      });
+
+      if (error) throw error;
+      
+      try {
+        // Parse the JSON array from AI response
+        return JSON.parse(data.content);
+      } catch (e) {
+        console.warn("AI didn't return valid JSON, using fallback formatting", e);
+        return [
+          { title: "Financial Analysis", content: data.content.slice(0, 200) + "...", type: "positive" }
+        ];
       }
-    ];
-  }, [metrics]);
+    },
+    staleTime: 1000 * 60 * 5, // Cache for 5 mins
+  });
+
+  const aiInsights = realAiInsights || [
+    {
+      title: "Analyzing Data...",
+      content: "The AI is currently processing your profit metrics for strategic insights.",
+      type: "positive"
+    }
+  ];
 
   return (
     <div className="space-y-6 pb-20">
@@ -221,17 +250,24 @@ const ProfitDashboard = () => {
             <h3 className="font-heading font-bold text-xl text-foreground">AI Profit Insights</h3>
          </div>
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
-            {aiInsights.map((insight, idx) => (
-              <div key={idx} className="space-y-2 p-4 rounded-2xl bg-background/50 border border-gold/10 hover:bg-background transition-colors duration-500">
-                <div className="flex items-center justify-between">
-                   <h4 className="font-heading font-bold text-base text-foreground tracking-tight">{insight.title}</h4>
-                   <Badge variant="outline" className={`text-[9px] uppercase font-black ${insight.type === 'positive' ? 'text-emerald-500 border-emerald-500/20' : 'text-amber-500 border-amber-500/20'}`}>
-                     {insight.type === 'positive' ? 'Strategic Opportunity' : 'Operational Flag'}
-                   </Badge>
+            {insightsLoading ? (
+              <>
+                <Skeleton className="h-32 w-full rounded-2xl bg-gold/10" />
+                <Skeleton className="h-32 w-full rounded-2xl bg-gold/10" />
+              </>
+            ) : (
+              aiInsights.map((insight: any, idx: number) => (
+                <div key={idx} className="space-y-2 p-4 rounded-2xl bg-background/50 border border-gold/10 hover:bg-background transition-colors duration-500">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-heading font-bold text-base text-foreground tracking-tight">{insight.title}</h4>
+                    <Badge variant="outline" className={`text-[9px] uppercase font-black ${insight.type === 'positive' ? 'text-emerald-500 border-emerald-500/20' : 'text-amber-500 border-amber-500/20'}`}>
+                      {insight.type === 'positive' ? 'Strategic Opportunity' : 'Operational Flag'}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground font-body leading-relaxed">{insight.content}</p>
                 </div>
-                <p className="text-sm text-muted-foreground font-body leading-relaxed">{insight.content}</p>
-              </div>
-            ))}
+              ))
+            )}
          </div>
       </div>
     </div>

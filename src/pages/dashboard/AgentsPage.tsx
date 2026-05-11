@@ -78,7 +78,7 @@ const AgentsPage = () => {
   const { data: orders } = useQuery({
     queryKey: ["agent-orders"],
     queryFn: async () => {
-      const { data } = await supabase.from("orders").select("agent_id, total, status, is_first_order");
+      const { data } = await supabase.from("orders").select("agent_id, total, status, is_first_order, surplus_profit, created_at");
       return data || [];
     },
   });
@@ -128,7 +128,10 @@ const AgentsPage = () => {
       const { error: updateError } = await supabase.from("agents")
         .update({
           referral_code: agent.referral_code,
-          commission_rate: agent.commission_rate
+          commission_rate: agent.commission_rate,
+          national_id: agent.national_id,
+          emergency_contact: agent.emergency_contact,
+          location: agent.location
         })
         .eq("user_id", userId);
 
@@ -192,18 +195,29 @@ const AgentsPage = () => {
 
   // Calculate real commissions and stats from DB
   const agentStats = useMemo(() => {
-    const stats: Record<string, { sales: number; commission: number; orderCount: number; customerCount: number }> = {};
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const stats: Record<string, { sales: number; monthlySales: number; commission: number; surplus: number; orderCount: number; customerCount: number }> = {};
     for (const agent of agents || []) {
       const agentOrders = orders?.filter(o => o.agent_id === agent.id && o.status !== "cancelled") || [];
       const agentCommissions = commissions?.filter(c => c.agent_id === agent.id) || [];
       const agentCustomers = customers?.filter(c => c.first_agent_id === agent.id) || [];
       
       const totalSales = agentOrders.reduce((s, o) => s + (o.total || 0), 0);
+      const monthlySales = agentOrders
+        .filter(o => o.status === "delivered" && new Date(o.created_at) >= startOfMonth)
+        .reduce((s, o) => s + (o.total || 0), 0);
+      
       const totalComm = agentCommissions.reduce((s, c) => s + (c.amount || 0), 0);
+      const totalSurplus = agentOrders.reduce((s, o) => s + (o.surplus_profit || 0), 0);
 
       stats[agent.id] = {
         sales: totalSales,
+        monthlySales,
         commission: totalComm,
+        surplus: totalSurplus,
         orderCount: agentOrders.length,
         customerCount: agentCustomers.length,
       };
@@ -298,7 +312,9 @@ const AgentsPage = () => {
               <TableHead>Rate</TableHead>
               <TableHead>Customers</TableHead>
               <TableHead>Orders</TableHead>
-              <TableHead>Sales</TableHead>
+              <TableHead>Monthly Sales</TableHead>
+              <TableHead>Total Sales</TableHead>
+              <TableHead>Surplus Pool</TableHead>
               <TableHead>Commission</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -332,8 +348,10 @@ const AgentsPage = () => {
                   <TableCell>{agent.commission_rate || 0}%</TableCell>
                   <TableCell><Badge variant="outline" className="text-xs">{stats.customerCount}</Badge></TableCell>
                   <TableCell><Badge variant="secondary" className="text-xs">{stats.orderCount}</Badge></TableCell>
-                  <TableCell className="font-semibold">MWK {stats.sales.toLocaleString()}</TableCell>
-                  <TableCell className="text-gold font-semibold">MWK {Math.round(stats.commission).toLocaleString()}</TableCell>
+                  <TableCell className="font-semibold text-xs">MWK {stats.monthlySales.toLocaleString()}</TableCell>
+                  <TableCell className="font-semibold text-xs">MWK {stats.sales.toLocaleString()}</TableCell>
+                  <TableCell className="text-emerald-600 font-bold text-xs">MWK {Math.round(stats.surplus).toLocaleString()}</TableCell>
+                  <TableCell className="text-gold font-semibold text-xs">MWK {Math.round(stats.commission).toLocaleString()}</TableCell>
                   <TableCell>
                     <Badge variant={agent.status === "active" ? "default" : "secondary"} className="capitalize text-xs">{agent.status || "inactive"}</Badge>
                   </TableCell>
@@ -479,6 +497,11 @@ const AgentsPage = () => {
                   <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground uppercase">Email</p><p className="font-semibold text-sm truncate">{viewAgent.email || "—"}</p></div>
                   <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground uppercase">Referral Code</p><p className="font-mono font-semibold text-sm">{viewAgent.referral_code}</p></div>
                   <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground uppercase">Commission Rate</p><p className="font-semibold text-sm">{viewAgent.commission_rate}%</p></div>
+                  
+                  <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground uppercase">National ID</p><p className="font-semibold text-sm">{(viewAgent as any).national_id || "—"}</p></div>
+                  <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground uppercase">Location</p><p className="font-semibold text-sm">{(viewAgent as any).location || "—"}</p></div>
+                  <div className="rounded-lg bg-muted/50 p-3 sm:col-span-2"><p className="text-[10px] text-muted-foreground uppercase">Emergency Contact</p><p className="font-semibold text-sm">{(viewAgent as any).emergency_contact || "—"}</p></div>
+
                   <div className="rounded-lg bg-primary/5 p-3"><p className="text-[10px] text-muted-foreground uppercase">Total Sales</p><p className="font-heading font-bold text-lg">MWK {stats.sales.toLocaleString()}</p></div>
                   <div className="rounded-lg bg-gold/5 p-3"><p className="text-[10px] text-muted-foreground uppercase">Commission Earned</p><p className="font-heading font-bold text-lg text-gold">MWK {Math.round(stats.commission).toLocaleString()}</p></div>
                 </div>
@@ -523,7 +546,11 @@ const AgentsPage = () => {
 };
 
 function AddAgentForm({ onSave, generateCode, isLoading }: { onSave: (a: any) => void; generateCode: () => string; isLoading?: boolean }) {
-  const [form, setForm] = useState({ name: "", phone: "", email: "", password: "", referral_code: generateCode(), commission_rate: "10" });
+  const [form, setForm] = useState({ 
+    name: "", phone: "", email: "", password: "", 
+    referral_code: generateCode(), commission_rate: "8",
+    national_id: "", emergency_contact: "", location: ""
+  });
   return (
     <div className="space-y-4">
       <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-3">
@@ -543,7 +570,15 @@ function AddAgentForm({ onSave, generateCode, isLoading }: { onSave: (a: any) =>
         </div>
         <Input placeholder="Commission Rate (%)" type="number" value={form.commission_rate} onChange={e => setForm(f => ({ ...f, commission_rate: e.target.value }))} />
       </div>
-      <Button className="w-full" disabled={isLoading || !form.name || !form.referral_code || !form.email || !form.password} onClick={() => onSave({ ...form, commission_rate: parseFloat(form.commission_rate) || 10 })}>
+
+      <div className="space-y-3">
+        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Mandatory Verification (Stage 2)</p>
+        <Input placeholder="National ID Number" value={form.national_id} onChange={e => setForm(f => ({ ...f, national_id: e.target.value }))} required />
+        <Input placeholder="Location / Address" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} required />
+        <Input placeholder="Emergency Contact (Name & Phone)" value={form.emergency_contact} onChange={e => setForm(f => ({ ...f, emergency_contact: e.target.value }))} required />
+      </div>
+
+      <Button className="w-full" disabled={isLoading || !form.name || !form.referral_code || !form.email || !form.password || !form.national_id} onClick={() => onSave({ ...form, commission_rate: parseFloat(form.commission_rate) || 10 })}>
         {isLoading ? "Registering..." : "Register Agent"}
       </Button>
     </div>

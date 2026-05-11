@@ -254,6 +254,11 @@ const ProductsPage = () => {
                   <Badge variant="secondary" className="text-[9px] font-bold uppercase backdrop-blur-sm bg-background/80">
                     {product.vendor_id ? "Vendor" : "In-House"}
                   </Badge>
+                  {product.is_luxury && (
+                    <Badge className="bg-purple-600 text-white text-[9px] font-black uppercase tracking-tighter">
+                      LUXURY
+                    </Badge>
+                  )}
                 </div>
                 {/* Quick actions overlay */}
                 <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -369,6 +374,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
     stock_status: "available",
     sizes: [] as string[],
     colors: [] as string[],
+    is_luxury: false,
     newSize: "",
     newColor: "",
   });
@@ -396,6 +402,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
         stock_status: (product as any).stock_status || "available",
         sizes: (product as any).sizes || [],
         colors: (product as any).colors || [],
+        is_luxury: product.is_luxury || false,
         newSize: "",
         newColor: "",
       });
@@ -413,6 +420,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
         stock_status: "available",
         sizes: [],
         colors: [],
+        is_luxury: false,
         newSize: "",
         newColor: "",
       });
@@ -442,6 +450,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
       stock_status: form.stock_status,
       sizes: form.sizes,
       colors: form.colors,
+      is_luxury: form.is_luxury,
       metadata: Object.keys(metadata).length > 0 ? metadata : null,
     };
     if (product) data.id = product.id;
@@ -550,6 +559,18 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
                     <SelectItem value="archived">Archived</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Product Tier (Workflow V2)</label>
+                <Select value={form.is_luxury ? "luxury" : "essentials"} onValueChange={v => setForm(f => ({ ...f, is_luxury: v === "luxury" }))}>
+                  <SelectTrigger className="font-body h-12 rounded-xl bg-muted/20 border-border/50"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="essentials">Essentials (Agent Marketable)</SelectItem>
+                    <SelectItem value="luxury">Luxury (In-House Only)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[9px] text-muted-foreground px-1">Luxury products are hidden from the Agent Portal.</p>
               </div>
             </div>
 

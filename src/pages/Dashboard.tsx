@@ -39,6 +39,8 @@ import AgentReferralsPage from "./dashboard/agent/AgentReferralsPage";
 import AgentEarningsPage from "./dashboard/agent/AgentEarningsPage";
 import AgentOrdersPage from "./dashboard/agent/AgentOrdersPage";
 import AgentProductsPage from "./dashboard/agent/AgentProductsPage";
+import AgentContentPage from "./dashboard/agent/AgentContentPage";
+import AgentTrainingPage from "./dashboard/agent/AgentTrainingPage";
 import VendorDashboard from "./dashboard/vendor/VendorDashboard";
 import VendorProductsPage from "./dashboard/vendor/VendorProductsPage";
 import VendorOrdersPage from "./dashboard/vendor/VendorOrdersPage";
@@ -547,6 +549,7 @@ const pageTitles: Record<string, string> = {
   "/dashboard/agent/referrals": "My Referrals",
   "/dashboard/agent/earnings": "My Earnings",
   "/dashboard/agent/orders": "Orders Tracking",
+  "/dashboard/agent/content": "Promotion Kit",
   "/dashboard/assistant": "AI Assistant",
   "/dashboard/analytics": "Analytics",
   "/dashboard/settings": "Settings",
@@ -589,6 +592,7 @@ const DashboardPage = () => {
       <Route path="agent/earnings" element={<AgentEarningsPage />} />
       <Route path="agent/orders" element={<AgentOrdersPage />} />
       <Route path="agent/products" element={<AgentProductsPage />} />
+      <Route path="agent/content" element={<AgentContentPage />} />
       <Route path="assistant" element={<AIAssistantPage />} />
       <Route path="analytics" element={<AnalyticsPage />} />
       <Route path="settings" element={<SettingsPage />} />
