@@ -122,11 +122,21 @@ export default function AgentEarningsPage() {
       return;
     }
 
+    let method = "Not Set";
+    let details = "Not Set";
+    try {
+      const d = JSON.parse(agent.payment_details || "{}");
+      method = d.type === 'bank' ? `Bank Transfer (${d.bank_name})` : `Mobile Money (${d.provider})`;
+      details = d.type === 'bank' ? `Acc: ${d.account_number}, Branch: ${d.branch_name}` : `Phone: ${d.phone_number}`;
+    } catch (e) {}
+
     setWithdrawing(true);
     const { error } = await supabase.from("agent_payouts").insert({
       agent_id: agent.id,
       amount: stats.balance,
-      status: "pending"
+      status: "pending",
+      payout_method: method,
+      payout_details: details
     });
 
     setWithdrawing(false);
@@ -143,9 +153,18 @@ export default function AgentEarningsPage() {
 
   const handleSavePayoutMethod = async (e: React.FormEvent) => {
     e.preventDefault();
+    const method = payoutMethod.type === 'bank' ? "Bank Transfer" : "Mobile Money";
+    const details = payoutMethod.type === 'bank' 
+      ? `${payoutMethod.bank_name} - ${payoutMethod.account_number}` 
+      : `${payoutMethod.provider} - ${payoutMethod.phone_number}`;
+
     const { error } = await supabase
       .from("agents")
-      .update({ payment_details: JSON.stringify(payoutMethod) })
+      .update({ 
+        payment_details: JSON.stringify(payoutMethod),
+        payout_method: method,
+        payout_details: details
+      })
       .eq("id", agent.id);
     
     if (error) {

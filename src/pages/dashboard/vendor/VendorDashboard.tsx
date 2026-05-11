@@ -94,7 +94,7 @@ export default function VendorDashboard() {
 
   const stats = useMemo(() => {
     const orders = allOrders || [];
-    const revenue = orders.reduce((s: number, o: any) => s + (o.total || 0), 0);
+    const revenue = orders.reduce((s: number, o: any) => s + (o.vendor_amount || 0), 0);
     const pending = orders.filter((o: any) => o.vendor_confirmation_status === "pending" || !o.vendor_confirmation_status).length;
     const delivered = orders.filter((o: any) => o.status === "delivered").length;
     return { revenue, orderCount: orders.length, pending, delivered };

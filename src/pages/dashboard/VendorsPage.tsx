@@ -576,11 +576,15 @@ const VendorsPage = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="p-3 rounded-2xl bg-muted/30 border border-border/50">
                         <p className="text-[9px] font-black uppercase text-muted-foreground mb-1">Confirmation</p>
-                        <p className="text-lg font-black text-foreground">{v.score > 80 ? 'EXCELLENT' : v.score > 60 ? 'GOOD' : 'POOR'}</p>
+                        <p className={`text-lg font-black ${v.score >= 80 ? 'text-emerald-600' : v.score >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                          {v.score >= 85 ? 'ELITE' : v.score >= 70 ? 'GOOD' : v.score >= 50 ? 'AVERAGE' : 'POOR'}
+                        </p>
                       </div>
                       <div className="p-3 rounded-2xl bg-muted/30 border border-border/50">
                         <p className="text-[9px] font-black uppercase text-muted-foreground mb-1">Fulfillment</p>
-                        <p className="text-lg font-black text-foreground">94%</p>
+                        <p className={`text-lg font-black ${v.score >= 75 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {v.score >= 75 ? 'RELIABLE' : 'WATCH'}
+                        </p>
                       </div>
                     </div>
 
