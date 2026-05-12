@@ -366,54 +366,78 @@ serve(async (req) => {
 
       // ── YES Confirmation Intercept ──
       // If the customer is confirming an order, bypass the AI entirely.
-      // Parse the order directly from the last bot summary message and send the link immediately.
+      // Parse the order directly from the last bot summary message or use the saved pending_order.
       const isConfirmation = /^\s*(yes|yeah|yep|yup|sure|confirm|ok|okay|y)\s*[.!]?\s*$/i.test(body.trim());
 
       if (isConfirmation) {
-        const reversedHistory = [...(historyData ?? [])].reverse();
-        const summaryMsg = reversedHistory.find(m =>
-          m.role === "ai" &&
-          m.content.includes("*Product:*") &&
-          (m.content.includes("Reply **YES**") || m.content.includes("Reply YES") || m.content.includes("reply YES"))
-        );
+        console.log(`[DEBUG] YES confirmation detected from ${customerPhone}`);
+        
+        let orderData = convo.pending_order;
+        
+        // Fallback: If no pending_order, try parsing the MOST RECENT summary message
+        if (!orderData) {
+          const reversedHistory = [...(historyData ?? [])].reverse();
+          const summaryMsg = reversedHistory.find(m =>
+            m.role === "ai" &&
+            (m.content.includes("Reply **YES**") || m.content.includes("Reply YES") || m.content.toLowerCase().includes("reply yes"))
+          );
 
-        if (summaryMsg) {
-          try {
+          if (summaryMsg) {
             const c = summaryMsg.content;
-            const productMatch  = c.match(/\*Product:\*\s*(.+)/);
+            // Flexible regex to handle different AI formatting
+            const productMatch  = c.match(/\*Product:\*\s*(.+)/) || c.match(/\*\*([^*]+)\*\*/);
             const quantityMatch = c.match(/\*Quantity:\*\s*(\d+)/);
-            const priceMatch    = c.match(/\*(?:Price|Total):\*\s*MWK\s*([\d,]+)/);
+            const priceMatch    = c.match(/\*(?:Price|Total):\*\s*MWK\s*([\d,]+)/) || c.match(/MWK\s*([\d,.]+)/);
             const nameMatch     = c.match(/\*Name:\*\s*(.+)/);
             const emailMatch    = c.match(/\*Email:\*\s*(.+)/);
             const addressMatch  = c.match(/\*Address:\*\s*(.+)/);
             const phoneMatch    = c.match(/\*Phone:\*\s*(.+)/);
             const courierMatch  = c.match(/\*Courier:\*\s*(.+)/);
 
-            const productName   = productMatch?.[1]?.trim() || "";
-            const quantity      = parseInt(quantityMatch?.[1] || "1");
-            const price         = parseInt((priceMatch?.[1] || "0").replace(/,/g, ""));
-            const custName      = nameMatch?.[1]?.trim()    || customer?.name    || "Guest";
-            const custEmail     = emailMatch?.[1]?.trim()   || customer?.email   || "";
-            const custAddress   = addressMatch?.[1]?.trim() || "";
-            const custPhone     = phoneMatch?.[1]?.trim()   || customerPhone;
-            const custCourier   = courierMatch?.[1]?.trim() || "Unspecified";
+            if (productMatch && priceMatch) {
+              orderData = {
+                product_name: productMatch[1].trim(),
+                quantity: parseInt(quantityMatch?.[1] || "1"),
+                price: parseInt(priceMatch[1].replace(/,/g, "")),
+                customer_name: nameMatch?.[1]?.trim() || customer?.name || "Guest",
+                customer_email: emailMatch?.[1]?.trim() || customer?.email || "",
+                address: addressMatch?.[1]?.trim() || "",
+                phone: phoneMatch?.[1]?.trim() || customerPhone,
+                courier: courierMatch?.[1]?.trim() || "Unspecified"
+              };
+              console.log(`✅ Parsed order from message history: ${orderData.product_name}`);
+            }
+          }
+        }
+
+        if (orderData) {
+          try {
+            const productName   = orderData.product_name || "";
+            const quantity      = orderData.quantity || 1;
+            const price         = orderData.price || 0;
+            const custName      = orderData.customer_name || customer?.name || "Guest";
+            const custEmail     = orderData.customer_email || customer?.email || "";
+            const custAddress   = orderData.address || "";
+            const custPhone     = orderData.phone || customerPhone;
+            const custCourier   = orderData.courier || "Unspecified";
 
             if (productName && price > 0) {
-              console.log(`⚡ YES intercept: Processing order for ${productName} — MWK ${price}`);
+              console.log(`⚡ Processing order for ${productName} — MWK ${price}`);
 
               const product = products?.find(p =>
                 p.name.toLowerCase() === productName.toLowerCase() ||
                 p.name.toLowerCase().includes(productName.toLowerCase())
               );
 
-              // Update customer name in DB
+              // Update customer/convo details
               if (custName && custName !== "Guest") {
                 await supabase.from("conversations").update({ customer_name: custName, pending_order: null }).eq("id", convo.id);
                 await supabase.from("customers").update({ name: custName }).eq("phone", customerPhone);
+              } else {
+                await supabase.from("conversations").update({ pending_order: null }).eq("id", convo.id);
               }
 
               // Create order
-              console.log(`[DEBUG] Creating order for ${customerPhone}. agentId: ${agentId}, convo.agent_id: ${convo?.agent_id}`);
               const isFirstOrder = customer ? (customer.total_orders === 0) : true;
               const { data: newOrder, error: orderError } = await supabase.from("orders").insert({
                 customer_phone: customerPhone,
@@ -433,7 +457,7 @@ serve(async (req) => {
               console.log(`✅ Order created (YES intercept): ${newOrder.id}`);
 
               // Invoke create-payment
-              const SUPABASE_URL_INT            = Deno.env.get("SUPABASE_URL")!;
+              const SUPABASE_URL_INT = Deno.env.get("SUPABASE_URL")!;
               const SUPABASE_SERVICE_ROLE_KEY_INT = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
               const payRes = await fetch(`${SUPABASE_URL_INT}/functions/v1/create-payment`, {
@@ -454,8 +478,7 @@ serve(async (req) => {
               });
 
               const payData = await payRes.json();
-              console.log("PayChangu response (YES intercept):", JSON.stringify(payData));
-
+              
               if (payData.success && payData.checkout_url) {
                 const linkMsg = `✅ Order confirmed, ${custName.split(" ")[0]}! 🎉\n\n💳 Here is your secure payment link:\n${payData.checkout_url}\n\nYou can pay via Airtel Money, Mpamba, or Card.\nWe'll start processing your *${productName}* as soon as payment is confirmed! 🚀✨`;
                 await sendWhatsApp(from, linkMsg, undefined, TEMPLATES.ORDER_CONFIRMATION);
@@ -472,7 +495,6 @@ serve(async (req) => {
             }
           } catch (interceptErr) {
             console.error("YES intercept failed, falling through to AI:", interceptErr);
-            // Fall through to normal AI call below
           }
         }
       }

@@ -19,6 +19,7 @@ export default function AgentContentPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sharingId, setSharingId] = useState<string | null>(null);
 
   const { data: session } = useQuery({
     queryKey: ["session"],
@@ -46,32 +47,69 @@ export default function AgentContentPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("content")
-        .select("*")
+        .select("*, products(name, description)")
         .eq("status", "published")
         .order("created_at", { ascending: false });
       
       if (error) throw error;
-      return data as Content[];
+      return data as (Content & { products: { name: string, description: string } | null })[];
     },
   });
 
   const referralUrl = agent ? `${window.location.origin}/shop?ref=${agent.referral_code}` : "";
 
-  const copyPromotion = (item: Content) => {
+  const getShareText = (item: any) => {
     const productParam = item.product_id ? `&product=${item.product_id}` : "";
     const link = `${referralUrl}${productParam}`;
-    const text = `${item.body || ""}\n\nShop here: ${link}`;
-    
+    // Prioritize product description over content body if it's a campaign/visual
+    const description = item.products?.description || item.body || "";
+    return `${description}\n\nShop here: ${link}`;
+  };
+
+  const copyPromotion = (item: any) => {
+    const text = getShareText(item);
     navigator.clipboard.writeText(text);
     setCopiedId(item.id);
     toast({ title: "Promotion Copied!", description: "Text and referral link ready to share." });
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const shareToWhatsApp = (item: Content) => {
-    const productParam = item.product_id ? `&product=${item.product_id}` : "";
-    const link = `${referralUrl}${productParam}`;
-    const text = `${item.body || ""}\n\nCheck it out here: ${link}`;
+  const shareAsset = async (item: any) => {
+    const text = getShareText(item);
+    
+    // Attempt Web Share API for media sharing (Mobile/Supported browsers)
+    if (navigator.share && item.media_url) {
+      setSharingId(item.id);
+      try {
+        // Fetch the media to share as a real file
+        const response = await fetch(item.media_url);
+        const blob = await response.blob();
+        const extension = item.type === 'video' || item.type === 'ugc' ? 'mp4' : 'jpg';
+        const file = new File([blob], `fsc-share-${item.id}.${extension}`, { type: blob.type });
+        
+        // Final check for file sharing support
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: item.title,
+            text: text,
+          });
+          setSharingId(null);
+          return;
+        }
+      } catch (e) {
+        console.error("Web Share failed, falling back to text", e);
+      }
+      setSharingId(null);
+    }
+    
+    // Fallback to WhatsApp text share (Desktop/Unsupported browsers)
+    if (item.media_url) {
+      toast({
+        title: "Desktop: Text-only share",
+        description: "WhatsApp desktop does not support automated media attachments. Please download the image to share it manually.",
+      });
+    }
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
 
@@ -186,7 +224,7 @@ export default function AgentContentPage() {
                             onMouseEnter={e => e.currentTarget.play()}
                             onMouseLeave={e => e.currentTarget.pause()}
                           />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover/video:bg-transparent transition-colors">
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover/video:bg-transparent transition-colors z-20">
                             <Play className="w-12 h-12 text-white fill-white opacity-80 group-hover/video:opacity-0 transition-opacity" />
                           </div>
                         </div>
@@ -194,7 +232,7 @@ export default function AgentContentPage() {
                         <img 
                           src={item.media_url} 
                           alt={item.title || ""} 
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
                         />
                       )
                     ) : (
@@ -205,20 +243,23 @@ export default function AgentContentPage() {
                     )}
                     
                     {/* Badge Overlay */}
-                    <div className="absolute top-4 left-4">
+                    <div className="absolute top-4 left-4 z-30">
                       <Badge className="bg-background/80 backdrop-blur-md text-foreground font-bold shadow-sm border-0 capitalize">
                         {item.type.replace('_', ' ')}
                       </Badge>
                     </div>
-
+ 
                     {/* Download Button Overlay */}
                     {item.media_url && (
-                      <div className="absolute bottom-4 right-4 translate-y-12 group-hover:translate-y-0 transition-transform">
+                      <div className="absolute bottom-4 right-4 translate-y-12 group-hover:translate-y-0 transition-all duration-300 z-30">
                         <Button 
                           size="icon" 
                           variant="secondary" 
                           className="rounded-full shadow-lg h-10 w-10 bg-white/90 hover:bg-white"
-                          onClick={() => downloadMedia(item.media_url!, `fsc-${item.id}.mp4`)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadMedia(item.media_url!, `fsc-${item.id}.mp4`);
+                          }}
                         >
                           <Download className="w-4 h-4" />
                         </Button>
@@ -254,11 +295,16 @@ export default function AgentContentPage() {
                         )}
                       </Button>
                       <Button 
-                        onClick={() => shareToWhatsApp(item)}
+                        onClick={() => shareAsset(item)}
+                        disabled={sharingId === item.id}
                         className="w-full gap-2 rounded-xl h-11 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                       >
-                        <Share2 className="w-4 h-4" />
-                        <span>Share to WhatsApp</span>
+                        {sharingId === item.id ? (
+                          <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <Share2 className="w-4 h-4" />
+                        )}
+                        <span>{sharingId === item.id ? "Preparing Media..." : "Share to WhatsApp"}</span>
                       </Button>
                     </div>
                   </div>
