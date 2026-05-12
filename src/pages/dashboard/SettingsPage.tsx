@@ -49,6 +49,8 @@ const SettingsPage = () => {
     password: '',
     role: 'vendor'
   });
+  const [activePage, setActivePage] = useState(1);
+  const itemsPerPage = 8;
   const [brandForm, setBrandForm] = useState({
     name: "Forgiven Shopping Centre",
     currency: "MWK",
@@ -426,7 +428,7 @@ const SettingsPage = () => {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        activeUsers.map((user) => (
+                        activeUsers.slice((activePage - 1) * itemsPerPage, activePage * itemsPerPage).map((user) => (
                           <TableRow key={user.id}>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-3">
@@ -499,6 +501,48 @@ const SettingsPage = () => {
                     </TableBody>
                   </Table>
                 </div>
+
+                {/* Pagination Controls */}
+                {activeUsers.length > itemsPerPage && (
+                  <div className="flex items-center justify-between mt-4 px-2">
+                    <div className="text-xs text-muted-foreground font-body">
+                      Showing {Math.min(activeUsers.length, (activePage - 1) * itemsPerPage + 1)} to {Math.min(activeUsers.length, activePage * itemsPerPage)} of {activeUsers.length} members
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setActivePage(p => Math.max(1, p - 1))}
+                        disabled={activePage === 1}
+                        className="h-8 px-3 border-border"
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.ceil(activeUsers.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                          <Button
+                            key={page}
+                            variant={activePage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setActivePage(page)}
+                            className={`h-8 w-8 p-0 ${activePage === page ? 'bg-gold hover:bg-gold/90' : 'border-border text-muted-foreground'}`}
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setActivePage(p => Math.min(Math.ceil(activeUsers.length / itemsPerPage), p + 1))}
+                        disabled={activePage >= Math.ceil(activeUsers.length / itemsPerPage)}
+                        className="h-8 px-3 border-border"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

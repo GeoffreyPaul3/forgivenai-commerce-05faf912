@@ -64,6 +64,8 @@ const AgentsPage = () => {
   const [viewAgent, setViewAgent] = useState<Agent | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [payoutPage, setPayoutPage] = useState(1);
+  const [pendingPage, setPendingPage] = useState(1);
   const [activeTab, setActiveTab] = useState("agents");
 
   const { data: agents, isLoading } = useQuery({
@@ -105,6 +107,20 @@ const AgentsPage = () => {
       const { data, error } = await supabase
         .from("agent_payouts")
         .select("*, agents(name, payment_details)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+  
+  const { data: pendingAgents } = useQuery({
+    queryKey: ["pending-agent-profiles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("status", "pending")
+        .eq("role", "agent")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -173,6 +189,36 @@ const AgentsPage = () => {
       setDeleteAgent(null);
       toast({ title: "Agent removed" });
     },
+  });
+
+
+  const approveAgent = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.from("profiles").update({ status: "approved" }).eq("id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pending-agent-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["agents"] });
+      toast({ title: "Agent Approved! 🎊", description: "They now have full access to the platform." });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Approval Failed", description: error.message });
+    }
+  });
+
+  const rejectAgent = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.from("profiles").update({ status: "rejected" }).eq("id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pending-agent-profiles"] });
+      toast({ title: "Request Declined", description: "The agent application has been rejected." });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Action Failed", description: error.message });
+    }
   });
 
   const updatePayoutStatus = useMutation({
@@ -258,10 +304,18 @@ const AgentsPage = () => {
         <div className="flex items-center justify-between">
           <TabsList className="bg-muted/50 p-1 rounded-2xl border border-border/50">
             <TabsTrigger value="agents" className="rounded-xl px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm">Agents</TabsTrigger>
-            <TabsTrigger value="payouts" className="rounded-xl px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm flex gap-2 items-center">
+            <TabsTrigger value="payouts" className="rounded-xl px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm flex gap-2 items-center text-sm font-semibold">
               Payouts
               {payouts?.some(p => p.status === 'pending') && (
                 <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="pending" className="rounded-xl px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm flex gap-2 items-center text-sm font-semibold">
+              Pending 
+              {pendingAgents && pendingAgents.length > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 min-w-5 flex items-center justify-center p-0 text-[10px] rounded-full">
+                  {pendingAgents.length}
+                </Badge>
               )}
             </TabsTrigger>
           </TabsList>
@@ -425,7 +479,7 @@ const AgentsPage = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    payouts.map(p => {
+                    payouts.slice((payoutPage - 1) * PAGE_SIZE, payoutPage * PAGE_SIZE).map(p => {
                       let paymentInfo = "Not configured";
                       try {
                         const d = JSON.parse((p.agents as any)?.payment_details || "{}");
@@ -481,6 +535,148 @@ const AgentsPage = () => {
               </Table>
             </CardContent>
           </Card>
+
+          {payouts && payouts.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-6 px-2">
+              <p className="text-xs text-muted-foreground font-body">
+                Showing {(payoutPage - 1) * PAGE_SIZE + 1} to {Math.min(payoutPage * PAGE_SIZE, payouts.length)} of {payouts.length} requests
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPayoutPage(p => Math.max(1, p - 1))}
+                  disabled={payoutPage === 1}
+                  className="rounded-xl h-9 border-border/50"
+                >
+                  Previous
+                </Button>
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.ceil(payouts.length / PAGE_SIZE) }, (_, i) => i + 1).map(p => (
+                    <Button
+                      key={p}
+                      variant={payoutPage === p ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPayoutPage(p)}
+                      className={`h-9 w-9 rounded-xl p-0 ${payoutPage === p ? 'bg-primary' : 'border-border/50'}`}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPayoutPage(p => Math.min(Math.ceil(payouts.length / PAGE_SIZE), p + 1))}
+                  disabled={payoutPage >= Math.ceil(payouts.length / PAGE_SIZE)}
+                  className="rounded-xl h-9 border-border/50"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="pending" className="m-0 space-y-6 outline-none">
+          <div className="grid grid-cols-1 gap-4">
+            {!pendingAgents || pendingAgents.length === 0 ? (
+              <div className="text-center py-20 bg-muted/20 rounded-3xl border border-dashed border-border/50">
+                <Users className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+                <h3 className="font-heading text-xl font-bold text-muted-foreground/60">No pending approvals</h3>
+                <p className="text-muted-foreground/40 text-sm mt-1">All agent applications have been processed.</p>
+              </div>
+            ) : (
+              pendingAgents.slice((pendingPage - 1) * PAGE_SIZE, pendingPage * PAGE_SIZE).map((profile, idx) => (
+                <motion.div 
+                  key={profile.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="group flex flex-col md:flex-row items-center justify-between p-6 rounded-3xl border border-border/50 bg-card hover:shadow-xl hover:border-primary/20 transition-all duration-300 gap-6"
+                >
+                  <div className="flex items-center gap-5 w-full md:w-auto">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black text-xl shadow-inner uppercase">
+                      {profile.full_name?.[0] || profile.email?.[0]}
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-lg font-black font-heading tracking-tight">{profile.full_name || "New Applicant"}</h4>
+                        <Badge variant="outline" className="text-[10px] uppercase font-black bg-primary/5 text-primary border-primary/20">
+                          Pending Review
+                        </Badge>
+                      </div>
+                      <div className="flex flex-col text-sm text-muted-foreground space-y-0.5">
+                        <p className="flex items-center gap-1.5 font-medium"><Search className="w-3.5 h-3.5 opacity-50" /> {profile.email}</p>
+                        <p className="flex items-center gap-1.5 opacity-70"><Clock className="w-3.5 h-3.5" /> Applied {new Date(profile.created_at).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 w-full md:w-auto">
+                    <Button 
+                      onClick={() => approveAgent.mutate(profile.id)} 
+                      disabled={approveAgent.isPending}
+                      className="flex-1 md:flex-none gap-2 rounded-2xl h-12 px-6 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
+                    >
+                      {approveAgent.isPending ? <Timer className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                      Approve Agent
+                    </Button>
+                    <Button 
+                      onClick={() => rejectAgent.mutate(profile.id)} 
+                      disabled={rejectAgent.isPending}
+                      variant="outline" 
+                      className="flex-1 md:flex-none gap-2 rounded-2xl h-12 px-6 font-bold border-destructive/20 text-destructive hover:bg-destructive/10"
+                    >
+                      <UserX className="w-4 h-4" />
+                      Decline
+                    </Button>
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </div>
+
+          {pendingAgents && pendingAgents.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-6 px-2">
+              <p className="text-xs text-muted-foreground font-body">
+                Showing {(pendingPage - 1) * PAGE_SIZE + 1} to {Math.min(pendingPage * PAGE_SIZE, pendingAgents.length)} of {pendingAgents.length} applicants
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPendingPage(p => Math.max(1, p - 1))}
+                  disabled={pendingPage === 1}
+                  className="rounded-xl h-9 border-border/50"
+                >
+                  Previous
+                </Button>
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.ceil(pendingAgents.length / PAGE_SIZE) }, (_, i) => i + 1).map(p => (
+                    <Button
+                      key={p}
+                      variant={pendingPage === p ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPendingPage(p)}
+                      className={`h-9 w-9 rounded-xl p-0 ${pendingPage === p ? 'bg-primary' : 'border-border/50'}`}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPendingPage(p => Math.min(Math.ceil(pendingAgents.length / PAGE_SIZE), p + 1))}
+                  disabled={pendingPage >= Math.ceil(pendingAgents.length / PAGE_SIZE)}
+                  className="rounded-xl h-9 border-border/50"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

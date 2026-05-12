@@ -92,6 +92,24 @@ serve(async (req) => {
           await sendWhatsApp(vendor.phone, vendorMessage);
         }
       }
+
+      // ── AGENT NOTIFICATIONS (on INSERT) ──
+      if (record.agent_id) {
+        const { data: agent } = await supabase
+          .from("agents")
+          .select("name, phone")
+          .eq("id", record.agent_id)
+          .maybeSingle();
+
+        if (agent?.phone) {
+          const customerName = record.customer_name || 'A customer';
+          const totalFormatted = `MWK ${Number(record.total).toLocaleString()}`;
+          const agentMessage = `🚀 *New Referral Sale!*\n\nCongratulations ${agent.name || 'Agent'}! ${customerName} just placed an order using your link.\n\n💰 *Order Total:* ${totalFormatted}\n📈 *Status:* Pending confirmation\n\nYour commission is being tracked! Keep up the great work. ✨`;
+          
+          console.log(`Notifying agent ${agent.name} at ${agent.phone} about new sale`);
+          await sendWhatsApp(agent.phone, agentMessage);
+        }
+      }
     }
 
     // ── CUSTOMER NOTIFICATIONS (on UPDATE) ──
@@ -122,6 +140,38 @@ serve(async (req) => {
         
         console.log(`Sending ${status} update to customer ${phone}`);
         await sendWhatsApp(phone, message, firstProductImage || undefined);
+
+        // ── AGENT NOTIFICATIONS (on UPDATE) ──
+        if (record.agent_id) {
+          const { data: agent } = await supabase
+            .from("agents")
+            .select("name, phone")
+            .eq("id", record.agent_id)
+            .maybeSingle();
+
+          if (agent?.phone) {
+            const agentStatusUpdate = `📦 *Referral Order Update*\n\nThe order from ${name} (Referral) has been updated to: *${status.toUpperCase()}* ${config.emoji}\n\nKeep sharing your link to earn more commissions! 🚀`;
+            console.log(`Notifying agent ${agent.name} about status update`);
+            await sendWhatsApp(agent.phone, agentStatusUpdate);
+          }
+        }
+      }
+    }
+
+    // ── PAYOUT NOTIFICATIONS (on UPDATE) ──
+    if (type === 'PAYOUT_UPDATE' && record.status === 'paid' && old_record.status !== 'paid') {
+      const { data: agent } = await supabase
+        .from("agents")
+        .select("name, phone")
+        .eq("id", record.agent_id)
+        .maybeSingle();
+
+      if (agent?.phone) {
+        const amountFormatted = `MWK ${Number(record.amount).toLocaleString()}`;
+        const payoutMessage = `💰 *Earnings Alert: Paid!* 🎊\n\nHi ${agent.name || 'Agent'}! Your payout of *${amountFormatted}* has been successfully processed and sent to your registered payment method.\n\nThank you for being a valued part of Forgiven Shopping Centre. Keep those referrals coming! 🚀`;
+        
+        console.log(`Notifying agent ${agent.name} about payout completion`);
+        await sendWhatsApp(agent.phone, payoutMessage);
       }
     }
 
