@@ -9,14 +9,24 @@ import {
 import {
   Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Search, Users, ExternalLink, TrendingUp, ShoppingBag, DollarSign, ShieldCheck } from "lucide-react";
-import { motion } from "framer-motion";
+import { Search, Users, ExternalLink, TrendingUp, ShoppingBag, DollarSign, ShieldCheck, MapPin, Phone, Mail, Calendar, Clock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 const PAGE_SIZE = 10;
 
 const CustomersPage = () => {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["user-profile"],
@@ -53,6 +63,20 @@ const CustomersPage = () => {
       }
 
       const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+  
+  const { data: customerOrders, isLoading: ordersLoading } = useQuery({
+    queryKey: ["customer-orders", selectedCustomer?.id],
+    enabled: !!selectedCustomer?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("customer_id", selectedCustomer.id)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -126,7 +150,14 @@ const CustomersPage = () => {
                 )) : paginated.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No customers found.</TableCell></TableRow>
                 ) : paginated.map(customer => (
-                  <TableRow key={customer.id}>
+                  <TableRow 
+                    key={customer.id} 
+                    className="cursor-pointer hover:bg-muted/30 transition-colors"
+                    onClick={() => {
+                      setSelectedCustomer(customer);
+                      setIsDetailsOpen(true);
+                    }}
+                  >
                     <TableCell>
                       <div>
                         <p className="font-heading font-semibold text-foreground">{customer.name || "Unknown"}</p>
@@ -161,6 +192,151 @@ const CustomersPage = () => {
           <PaginationItem><PaginationNext href="#" onClick={e => { e.preventDefault(); setPage(p => Math.min(totalPages, p + 1)); }} /></PaginationItem>
         </PaginationContent></Pagination>
       )}
+
+      {/* Customer Details Modal */}
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="max-w-3xl h-[85vh] p-0 overflow-hidden bg-card border-border rounded-3xl">
+          <DialogHeader className="p-6 bg-muted/20 border-b border-border">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold">
+                {selectedCustomer?.name?.[0] || "?"}
+              </div>
+              <div>
+                <DialogTitle className="text-2xl font-heading font-bold text-foreground">
+                  {selectedCustomer?.name || "Unknown Customer"}
+                </DialogTitle>
+                <div className="flex items-center gap-3 mt-1">
+                  <Badge variant="outline" className="text-[10px] font-bold bg-primary/5 text-primary border-primary/20 uppercase tracking-widest">
+                    {selectedCustomer?.customer_status || 'new'}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground font-body flex items-center gap-1">
+                    <Calendar className="w-3 h-3" /> Joined {selectedCustomer && new Date(selectedCustomer.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 h-[calc(85vh-88px)] min-h-0">
+            {/* Left Sidebar: Profile Details */}
+            <ScrollArea className="border-r border-border bg-muted/5">
+              <div className="p-6 space-y-6">
+                <div>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Profile Information</h4>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <Phone className="w-4 h-4 text-primary mt-0.5" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground font-bold">PHONE</p>
+                        <p className="text-sm font-body font-medium">{selectedCustomer?.phone}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Mail className="w-4 h-4 text-primary mt-0.5" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground font-bold">EMAIL</p>
+                        <p className="text-sm font-body font-medium">{selectedCustomer?.email || "No email provided"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-4 h-4 text-primary mt-0.5" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground font-bold">LOCATION</p>
+                        <p className="text-sm font-body font-medium">{selectedCustomer?.location || "Not specified"}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator className="bg-border/50" />
+
+                <div>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Lifetime Summary</h4>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="p-4 rounded-2xl bg-background border border-border">
+                      <p className="text-[10px] text-muted-foreground font-bold">TOTAL SPENT</p>
+                      <p className="text-xl font-heading font-black text-primary">MWK {selectedCustomer?.total_spent?.toLocaleString()}</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-background border border-border">
+                      <p className="text-[10px] text-muted-foreground font-bold">TOTAL ORDERS</p>
+                      <p className="text-xl font-heading font-black text-foreground">{selectedCustomer?.total_orders}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+
+            {/* Right Side: Order History */}
+            <div className="col-span-2 flex flex-col min-h-0 bg-background">
+              <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Order History</h4>
+                <Badge variant="secondary" className="text-[10px]">
+                  {customerOrders?.length || 0} Transactions
+                </Badge>
+              </div>
+              <ScrollArea className="flex-1 overflow-y-auto">
+                <div className="p-6">
+                  {ordersLoading ? (
+                    <div className="space-y-4">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />
+                      ))}
+                    </div>
+                  ) : !customerOrders || customerOrders.length === 0 ? (
+                    <div className="text-center py-20">
+                      <ShoppingBag className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
+                      <p className="text-muted-foreground font-body">No orders recorded yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {customerOrders.map((order) => (
+                        <div key={order.id} className="p-4 rounded-2xl border border-border bg-card/50 hover:border-primary/20 transition-all group">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-muted-foreground">#{order.id.slice(0, 8).toUpperCase()}</span>
+                              <Badge 
+                                className="text-[9px] font-black uppercase tracking-widest"
+                                variant={order.status === 'delivered' ? 'default' : 'secondary'}
+                              >
+                                {order.status}
+                              </Badge>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-body">
+                              <Clock className="w-3 h-3" /> {new Date(order.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex -space-x-2 overflow-hidden">
+                              {(order.items as any[])?.slice(0, 3).map((item, i) => (
+                                <div key={i} className="w-8 h-8 rounded-lg border-2 border-background bg-muted flex items-center justify-center overflow-hidden">
+                                  {item.image ? (
+                                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <ShoppingBag className="w-3 h-3 text-muted-foreground" />
+                                  )}
+                                </div>
+                              ))}
+                              {(order.items as any[])?.length > 3 && (
+                                <div className="w-8 h-8 rounded-lg border-2 border-background bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                                  +{(order.items as any[]).length - 3}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-muted-foreground font-body">Total Amount</p>
+                              <p className="text-sm font-bold text-primary">MWK {order.total?.toLocaleString()}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

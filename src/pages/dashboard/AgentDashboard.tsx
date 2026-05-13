@@ -261,8 +261,21 @@ const AgentDashboard = () => {
           </Button>
           <Button 
             className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-            onClick={() => {
+            onClick={async () => {
               const text = `🛍️ Shop premium fashion at Forgiven Shopping Centre!\nUse my referral link and discover amazing deals:\n${referralUrl}`;
+              
+              if (navigator.share) {
+                try {
+                  await navigator.share({
+                    title: "Forgiven Shopping Centre",
+                    text: text,
+                  });
+                  return;
+                } catch (e) {
+                  console.error("Share failed:", e);
+                }
+              }
+              
               window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
             }}
           >

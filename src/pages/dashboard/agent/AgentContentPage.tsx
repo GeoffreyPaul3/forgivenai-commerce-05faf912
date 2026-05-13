@@ -76,58 +76,78 @@ export default function AgentContentPage() {
 
   const shareAsset = async (item: any) => {
     const text = getShareText(item);
+    const hasMedia = !!item.media_url;
     
-    // Attempt Web Share API for media sharing (Mobile/Supported browsers)
-    if (navigator.share && item.media_url) {
+    // 1. Mobile/Native Sharing Attempt
+    if (navigator.share) {
       setSharingId(item.id);
       try {
-        // Fetch the media to share as a real file
-        const response = await fetch(item.media_url);
-        const blob = await response.blob();
-        const extension = item.type === 'video' || item.type === 'ugc' ? 'mp4' : 'jpg';
-        const file = new File([blob], `fsc-share-${item.id}.${extension}`, { type: blob.type });
-        
-        // Final check for file sharing support
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: item.title,
-            text: text,
-          });
-          setSharingId(null);
-          return;
+        if (hasMedia) {
+          // Use absolute URL for fetch
+          const mediaUrl = item.media_url?.startsWith('http') ? item.media_url : `${window.location.origin}${item.media_url}`;
+          const response = await fetch(mediaUrl);
+          if (!response.ok) throw new Error("Media fetch failed");
+          
+          const blob = await response.blob();
+          const mimeType = blob.type || (item.type === 'video' || item.type === 'ugc' ? 'video/mp4' : 'image/jpeg');
+          const ext = mimeType.split("/")[1]?.split("+")[0] || (item.type === 'video' || item.type === 'ugc' ? 'mp4' : 'jpg');
+          const fileName = `promo-${item.id.slice(0, 5)}.${ext}`;
+          
+          const file = new File([blob], fileName, { type: mimeType });
+          
+          // Test sharing with files
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              text: text
+            });
+            setSharingId(null);
+            return;
+          }
         }
+        
+        // Fallback to text-only native share
+        await navigator.share({ text });
+        setSharingId(null);
+        return;
       } catch (e) {
-        console.error("Web Share failed, falling back to text", e);
+        console.error("Native share error:", e);
       }
       setSharingId(null);
     }
     
-    // Fallback to WhatsApp text share (Desktop/Unsupported browsers)
-    if (item.media_url) {
+    // 2. Desktop Fallback (WhatsApp Web)
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, "_blank");
+    
+    if (hasMedia) {
       toast({
-        title: "Desktop: Text-only share",
-        description: "WhatsApp desktop does not support automated media attachments. Please download the image to share it manually.",
+        title: "Sharing to Desktop?",
+        description: "WhatsApp desktop does not support auto-media sharing. Please download the file to share it manually.",
       });
     }
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
 
   const downloadMedia = async (url: string, filename: string) => {
     try {
       const response = await fetch(url);
+      if (!response.ok) throw new Error("Network response was not ok");
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      const link = document.createElement('a');
       link.href = blobUrl;
       link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
-      toast({ title: "Download started" });
     } catch (e) {
-      window.open(url, "_blank");
+      console.error("Download failed:", e);
+      toast({
+        title: "Download failed",
+        description: "Could not download the file directly. You can try right-clicking the image and selecting 'Save Image As'.",
+        variant: "destructive"
+      });
     }
   };
 

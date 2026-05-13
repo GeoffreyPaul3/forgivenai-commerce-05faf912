@@ -207,7 +207,7 @@ function OverviewPage() {
       }
 
       const revenue = filteredOrders
-        .filter((o: any) => ["paid", "delivered"].includes(o.status))
+        .filter((o: any) => o.status !== "cancelled")
         .reduce((sum: number, o: any) => sum + (o.total || 0), 0);
       const pending = filteredOrders.filter((o: any) => o.status === "pending").length;
       
@@ -296,7 +296,7 @@ function OverviewPage() {
       label: "Total Revenue",
       value: `MWK ${(stats?.revenue || 0).toLocaleString()}`,
       icon: TrendingUp,
-      sub: "From paid & delivered orders",
+      sub: "From all active orders",
       accent: true,
     },
     {
