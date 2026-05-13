@@ -2,7 +2,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, CreditCard, User, LogOut,
-  ChevronDown, Users, TrendingUp, PackageSearch, ShoppingBag, GraduationCap
+  ChevronDown, Users, TrendingUp, PackageSearch, ShoppingBag, GraduationCap,
+  Bell
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -14,6 +15,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NavLink } from "@/components/NavLink";
+import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import logo from "@/assets/forgiven.png";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
@@ -109,6 +111,11 @@ export default function AgentLayout({ children, title }: { children: React.React
           <header className="h-14 flex items-center border-b border-border px-4 shrink-0">
             <SidebarTrigger className="mr-4" />
             <h1 className="font-heading text-xl font-semibold text-foreground flex-1">{title}</h1>
+
+            <Button variant="ghost" size="icon" className="mr-2 h-9 w-9 rounded-full relative">
+              <Bell className="w-4 h-4 text-muted-foreground" />
+              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-background" />
+            </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

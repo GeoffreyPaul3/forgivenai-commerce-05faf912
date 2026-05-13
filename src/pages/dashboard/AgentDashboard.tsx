@@ -16,11 +16,20 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription 
+} from "@/components/ui/dialog";
+import { Eye, Package, Ruler, Palette, Info } from "lucide-react";
 
 const AgentDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [session, setSession] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
   // 1. Get current user session
   useQuery({
@@ -91,11 +100,40 @@ const AgentDashboard = () => {
   const { data: products } = useQuery({
     queryKey: ["featured-products-overview"],
     queryFn: async () => {
-      const { data } = await supabase
+      // 1. Local products
+      const { data: local } = await supabase
         .from("products")
         .select("*")
         .limit(4);
-      return data || [];
+      
+      // 2. Live products
+      try {
+        const res = await fetch("https://www.forgivenshoppingcentre.com/api/products/all");
+        const live = await res.json();
+        if (live.success && Array.isArray(live.data)) {
+          const mappedLive = live.data.slice(0, 4).map((p: any) => ({
+            id: `live_${p.id}`,
+            name: p.name,
+            category: p.category?.name || p.productType || "General",
+            price: p.salePrice || p.price,
+            currency: "MWK",
+            images: p.images || [],
+            description: p.description,
+            sizes: p.sizes || 
+                   (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.size || v.value || v.name).filter(Boolean))] : []) ||
+                   (p.options?.find((o: any) => o.name?.toLowerCase().includes("size"))?.values || []),
+            colors: p.colors || 
+                    (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.color || v.colour || v.name).filter(Boolean))] : []) ||
+                    (p.options?.find((o: any) => o.name?.toLowerCase().includes("color") || o.name?.toLowerCase().includes("colour"))?.values || []),
+            isLive: true,
+            created_at: p.createdAt
+          }));
+          return [...(local || []), ...mappedLive].slice(0, 8);
+        }
+      } catch (e) {
+        console.warn("Could not fetch live products for dashboard:", e);
+      }
+      return local || [];
     },
   });
 
@@ -379,7 +417,11 @@ const AgentDashboard = () => {
             <CardContent className="p-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {(products || []).map((product) => (
-                  <div key={product.id} className="flex items-center gap-4 p-3 rounded-2xl bg-muted/20 hover:bg-muted/40 transition-colors group">
+                  <div 
+                    key={product.id} 
+                    className="flex items-center gap-4 p-3 rounded-2xl bg-muted/20 hover:bg-muted/40 transition-colors group cursor-pointer"
+                    onClick={() => setSelectedProduct(product)}
+                  >
                     <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted shrink-0">
                       {product.images?.[0] ? (
                         <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
@@ -389,17 +431,137 @@ const AgentDashboard = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{product.name}</p>
-                      <p className="text-xs font-bold text-primary">MWK {product.price.toLocaleString()}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-xs font-bold text-primary shrink-0">MWK {product.price.toLocaleString()}</p>
+                        <div className="flex gap-1 overflow-hidden">
+                          {product.sizes?.slice(0, 3).map((s: string) => (
+                            <span key={s} className="text-[8px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-bold uppercase">{s}</span>
+                          ))}
+                          {(product.sizes?.length || 0) > 3 && <span className="text-[8px] text-muted-foreground font-bold">+{product.sizes.length - 3}</span>}
+                        </div>
+                      </div>
+                      {product.colors && product.colors.length > 0 && (
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <div className="flex gap-1">
+                            {product.colors.slice(0, 4).map((c: string) => (
+                              <div key={c} className="w-2.5 h-2.5 rounded-full border border-border/50" style={{ backgroundColor: c.toLowerCase() }} title={c} />
+                            ))}
+                            {(product.colors?.length || 0) > 4 && <span className="text-[8px] text-muted-foreground">+{product.colors.length - 4}</span>}
+                          </div>
+                          <span className="text-[10px] text-muted-foreground truncate">{product.colors.join(", ")}</span>
+                        </div>
+                      )}
                     </div>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Plus className="w-4 h-4" />
-                    </Button>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Product Details Dialog */}
+        <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
+          <DialogContent className="max-w-3xl rounded-[2rem] p-0 overflow-hidden border-0 shadow-2xl">
+            {selectedProduct && (
+              <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
+                <div className="w-full md:w-1/2 bg-muted/30 p-6 flex flex-col gap-4 overflow-y-auto">
+                  <div className="aspect-square rounded-[1.5rem] overflow-hidden bg-white shadow-inner">
+                    {selectedProduct.images?.[0] ? (
+                      <img src={selectedProduct.images[0]} alt={selectedProduct.name} className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center opacity-20"><Package className="w-20 h-20" /></div>
+                    )}
+                  </div>
+                  {selectedProduct.images && selectedProduct.images.length > 1 && (
+                    <div className="grid grid-cols-4 gap-3">
+                      {selectedProduct.images.slice(1).map((img: string, idx: number) => (
+                        <div key={idx} className="aspect-square rounded-xl overflow-hidden border border-border/50 bg-white">
+                          <img src={img} alt={`${selectedProduct.name} ${idx + 1}`} className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="w-full md:w-1/2 p-8 flex flex-col overflow-y-auto bg-card">
+                  <div className="mb-6">
+                    <Badge className="bg-primary/10 text-primary border-0 font-bold mb-3 uppercase tracking-wider text-[10px]">
+                      {selectedProduct.category || 'General'}
+                    </Badge>
+                    <DialogTitle className="font-heading text-2xl font-black leading-tight mb-2">
+                      {selectedProduct.name}
+                    </DialogTitle>
+                    <div className="text-2xl font-black text-primary font-heading">
+                      MWK {(selectedProduct.price || 0).toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6 mb-8">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-black uppercase text-muted-foreground tracking-widest">
+                        <Info className="w-3.5 h-3.5" /> Description
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed font-body">
+                        {selectedProduct.description || selectedProduct.ai_description || "No description available."}
+                      </p>
+                    </div>
+
+                    {selectedProduct.sizes && selectedProduct.sizes.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-black uppercase text-muted-foreground tracking-widest">
+                          <Ruler className="w-3.5 h-3.5" /> Available Sizes
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedProduct.sizes.map((s: string) => (
+                            <Badge key={s} variant="outline" className="px-3 h-8 rounded-lg bg-muted/30 border-border/50 font-bold">
+                              {s}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedProduct.colors && selectedProduct.colors.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-black uppercase text-muted-foreground tracking-widest">
+                          <Palette className="w-3.5 h-3.5" /> Available Colours
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          {selectedProduct.colors.map((c: string) => (
+                            <div key={c} className="flex items-center gap-2">
+                              <div className="w-5 h-5 rounded-full border-2 border-background shadow-md" style={{ backgroundColor: c.toLowerCase() }} />
+                              <span className="text-xs font-medium text-muted-foreground">{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-auto pt-6 border-t border-border/50 flex flex-col gap-3">
+                    <Button 
+                      onClick={() => {
+                        if (!agent?.referral_code) {
+                          toast({ title: "Error", description: "Referral code not found", variant: "destructive" });
+                          return;
+                        }
+                        const url = `${window.location.origin}/shop?ref=${agent.referral_code}&product=${selectedProduct.id}`;
+                        navigator.clipboard.writeText(url);
+                        toast({ title: "Link Copied!", description: "Share this link to earn commission." });
+                        setSelectedProduct(null);
+                      }}
+                      className="w-full gap-2 rounded-2xl h-14 font-black text-lg shadow-lg shadow-primary/20"
+                    >
+                      <Copy className="w-5 h-5" />
+                      Copy Referral Link
+                    </Button>
+                    <Button variant="ghost" onClick={() => setSelectedProduct(null)} className="w-full rounded-2xl h-12 font-bold text-muted-foreground">Close</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Right Column: Quick Actions */}
         <div className="space-y-6">

@@ -32,7 +32,9 @@ serve(async (req) => {
       price: p.salePrice || p.price,
       images: p.images || [],
       source_url: "https://www.forgivenshoppingcentre.com/",
-      status: 'active'
+      status: 'active',
+      sizes: p.sizes || (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.size || v.value || v.name).filter(Boolean))] : []) || (p.options?.find((o: any) => o.name?.toLowerCase().includes("size"))?.values || []),
+      colors: p.colors || (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.color || v.colour || v.name).filter(Boolean))] : []) || (p.options?.find((o: any) => o.name?.toLowerCase().includes("color") || o.name?.toLowerCase().includes("colour"))?.values || [])
     }));
 
     // Deduplicate by name
@@ -49,6 +51,8 @@ serve(async (req) => {
         images: p.images,
         source_url: p.source_url,
         status: 'active',
+        sizes: p.sizes,
+        colors: p.colors
       })),
       { onConflict: 'name' }
     );

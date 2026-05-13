@@ -45,6 +45,12 @@ export default function Shop() {
             currency: "MWK",
             images: p.images || [],
             description: p.description,
+            sizes: (p.sizes && p.sizes.length > 0) ? p.sizes : 
+                   (p.variants && p.variants.length > 0 && [...new Set(p.variants.map((v: any) => v.size || v.value || v.name).filter(Boolean))].length > 0) ? [...new Set(p.variants.map((v: any) => v.size || v.value || v.name).filter(Boolean))] :
+                   (p.options?.find((o: any) => o.name?.toLowerCase().includes("size"))?.values || []),
+            colors: (p.colors && p.colors.length > 0) ? p.colors :
+                    (p.variants && p.variants.length > 0 && [...new Set(p.variants.map((v: any) => v.color || v.colour || v.name).filter(Boolean))].length > 0) ? [...new Set(p.variants.map((v: any) => v.color || v.colour || v.name).filter(Boolean))] :
+                    (p.options?.find((o: any) => o.name?.toLowerCase().includes("color") || o.name?.toLowerCase().includes("colour"))?.values || []),
             isLive: true,
             created_at: p.createdAt
           }));
@@ -232,7 +238,15 @@ export default function Shop() {
                           </div>
                         </div>
                         <h3 className="text-xs font-semibold text-gray-800 truncate group-hover:text-[#8B1A4A] transition-colors">{p.name}</h3>
-                        <p className="text-[#8B1A4A] font-bold text-xs mt-0.5">{p.currency||"MWK"} {p.price?.toLocaleString()}</p>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <p className="text-[#8B1A4A] font-bold text-xs">{p.currency||"MWK"} {p.price?.toLocaleString()}</p>
+                          {(p.sizes?.length > 0 || p.colors?.length > 0) && (
+                            <div className="flex gap-1">
+                              {p.sizes?.length > 0 && <span className="text-[8px] text-gray-400 font-bold uppercase">{p.sizes[0]}{p.sizes.length > 1 ? '+' : ''}</span>}
+                              {p.colors?.length > 0 && <div className="w-1.5 h-1.5 rounded-full mt-1" style={{ backgroundColor: p.colors[0].toLowerCase() }} />}
+                            </div>
+                          )}
+                        </div>
                       </motion.div>
                     ))}
                   </AnimatePresence>
@@ -293,7 +307,40 @@ export default function Shop() {
               <div className="p-5 pt-4 space-y-3">
                 <h2 className="font-heading text-xl font-bold text-gray-900">{detail.name}</h2>
                 <p className="text-[#8B1A4A] font-heading font-black text-2xl">{detail.currency||"MWK"} {detail.price?.toLocaleString()}</p>
-                {detail.description && <p className="text-gray-500 text-sm leading-relaxed font-body">{detail.description}</p>}
+                
+                {detail.sizes && detail.sizes.length > 0 && (
+                  <div className="py-1">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Available Sizes</p>
+                    <div className="flex flex-wrap gap-2">
+                      {detail.sizes.map((s: string) => (
+                        <span key={s} className="px-3 py-1 rounded-lg border border-gray-100 bg-gray-50 text-[10px] font-black text-gray-600 uppercase">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {detail.colors && detail.colors.length > 0 && (
+                  <div className="py-1">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Available Colours</p>
+                    <div className="flex flex-wrap gap-3">
+                      {detail.colors.map((c: string) => (
+                        <div key={c} className="flex items-center gap-1.5">
+                          <div className="w-4 h-4 rounded-full border border-gray-100 shadow-sm" style={{ backgroundColor: c.toLowerCase() }} />
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">{c}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {detail.description && (
+                  <div className="py-1">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Description</p>
+                    <p className="text-gray-500 text-sm leading-relaxed font-body">{detail.description}</p>
+                  </div>
+                )}
                 <div className="pt-3">
                   <Button className="w-full h-13 rounded-2xl bg-[#25D366] hover:bg-[#1DA851] text-white font-bold gap-3 text-base shadow-lg shadow-emerald-200/50" onClick={() => order(detail)}>
                     <MessageCircle className="w-5 h-5" /> Order via WhatsApp
