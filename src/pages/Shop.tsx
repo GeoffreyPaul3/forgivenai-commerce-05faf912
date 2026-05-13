@@ -19,6 +19,8 @@ export default function Shop() {
   const [search, setSearch] = useState("");
   const [activeCat, setActiveCat] = useState("all");
   const [detail, setDetail] = useState<any>(null);
+  const [selectedSize, setSelectedSize] = useState<string>("");
+  const [selectedColor, setSelectedColor] = useState<string>("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
 
@@ -82,11 +84,20 @@ export default function Shop() {
   // Reset to page 1 when filters change
   useEffect(() => { setPage(1); }, [search, activeCat]);
 
-  const order = (p: any) => {
+  const order = (p: any, size?: string, color?: string) => {
     const ref = localStorage.getItem("referral_code") || "";
-    let m = `Hi! I'd like to order:\n🛍️ *${p.name}*\n💰 ${p.currency||"MWK"} ${p.price?.toLocaleString()}`;
+    let m = `Hi! I'd like to order:\n🛍️ *${p.name}*`;
+    if (size) m += `\n📏 Size: ${size}`;
+    if (color) m += `\n🎨 Colour: ${color}`;
+    m += `\n💰 ${p.currency||"MWK"} ${p.price?.toLocaleString()}`;
     if (ref) m += `\n🏷️ Ref: ${ref}`;
     window.open(`https://wa.me/${WHATSAPP_NUMBER.replace("+","")}?text=${encodeURIComponent(m)}`, "_blank");
+  };
+
+  const openDetail = (p: any) => {
+    setDetail(p);
+    setSelectedSize("");
+    setSelectedColor("");
   };
 
   return (
@@ -219,7 +230,7 @@ export default function Shop() {
                     {paginated.map((p: any, i: number) => (
                       <motion.div key={p.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                         transition={{ delay: Math.min(i * 0.03, 0.3) }}
-                        className="group cursor-pointer" onClick={() => setDetail(p)}
+                        className="group cursor-pointer" onClick={() => openDetail(p)}
                       >
                         <div className="aspect-square rounded-xl overflow-hidden bg-gray-50 mb-2 relative shadow-sm group-hover:shadow-md transition-shadow duration-400">
                           {p.images?.[0] ? (
@@ -230,10 +241,10 @@ export default function Shop() {
                             </div>
                           )}
                           <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300">
-                            <button onClick={(e) => { e.stopPropagation(); order(p); }}
-                              className="w-full flex items-center justify-center gap-1.5 bg-[#25D366] text-white text-[10px] font-bold py-2 rounded-lg shadow-lg hover:bg-[#1DA851] transition-colors"
+                            <button onClick={(e) => { e.stopPropagation(); openDetail(p); }}
+                              className="w-full flex items-center justify-center gap-1.5 bg-[#8B1A4A] text-white text-[10px] font-bold py-2 rounded-lg shadow-lg hover:bg-[#A31E56] transition-colors"
                             >
-                              <MessageCircle className="w-3 h-3" /> Order
+                              <MessageCircle className="w-3 h-3" /> Select Options
                             </button>
                           </div>
                         </div>
@@ -310,12 +321,22 @@ export default function Shop() {
                 
                 {detail.sizes && detail.sizes.length > 0 && (
                   <div className="py-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Available Sizes</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                      Available Sizes <span className="text-red-500">*</span>
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {detail.sizes.map((s: string) => (
-                        <span key={s} className="px-3 py-1 rounded-lg border border-gray-100 bg-gray-50 text-[10px] font-black text-gray-600 uppercase">
+                        <button 
+                          key={s} 
+                          onClick={() => setSelectedSize(s)}
+                          className={`px-4 py-2 rounded-xl border transition-all text-xs font-black uppercase ${
+                            selectedSize === s 
+                            ? "bg-[#8B1A4A] border-[#8B1A4A] text-white shadow-md shadow-[#8B1A4A]/20" 
+                            : "border-gray-100 bg-gray-50 text-gray-600 hover:border-gray-200"
+                          }`}
+                        >
                           {s}
-                        </span>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -323,15 +344,36 @@ export default function Shop() {
 
                 {detail.colors && detail.colors.length > 0 && (
                   <div className="py-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Available Colours</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                      Available Colours <span className="text-red-500">*</span>
+                    </p>
                     <div className="flex flex-wrap gap-3">
                       {detail.colors.map((c: string) => (
-                        <div key={c} className="flex items-center gap-1.5">
-                          <div className="w-4 h-4 rounded-full border border-gray-100 shadow-sm" style={{ backgroundColor: c.toLowerCase() }} />
-                          <span className="text-[10px] font-bold text-gray-500 uppercase">{c}</span>
-                        </div>
+                        <button 
+                          key={c} 
+                          onClick={() => setSelectedColor(c)}
+                          className={`flex items-center gap-2 p-2 rounded-xl border transition-all ${
+                            selectedColor === c 
+                            ? "bg-gray-900 border-gray-900 text-white shadow-lg" 
+                            : "border-gray-100 bg-gray-50 text-gray-600 hover:border-gray-200"
+                          }`}
+                        >
+                          <div className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: c.toLowerCase() }} />
+                          <span className="text-[10px] font-bold uppercase pr-1">{c}</span>
+                        </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {(detail.sizes?.length > 0 || detail.colors?.length > 0) && (
+                  <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100/50">
+                    <p className="text-[10px] font-bold text-amber-700/70 uppercase tracking-tight flex items-center gap-2">
+                      <Sparkles className="w-3 h-3" /> 
+                      {(!selectedSize && detail.sizes?.length > 0) || (!selectedColor && detail.colors?.length > 0) 
+                        ? "Please select size & color to proceed" 
+                        : "Ready to order with your selection!"}
+                    </p>
                   </div>
                 )}
 
@@ -342,8 +384,17 @@ export default function Shop() {
                   </div>
                 )}
                 <div className="pt-3">
-                  <Button className="w-full h-13 rounded-2xl bg-[#25D366] hover:bg-[#1DA851] text-white font-bold gap-3 text-base shadow-lg shadow-emerald-200/50" onClick={() => order(detail)}>
-                    <MessageCircle className="w-5 h-5" /> Order via WhatsApp
+                  <Button 
+                    disabled={(detail.sizes?.length > 0 && !selectedSize) || (detail.colors?.length > 0 && !selectedColor)}
+                    className={`w-full h-13 rounded-2xl font-bold gap-3 text-base shadow-lg transition-all ${
+                      (detail.sizes?.length > 0 && !selectedSize) || (detail.colors?.length > 0 && !selectedColor)
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                      : "bg-[#25D366] hover:bg-[#1DA851] text-white shadow-emerald-200/50 active:scale-[0.98]"
+                    }`} 
+                    onClick={() => order(detail, selectedSize, selectedColor)}
+                  >
+                    <MessageCircle className="w-5 h-5" /> 
+                    Order via WhatsApp
                   </Button>
                   <p className="text-center text-gray-400 text-[11px] mt-3">Nationwide delivery • Quality guaranteed</p>
                 </div>

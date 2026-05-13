@@ -353,8 +353,13 @@ serve(async (req) => {
       await supabase.from("messages").insert({ conversation_id: convo.id, role: "customer", content: body });
 
       // Get products for AI context
-      const { data: products } = await supabase.from("products").select("id, name, category, price, currency, description, images").eq("status", "active").limit(100);
-      const productList = products?.map(p => `- ${p.name} (${p.category}) — ${p.currency} ${p.price}`).join("\n") || "No products available";
+      const { data: products } = await supabase.from("products").select("id, name, category, price, currency, description, images, sizes, colors").eq("status", "active").limit(100);
+      const productList = products?.map(p => {
+        let details = `- ${p.name} (${p.category}) — ${p.currency} ${p.price}`;
+        if (p.sizes && p.sizes.length > 0) details += ` | Sizes: ${p.sizes.join(", ")}`;
+        if (p.colors && p.colors.length > 0) details += ` | Colours: ${p.colors.join(", ")}`;
+        return details;
+      }).join("\n") || "No products available";
 
       // Get conversation history (latest 15 messages, ordered chronologically)
       const { data: rawHistory } = await supabase.from("messages").select("role, content").eq("conversation_id", convo.id).order("created_at", { ascending: false }).limit(15);
@@ -387,6 +392,8 @@ serve(async (req) => {
             // Flexible regex to handle different AI formatting
             const productMatch  = c.match(/\*Product:\*\s*(.+)/) || c.match(/\*\*([^*]+)\*\*/);
             const quantityMatch = c.match(/\*Quantity:\*\s*(\d+)/);
+            const sizeMatch     = c.match(/\*Size:\*\s*(.+)/);
+            const colorMatch    = c.match(/\*Colour:\*\s*(.+)/);
             const priceMatch    = c.match(/\*(?:Price|Total):\*\s*MWK\s*([\d,]+)/) || c.match(/MWK\s*([\d,.]+)/);
             const nameMatch     = c.match(/\*Name:\*\s*(.+)/);
             const emailMatch    = c.match(/\*Email:\*\s*(.+)/);
@@ -398,6 +405,8 @@ serve(async (req) => {
               orderData = {
                 product_name: productMatch[1].trim(),
                 quantity: parseInt(quantityMatch?.[1] || "1"),
+                size: sizeMatch?.[1]?.trim() || null,
+                color: colorMatch?.[1]?.trim() || null,
                 price: parseInt(priceMatch[1].replace(/,/g, "")),
                 customer_name: nameMatch?.[1]?.trim() || customer?.name || "Guest",
                 customer_email: emailMatch?.[1]?.trim() || customer?.email || "",
@@ -443,7 +452,14 @@ serve(async (req) => {
                 customer_phone: customerPhone,
                 customer_name:  custName,
                 customer_email: custEmail,
-                items: [{ product_id: product?.id || null, name: productName, quantity, price }] as any,
+                items: [{ 
+                  product_id: product?.id || null, 
+                  name: productName, 
+                  quantity, 
+                  price,
+                  size: orderData.size,
+                  color: orderData.color
+                }] as any,
                 total: price * quantity,
                 channel: "whatsapp",
                 agent_id: agentId,
@@ -561,14 +577,18 @@ ORDER CAPTURE PROCESS:
    - Delivery Address (e.g., Kanjedza, Blantyre or Area 47, Lilongwe)
    - Preferred Contact Number
    - Preferred Courier Service (e.g., CTS, Smart Deliveries, Speed, etc.)
+   - Size (if the product has size options)
+   - Colour (if the product has colour options)
 3. When you have all details and are ready to show the order summary, you MUST include this hidden machine-readable block FIRST (it will be stripped before sending to the customer — do NOT mention it):
 ###PENDING_ORDER###
-{"product_name":"exact product name","quantity":1,"price":25000,"customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Preferred Courier"}
+{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Preferred Courier"}
 ###END_PENDING_ORDER###
 
    Then present the human-readable summary:
    *Product:* X
    *Quantity:* X
+   *Size:* X (only if applicable)
+   *Colour:* X (only if applicable)
    *Total:* MWK X
    *Name:* X
    *Email:* X
@@ -579,7 +599,7 @@ ORDER CAPTURE PROCESS:
 
 4. CRITICAL: ONLY AFTER the customer replies with "YES" or explicit confirmation of the summary, respond with EXACTLY this JSON block:
 ###ORDER_JSON###
-{"product_name":"exact product name","quantity":1,"price":25000,"customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Preferred Courier"}
+{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Preferred Courier"}
 ###END_ORDER_JSON###
 
 Followed by ONLY: "Perfect! I'm generating your PayChangu secure payment link right now... 🚀"
@@ -649,7 +669,14 @@ ${productList}`;
           customer_phone: customerPhone,
           customer_name: orderData.customer_name,
           customer_email: orderData.customer_email,
-          items: [{ product_id: product?.id || null, name: orderData.product_name, quantity: orderData.quantity, price: orderData.price }] as any,
+          items: [{ 
+            product_id: product?.id || null, 
+            name: orderData.product_name, 
+            quantity: orderData.quantity, 
+            price: orderData.price,
+            size: orderData.size,
+            color: orderData.color
+          }] as any,
           total: orderData.price * orderData.quantity,
           channel: "whatsapp",
           agent_id: agentId,

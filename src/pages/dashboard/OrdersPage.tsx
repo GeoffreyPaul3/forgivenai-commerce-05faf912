@@ -311,7 +311,19 @@ const OrdersPage = () => {
                            </div>
                            <div>
                              <p className="text-sm font-bold">{item.name}</p>
-                             <p className="text-[10px] text-muted-foreground font-body">Qty: {item.quantity} × {selectedOrder.currency} {Number(item.price).toLocaleString()}</p>
+                             <div className="flex items-center gap-2 mt-0.5">
+                               <p className="text-[10px] text-muted-foreground font-body">Qty: {item.quantity} × {selectedOrder.currency} {Number(item.price).toLocaleString()}</p>
+                               {item.size && (
+                                 <Badge variant="outline" className="h-4 px-1.5 text-[8px] font-black uppercase bg-muted/50 border-border/50">
+                                   Size: {item.size}
+                                 </Badge>
+                               )}
+                               {item.color && (
+                                 <Badge variant="outline" className="h-4 px-1.5 text-[8px] font-black uppercase bg-muted/50 border-border/50">
+                                   Colour: {item.color}
+                                 </Badge>
+                               )}
+                             </div>
                            </div>
                         </div>
                         <p className="text-sm font-black text-foreground">{selectedOrder.currency} {(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
