@@ -176,7 +176,7 @@ export default function AgentReferralsPage() {
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Referred", value: stats.total, icon: Users, color: "text-blue-500", bg: "bg-blue-500/5", border: "border-blue-500/20" },
+          { label: "Total Referred", value: stats.total, icon: Users, color: "text-[#A21D7F]", bg: "bg-[#A21D7F]/5", border: "border-[#A21D7F]/20" },
           { label: "Converted", value: stats.converted, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },
           { label: "Conversion Rate", value: `${stats.rate}%`, icon: TrendingUp, color: "text-gold", bg: "bg-gold/5", border: "border-gold/20" },
           { label: "Active Customers", value: stats.active, icon: ShoppingBag, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },

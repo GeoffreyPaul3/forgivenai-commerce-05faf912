@@ -137,10 +137,10 @@ export default function VendorDashboard() {
         <motion.div 
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="w-20 h-20 rounded-[2.5rem] bg-orange-500/10 flex items-center justify-center relative"
+          className="w-20 h-20 rounded-[2.5rem] bg-primary/10 flex items-center justify-center relative"
         >
-          <div className="absolute inset-0 rounded-[2.5rem] border-2 border-orange-500/20 animate-ping" style={{ animationDuration: '3s' }} />
-          <Store className="w-10 h-10 text-orange-500" />
+          <div className="absolute inset-0 rounded-[2.5rem] border-2 border-primary/20 animate-ping" style={{ animationDuration: '3s' }} />
+          <Store className="w-10 h-10 text-primary" />
         </motion.div>
         
         <div className="space-y-2 max-w-sm">
@@ -153,7 +153,7 @@ export default function VendorDashboard() {
         <div className="flex flex-col gap-3 w-full max-w-xs">
           <Button 
             size="lg" 
-            className="w-full bg-orange-500 hover:bg-orange-600 h-12 rounded-2xl font-bold shadow-lg shadow-orange-500/20"
+            className="w-full bg-primary hover:bg-primary/90 h-12 rounded-2xl font-bold shadow-lg shadow-primary/20"
             onClick={() => createVendorMutation.mutate()}
             disabled={createVendorMutation.isPending || !session?.user?.id}
           >
@@ -216,7 +216,7 @@ export default function VendorDashboard() {
         <Card className="rounded-3xl border-border/50 bg-card shadow-sm hover:shadow-xl transition-all group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-500 group-hover:scale-110 transition-transform">
+              <div className="p-2.5 rounded-2xl bg-[#A21D7F]/10 text-[#A21D7F] group-hover:scale-110 transition-transform">
                 <ShoppingBag className="w-5 h-5" />
               </div>
             </div>

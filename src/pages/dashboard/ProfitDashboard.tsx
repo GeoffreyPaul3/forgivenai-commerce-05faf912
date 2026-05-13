@@ -15,7 +15,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const COLORS = ["hsl(350, 72%, 21%)", "hsl(40, 60%, 50%)", "hsl(0, 0%, 15%)", "hsl(35, 30%, 60%)"];
+const COLORS = ["hsl(334, 68%, 32%)", "hsl(334, 50%, 45%)", "hsl(40, 60%, 50%)", "hsl(35, 30%, 60%)"];
 
 const ProfitDashboard = () => {
   const [timeRange, setTimeRange] = useState("30");
@@ -171,10 +171,10 @@ const ProfitDashboard = () => {
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="relative overflow-hidden p-6 rounded-3xl border border-indigo-500/20 bg-indigo-500/5 group shadow-sm transition-all hover:shadow-xl hover:shadow-indigo-500/5">
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="relative overflow-hidden p-6 rounded-3xl border border-[#A21D7F]/20 bg-[#A21D7F]/5 group shadow-sm transition-all hover:shadow-xl hover:shadow-[#A21D7F]/5">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><PieIcon className="w-20 h-20" /></div>
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 font-body">Total Surplus</p>
-          <p className="text-3xl font-heading font-black text-indigo-500">MWK {metrics.totalSurplus.toLocaleString()}</p>
+          <p className="text-3xl font-heading font-black text-[#A21D7F]">MWK {metrics.totalSurplus.toLocaleString()}</p>
           <p className="text-[10px] text-muted-foreground mt-3 font-medium uppercase tracking-tight">Extra margin beyond base profit</p>
         </motion.div>
       </div>

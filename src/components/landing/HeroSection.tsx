@@ -46,7 +46,7 @@ const HeroSection = () => {
             opacity: [0.1, 0.2, 0.1] 
           }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-gold rounded-full blur-[150px]" 
+          className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-primary rounded-full blur-[150px]" 
         />
         <motion.div 
           animate={{ 

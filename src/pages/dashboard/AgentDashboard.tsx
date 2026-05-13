@@ -288,14 +288,24 @@ const AgentDashboard = () => {
 
         <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500">
-                <ShoppingBag className="w-5 h-5" />
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-2xl bg-primary/10 text-primary">
+                <ShoppingBag className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-body">Total Orders</p>
+                <p className="text-2xl font-black">{stats.totalOrders}</p>
               </div>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Total Orders</p>
-            <h3 className="text-2xl font-heading font-black">{stats.totalOrders}</h3>
-            <p className="text-[10px] text-muted-foreground mt-2 font-body">{stats.pendingOrders} pending</p>
+            <div className="flex items-center gap-4 mt-4">
+              <div className="p-3 rounded-2xl bg-[#A21D7F]/10 text-[#A21D7F]">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-body">Customers</p>
+                <p className="text-2xl font-black">{stats.customers}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -305,7 +315,7 @@ const AgentDashboard = () => {
               <div className="p-2 rounded-xl bg-gold/10 text-gold">
                 <Trophy className="w-5 h-5" />
               </div>
-              <Badge variant="outline" className="bg-emerald-500/5 text-emerald-600 border-emerald-500/20 font-bold">
+              <Badge variant="outline" className="bg-[#A21D7F]/5 text-[#A21D7F] border-[#A21D7F]/20 font-bold">
                 {agent?.commission_rate || 8}% Rate
               </Badge>
             </div>
@@ -315,12 +325,12 @@ const AgentDashboard = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-[10px] font-bold uppercase">
                 <span className="text-muted-foreground">Monthly Goal</span>
-                <span className="text-primary">{Math.round(stats.progress)}%</span>
+                <span className="text-[#A21D7F]">{Math.round(stats.progress)}%</span>
               </div>
               <Progress value={stats.progress} className="h-1.5" />
               {stats.remaining > 0 ? (
                 <p className="text-[10px] text-muted-foreground font-body">
-                  Need <span className="font-bold text-primary">MWK {stats.remaining.toLocaleString()}</span> more to reach {stats.nextRate} tier.
+                  Need <span className="font-bold text-[#A21D7F]">MWK {stats.remaining.toLocaleString()}</span> more to reach {stats.nextRate} tier.
                 </p>
               ) : (
                 <p className="text-[10px] text-emerald-600 font-bold font-body">
@@ -334,7 +344,7 @@ const AgentDashboard = () => {
         <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
+              <div className="p-2 rounded-xl bg-[#A21D7F]/10 text-[#A21D7F]">
                 <TrendingUp className="w-5 h-5" />
               </div>
               {stats.rank === 1 && (
@@ -358,7 +368,7 @@ const AgentDashboard = () => {
                 <CardTitle className="font-heading text-xl">Recent Orders</CardTitle>
                 <CardDescription>{(myOrders || []).length > 0 ? "2 latest" : "No orders yet"}</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" className="gap-1 text-primary" onClick={() => navigate("/dashboard/agent/orders")}>
+              <Button variant="ghost" size="sm" className="gap-1 text-[#A21D7F]" onClick={() => navigate("/dashboard/agent/orders")}>
                 View all <ArrowRight className="w-4 h-4" />
               </Button>
             </CardHeader>
@@ -393,14 +403,14 @@ const AgentDashboard = () => {
                       </TableCell>
                       <TableCell className="font-bold text-sm">MWK {order.total.toLocaleString()}</TableCell>
                       <TableCell className="pr-6">
-                        <Badge className={`text-[10px] font-bold uppercase ${
-                          order.status === 'delivered' ? 'bg-emerald-500/10 text-emerald-500' : 
-                          order.status === 'shipped' ? 'bg-blue-500/10 text-blue-500' :
-                          'bg-amber-500/10 text-amber-500'
-                        }`}>
-                          {order.status}
-                        </Badge>
-                      </TableCell>
+                      <Badge variant="outline" className={`font-black text-[10px] uppercase ${
+                        order.status === 'delivered' ? 'bg-green-500/10 text-green-500' : 
+                        order.status === 'shipped' ? 'bg-primary/10 text-primary' : 
+                        'bg-yellow-500/10 text-yellow-500'
+                      }`}>
+                        {order.status}
+                      </Badge>
+                    </TableCell>
                     </TableRow>
                   )))}
                 </TableBody>
@@ -432,7 +442,7 @@ const AgentDashboard = () => {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{product.name}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <p className="text-xs font-bold text-primary shrink-0">MWK {product.price.toLocaleString()}</p>
+                        <p className="text-xs font-bold text-[#A21D7F] shrink-0">MWK {product.price.toLocaleString()}</p>
                         <div className="flex gap-1 overflow-hidden">
                           {product.sizes?.slice(0, 3).map((s: string) => (
                             <span key={s} className="text-[8px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-bold uppercase">{s}</span>
@@ -485,13 +495,13 @@ const AgentDashboard = () => {
 
                 <div className="w-full md:w-1/2 p-8 flex flex-col overflow-y-auto bg-card">
                   <div className="mb-6">
-                    <Badge className="bg-primary/10 text-primary border-0 font-bold mb-3 uppercase tracking-wider text-[10px]">
+                    <Badge className="bg-[#A21D7F]/10 text-[#A21D7F] border-0 font-bold mb-3 uppercase tracking-wider text-[10px]">
                       {selectedProduct.category || 'General'}
                     </Badge>
                     <DialogTitle className="font-heading text-2xl font-black leading-tight mb-2">
                       {selectedProduct.name}
                     </DialogTitle>
-                    <div className="text-2xl font-black text-primary font-heading">
+                    <div className="text-2xl font-black text-[#A21D7F] font-heading">
                       MWK {(selectedProduct.price || 0).toLocaleString()}
                     </div>
                   </div>
@@ -550,7 +560,7 @@ const AgentDashboard = () => {
                         toast({ title: "Link Copied!", description: "Share this link to earn commission." });
                         setSelectedProduct(null);
                       }}
-                      className="w-full gap-2 rounded-2xl h-14 font-black text-lg shadow-lg shadow-primary/20"
+                      className="w-full gap-2 rounded-2xl h-14 font-black text-lg shadow-lg shadow-[#A21D7F]/20 bg-[#A21D7F] hover:bg-[#8a186b]"
                     >
                       <Copy className="w-5 h-5" />
                       Copy Referral Link
@@ -582,15 +592,23 @@ const AgentDashboard = () => {
                 </div>
                 <span className="font-semibold text-sm">Copy Referral Link</span>
               </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start gap-3 rounded-2xl hover:bg-blue-500/5 hover:text-blue-500 transition-all h-12"
-                onClick={() => navigate("/dashboard/agent/orders")}
+              <Button variant="ghost" 
+                onClick={() => navigate("/dashboard/products")}
+                className="w-full justify-start gap-3 rounded-2xl hover:bg-primary/5 hover:text-primary transition-all h-12"
               >
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                   <ShoppingBag className="w-4 h-4" />
                 </div>
-                <span className="font-semibold text-sm">View All Orders</span>
+                <span className="text-sm font-bold">Browse Products</span>
+              </Button>
+              <Button variant="ghost" 
+                onClick={() => navigate("/dashboard/customers")}
+                className="w-full justify-start gap-3 rounded-2xl hover:bg-[#A21D7F]/5 hover:text-[#A21D7F] transition-all h-12"
+              >
+                <div className="w-8 h-8 rounded-lg bg-[#A21D7F]/10 flex items-center justify-center">
+                  <Users className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-bold">My Customers</span>
               </Button>
               <Button 
                 variant="ghost" 

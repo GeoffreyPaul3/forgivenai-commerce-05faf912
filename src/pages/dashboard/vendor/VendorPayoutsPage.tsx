@@ -115,7 +115,7 @@ export default function VendorPayoutsPage() {
         {[
           {
             label: "Total Revenue", value: `MWK ${stats.totalRevenue.toLocaleString()}`,
-            sub: "All orders combined", icon: DollarSign, color: "text-blue-500", bg: "bg-blue-500/5", border: "border-blue-500/20",
+            sub: "All orders combined", icon: DollarSign, color: "text-[#A21D7F]", bg: "bg-[#A21D7F]/5", border: "border-[#A21D7F]/20",
           },
           {
             label: "Your Net Earnings", value: `MWK ${stats.vendorShare.toLocaleString()}`,
@@ -163,7 +163,7 @@ export default function VendorPayoutsPage() {
           </CardHeader>
           <CardContent className="pt-5 space-y-4">
             {[
-              { label: "Gross Marketplace Sales", value: stats.totalRevenue, color: "bg-blue-500" },
+              { label: "Gross Marketplace Sales", value: stats.totalRevenue, color: "bg-[#A21D7F]" },
               { label: "My Net Earnings", value: stats.vendorShare, color: "bg-primary" },
               { label: "Successfully Withdrawn", value: stats.totalPaid, color: "bg-emerald-500", negative: true },
               { label: "Available for Payout", value: Math.max(0, stats.balance), color: "bg-gold" },

@@ -255,7 +255,7 @@ const ProductsPage = () => {
                     {product.vendor_id ? "Vendor" : "In-House"}
                   </Badge>
                   {product.is_luxury && (
-                    <Badge className="bg-purple-600 text-white text-[9px] font-black uppercase tracking-tighter">
+                    <Badge className="bg-primary text-white text-[9px] font-black uppercase tracking-tighter shadow-sm shadow-primary/20">
                       LUXURY
                     </Badge>
                   )}

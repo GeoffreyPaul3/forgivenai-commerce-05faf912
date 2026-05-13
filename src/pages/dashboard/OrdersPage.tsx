@@ -23,10 +23,10 @@ function getConfirmDelay(order: Order): { mins: number; state: "ok" | "flagged" 
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
-  confirmed: "bg-blue-100 text-blue-800",
+  confirmed: "bg-primary/10 text-primary",
   paid: "bg-green-100 text-green-800",
-  processing: "bg-purple-100 text-purple-800",
-  shipped: "bg-indigo-100 text-indigo-800",
+  processing: "bg-[#A21D7F]/10 text-[#A21D7F]",
+  shipped: "bg-primary text-white",
   delivered: "bg-green-200 text-green-900",
   cancelled: "bg-red-100 text-red-800",
 };
@@ -360,14 +360,14 @@ const OrdersPage = () => {
 
               {/* Right Column: Fulfillment & Notes */}
               <div className="lg:col-span-5 space-y-6">
-                <div className="p-6 rounded-[2.5rem] bg-indigo-50/50 border border-indigo-100 space-y-6">
-                  <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest inline-flex items-center gap-2">
+                <div className="p-6 rounded-[2.5rem] bg-primary/5 border border-primary/10 space-y-6">
+                  <p className="text-[10px] font-black text-primary uppercase tracking-widest inline-flex items-center gap-2">
                     <Truck className="w-3.5 h-3.5" /> Fulfillment Logistics
                   </p>
                   
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Assigned Rider Name / ID</label>
+                      <label className="text-[9px] font-black uppercase text-primary/60 px-1">Assigned Rider Name / ID</label>
                       <Input 
                         placeholder="e.g. Samuel (Rider 04)" 
                         defaultValue={(selectedOrder as any).rider_name}
@@ -378,35 +378,35 @@ const OrdersPage = () => {
                             });
                           }
                         }}
-                        className="bg-white border-indigo-200 h-12 rounded-2xl" 
+                        className="bg-white border-primary/20 h-12 rounded-2xl" 
                       />
                     </div>
                     
                     <div className="space-y-3">
-                      <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Delivery Proof Image</label>
+                      <label className="text-[9px] font-black uppercase text-primary/60 px-1">Delivery Proof Image</label>
                       
                       {selectedOrder.delivery_proof_url ? (
-                        <div className="relative group aspect-video rounded-3xl overflow-hidden border-2 border-indigo-200 bg-white">
+                        <div className="relative group aspect-video rounded-3xl overflow-hidden border-2 border-primary/20 bg-white">
                           <img src={selectedOrder.delivery_proof_url} alt="Proof" className="w-full h-full object-cover" />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                              <Button size="sm" variant="secondary" className="rounded-xl font-black text-[10px] uppercase" onClick={() => window.open(selectedOrder.delivery_proof_url!, '_blank')}>
                                <Image className="w-3 h-3 mr-1" /> View Full
                              </Button>
-                             <label className="cursor-pointer bg-white text-indigo-600 px-3 py-1.5 rounded-xl font-black text-[10px] uppercase flex items-center gap-1 hover:bg-indigo-50 transition-colors">
+                             <label className="cursor-pointer bg-white text-primary px-3 py-1.5 rounded-xl font-black text-[10px] uppercase flex items-center gap-1 hover:bg-primary/5 transition-colors">
                                <Upload className="w-3 h-3" /> Change
                                <input type="file" accept="image/*" className="hidden" onChange={e => handleUpload(e, selectedOrder.id)} disabled={uploading} />
                              </label>
                           </div>
                         </div>
                       ) : (
-                        <label className={`flex flex-col items-center justify-center aspect-video rounded-3xl border-2 border-dashed transition-all cursor-pointer ${uploading ? 'bg-muted/10 border-muted animate-pulse' : 'bg-white border-indigo-100 hover:bg-indigo-50 hover:border-indigo-300'}`}>
+                        <label className={`flex flex-col items-center justify-center aspect-video rounded-3xl border-2 border-dashed transition-all cursor-pointer ${uploading ? 'bg-muted/10 border-muted animate-pulse' : 'bg-white border-primary/10 hover:bg-primary/5 hover:border-primary/30'}`}>
                           {uploading ? (
-                            <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+                            <Loader2 className="w-8 h-8 text-primary/40 animate-spin" />
                           ) : (
                             <>
-                              <Upload className="w-8 h-8 text-indigo-400 mb-2" />
-                              <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Upload Proof Image</p>
-                              <p className="text-[9px] text-indigo-400 mt-1">Tap to select photo</p>
+                              <Upload className="w-8 h-8 text-primary/40 mb-2" />
+                              <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest">Upload Proof Image</p>
+                              <p className="text-[9px] text-primary/40 mt-1">Tap to select photo</p>
                             </>
                           )}
                           <input type="file" accept="image/*" className="hidden" onChange={e => handleUpload(e, selectedOrder.id)} disabled={uploading} />
@@ -418,7 +418,7 @@ const OrdersPage = () => {
                   <div className="flex gap-3">
                     <Button 
                       variant="outline" 
-                      className="flex-1 border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-black text-xs h-12 rounded-2xl"
+                      className="flex-1 border-primary/20 text-primary hover:bg-primary/5 font-black text-xs h-12 rounded-2xl"
                       onClick={() => {
                         const now = new Date().toISOString();
                         supabase.from('orders').update({ fulfillment_collected_at: now, status: 'shipped' } as any).eq('id', selectedOrder.id).then(() => {
@@ -430,7 +430,7 @@ const OrdersPage = () => {
                       Mark Collected
                     </Button>
                     <Button 
-                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs h-12 rounded-2xl shadow-lg shadow-indigo-200"
+                      className="flex-1 bg-primary hover:bg-primary/90 text-white font-black text-xs h-12 rounded-2xl shadow-lg shadow-primary/10"
                       onClick={() => {
                         const now = new Date().toISOString();
                         supabase.from('orders').update({ delivery_confirmed_at: now, status: 'delivered' } as any).eq('id', selectedOrder.id).then(() => {

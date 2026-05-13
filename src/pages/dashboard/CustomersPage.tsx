@@ -66,7 +66,7 @@ const CustomersPage = () => {
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const stats = [
-    { label: "Total Customers", value: (customers || []).length, icon: Users, color: "text-blue-600" },
+    { label: "Total Customers", value: (customers || []).length, icon: Users, color: "text-[#A21D7F]" },
     { label: "Returning Customers", value: (customers || []).filter(c => c.customer_status !== 'new').length, icon: ShoppingBag, color: "text-emerald-600" },
     { label: "High Value", value: (customers || []).filter(c => c.customer_status === 'high_value').length, icon: TrendingUp, color: "text-gold" },
     { label: "Total Revenue", value: `MWK ${(customers || []).reduce((s, c) => s + (c.total_spent || 0), 0).toLocaleString()}`, icon: DollarSign, color: "text-primary" },

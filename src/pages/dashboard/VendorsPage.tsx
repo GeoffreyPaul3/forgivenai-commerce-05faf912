@@ -32,7 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 function getVendorClass(score: number | null) {
   if (!score && score !== 0) return { label: "—", color: "text-muted-foreground border-muted", bg: "" };
   if (score >= 85) return { label: "A", color: "text-emerald-700 border-emerald-500/30", bg: "bg-emerald-500/10" };
-  if (score >= 70) return { label: "B", color: "text-blue-700 border-blue-500/30", bg: "bg-blue-500/10" };
+  if (score >= 70) return { label: "B", color: "text-[#A21D7F] border-[#A21D7F]/30", bg: "bg-[#A21D7F]/10" };
   if (score >= 50) return { label: "C", color: "text-amber-700 border-amber-500/30", bg: "bg-amber-500/10" };
   return { label: "D", color: "text-red-700 border-red-500/30", bg: "bg-red-500/10" };
 }

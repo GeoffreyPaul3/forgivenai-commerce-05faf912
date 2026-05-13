@@ -14,9 +14,9 @@ import { motion } from "framer-motion";
 
 const statusConfig: Record<string, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
   pending:   { label: "Pending",   color: "text-amber-500",  bg: "bg-amber-500/5",  border: "border-amber-500/20",  icon: Clock },
-  confirmed: { label: "Confirmed", color: "text-blue-500",   bg: "bg-blue-500/5",   border: "border-blue-500/20",   icon: Package },
-  processing:{ label: "Processing",color: "text-purple-500", bg: "bg-purple-500/5", border: "border-purple-500/20", icon: Package },
-  shipped:   { label: "Shipped",   color: "text-indigo-500", bg: "bg-indigo-500/5", border: "border-indigo-500/20", icon: Truck },
+  confirmed: { label: "Confirmed", color: "text-[#A21D7F]",   bg: "bg-[#A21D7F]/5",   border: "border-[#A21D7F]/20",   icon: Package },
+  processing:{ label: "Processing",color: "text-primary",      bg: "bg-primary/5",      border: "border-primary/20",    icon: Package },
+  shipped:   { label: "Shipped",   color: "text-primary",      bg: "bg-primary/5",      border: "border-primary/20",    icon: Truck },
   delivered: { label: "Delivered", color: "text-emerald-500",bg: "bg-emerald-500/5",border: "border-emerald-500/20",icon: CheckCircle2 },
   cancelled: { label: "Cancelled", color: "text-red-500",    bg: "bg-red-500/5",    border: "border-red-500/20",    icon: XCircle },
   paid:      { label: "Paid",      color: "text-emerald-500",bg: "bg-emerald-500/5",border: "border-emerald-500/20",icon: CheckCircle2 },
@@ -89,7 +89,7 @@ export default function AgentOrdersPage() {
   const kpis = [
     { label: "Total Orders", value: orders?.length ?? 0, icon: ShoppingBag, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
     { label: "Delivered", value: orders?.filter((o: any) => o.status === "delivered").length ?? 0, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },
-    { label: "In Transit", value: orders?.filter((o: any) => ["paid", "confirmed", "processing", "shipped"].includes(o.status)).length ?? 0, icon: Truck, color: "text-indigo-500", bg: "bg-indigo-500/5", border: "border-indigo-500/20" },
+    { label: "In Transit", value: orders?.filter((o: any) => ["paid", "confirmed", "processing", "shipped"].includes(o.status)).length ?? 0, icon: Truck, color: "text-[#A21D7F]", bg: "bg-[#A21D7F]/5", border: "border-[#A21D7F]/20" },
     { label: "Total Revenue", value: `MWK ${(orders || []).reduce((s: number, o: any) => s + (o.total || 0), 0).toLocaleString()}`, icon: DollarSign, color: "text-gold", bg: "bg-gold/5", border: "border-gold/20" },
   ];
 

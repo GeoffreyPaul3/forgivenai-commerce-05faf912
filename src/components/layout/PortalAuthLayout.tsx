@@ -38,7 +38,7 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
     <div className="min-h-screen bg-maroon-dark flex flex-col lg:flex-row relative overflow-hidden">
       {/* Marketing Side (Left) */}
       <div className="hidden lg:flex lg:w-1/2 p-12 flex-col justify-between relative z-10">
-        <div className="absolute inset-0 bg-gold/5 blur-[120px] -z-10" />
+        <div className="absolute inset-0 bg-primary/10 blur-[120px] -z-10" />
         
         <Link to="/" className="flex items-center gap-3 group">
           <div className="rounded-lg bg-white/80 flex items-center justify-center shadow-lg shadow-gold/20">

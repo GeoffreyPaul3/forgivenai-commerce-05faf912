@@ -337,7 +337,7 @@ const AgentsPage = () => {
             {[
               { label: "Total Agents", value: agents?.length || 0, icon: Users, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
               { label: "Active", value: agents?.filter(a => a.status === "active").length || 0, icon: UserCheck, color: "text-emerald-600", bg: "bg-emerald-600/5", border: "border-emerald-600/20" },
-              { label: "Total Sales", value: `MWK ${totalSales.toLocaleString()}`, icon: TrendingUp, color: "text-blue-600", bg: "bg-blue-600/5", border: "border-blue-600/20" },
+              { label: "Total Sales", value: `MWK ${totalSales.toLocaleString()}`, icon: TrendingUp, color: "text-[#A21D7F]", bg: "bg-[#A21D7F]/5", border: "border-[#A21D7F]/20" },
               { label: "Unpaid Payouts", value: payouts?.filter(p => p.status === 'pending').length || 0, icon: Wallet, color: "text-gold", bg: "bg-gold/5", border: "border-gold/20" },
             ].map(s => (
               <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`p-5 rounded-2xl border ${s.border} ${s.bg} shadow-sm group hover:shadow-md transition-all`}>

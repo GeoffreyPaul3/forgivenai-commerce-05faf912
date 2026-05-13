@@ -62,7 +62,7 @@ const RootRedirect = () => {
   if (appMode !== "admin") {
     return (
       <div className="min-h-screen bg-maroon-dark flex flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="w-8 h-8 text-gold animate-spin mb-4" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
         <p className="text-white font-body">Detecting portal: {appMode}...</p>
       </div>
     );

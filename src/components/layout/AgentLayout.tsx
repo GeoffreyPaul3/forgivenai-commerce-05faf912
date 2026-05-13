@@ -44,7 +44,7 @@ function AgentSidebar() {
           {!collapsed && (
             <div className="flex flex-col">
               <span className="font-heading text-lg font-bold text-sidebar-foreground leading-tight">Agent Portal</span>
-              <span className="text-[10px] uppercase tracking-wider font-bold text-orange-500 opacity-80 leading-tight">Sales Partner</span>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-[#A21D7F] opacity-80 leading-tight">Sales Partner</span>
             </div>
           )}
         </div>

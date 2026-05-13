@@ -41,7 +41,7 @@ function VendorSidebar() {
           {!collapsed && (
             <div className="flex flex-col">
               <span className="font-heading text-lg font-bold text-sidebar-foreground leading-tight">Vendor Portal</span>
-              <span className="text-[10px] uppercase tracking-wider font-bold text-orange-500 opacity-80 leading-tight">Business Partner</span>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-[#A21D7F] opacity-80 leading-tight">Business Partner</span>
             </div>
           )}
         </div>
@@ -116,7 +116,7 @@ export default function VendorLayout({ children, title }: { children: React.Reac
                   {user?.user_metadata?.avatar_url ? (
                     <img src={user.user_metadata.avatar_url} alt="avatar" className="w-8 h-8 rounded-full object-cover shrink-0 border border-border" />
                   ) : (
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center font-heading font-bold text-sm shrink-0 bg-orange-500 text-white">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center font-heading font-bold text-sm shrink-0 bg-primary text-white">
                       {initials}
                     </div>
                   )}

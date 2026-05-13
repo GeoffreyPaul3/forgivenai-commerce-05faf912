@@ -164,8 +164,8 @@ export default function VendorPerformancePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               { label: "Confirmation Speed", weight: "30%", val: kpis.confirmationSpeed, icon: Clock, color: "bg-emerald-500" },
-              { label: "Acceptance Rate", weight: "30%", val: kpis.acceptanceRate, icon: CheckCircle2, color: "bg-blue-500" },
-              { label: "Fulfillment Success", weight: "25%", val: kpis.fulfillmentSuccess, icon: Package, color: "bg-purple-500" },
+              { label: "Acceptance Rate", weight: "30%", val: kpis.acceptanceRate, icon: CheckCircle2, color: "bg-[#A21D7F]" },
+              { label: "Fulfillment Success", weight: "25%", val: kpis.fulfillmentSuccess, icon: Package, color: "bg-primary" },
               { label: "Product Quality", weight: "15%", val: kpis.productQuality, icon: Star, color: "bg-gold" },
             ].map(m => (
               <div key={m.label} className="space-y-4">
@@ -197,10 +197,10 @@ export default function VendorPerformancePage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {[
           { label: "Market Earnings", value: `MWK ${kpis.revenue.toLocaleString()}`, icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },
-          { label: "Supply Volume", value: kpis.totalOrders, icon: ShoppingBag, color: "text-blue-500", bg: "bg-blue-500/5", border: "border-blue-500/20" },
+          { label: "Supply Volume", value: kpis.totalOrders, icon: ShoppingBag, color: "text-[#A21D7F]", bg: "bg-[#A21D7F]/5", border: "border-[#A21D7F]/20" },
           { label: "Average Item Payout", value: `MWK ${kpis.avgOrder.toLocaleString()}`, icon: TrendingUp, color: "text-gold", bg: "bg-gold/5", border: "border-gold/20" },
           { label: "Confirmed Delivery", value: kpis.delivered, icon: Package, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
-          { label: "Conversion Rate", value: `${kpis.conversionRate}%`, icon: BarChart3, color: "text-purple-500", bg: "bg-purple-500/5", border: "border-purple-500/20" },
+          { label: "Conversion Rate", value: `${kpis.conversionRate}%`, icon: BarChart3, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
           { label: "Escalated Delays", value: kpis.cancelled, icon: Zap, color: "text-red-500", bg: "bg-red-500/5", border: "border-red-500/20" },
         ].map((s, i) => (
           <motion.div

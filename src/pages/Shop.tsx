@@ -103,7 +103,7 @@ export default function Shop() {
   return (
     <div className="min-h-screen" style={{ background: "linear-gradient(180deg, #FFF9F5 0%, #FFFFFF 30%)" }}>
       {/* Slim Top Accent */}
-      <div className="h-1 w-full bg-gradient-to-r from-[#8B1A4A] via-[#C2185B] to-[#D4A574]" />
+      <div className="h-1 w-full bg-gradient-to-r from-[#8B1A4A] via-[#A21D7F] to-[#D4A574]" />
 
       {/* Navbar */}
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-100/80">
@@ -139,7 +139,7 @@ export default function Shop() {
       {/* Referral Banner */}
       {refCode && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-[#8B1A4A] to-[#C2185B] text-white"
+          className="bg-gradient-to-r from-[#8B1A4A] to-[#A21D7F] text-white"
         >
           <div className="container mx-auto px-4 py-3 flex items-center justify-center gap-3 text-sm">
             <span>Welcome! You've been referred by a Forgiven agent</span>
@@ -148,35 +148,112 @@ export default function Shop() {
         </motion.div>
       )}
 
-      {/* Hero — editorial, not a clone */}
-      <section className="container mx-auto px-4 pt-12 pb-8">
-        <div className="rounded-3xl overflow-hidden relative h-56 md:h-80 lg:h-[420px]" style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}>
-          <div className="absolute inset-0 opacity-20 mix-blend-overlay"
-            style={{ backgroundImage: "url('https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=1400&q=80')", backgroundSize: "cover", backgroundPosition: "center" }} />
-          <div className="relative z-10 h-full flex flex-col justify-center px-8 md:px-14 max-w-2xl">
-            <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
-              className="text-amber-300/80 text-[10px] md:text-xs font-bold uppercase tracking-[0.35em] mb-4"
+      {/* Hero — Animated & Sleek */}
+      <section className="container mx-auto px-4 pt-6 md:pt-12 pb-8">
+        <div className="rounded-[2.5rem] overflow-hidden relative min-h-[320px] md:h-80 lg:h-[480px] bg-[#0A0A12] shadow-2xl shadow-indigo-200/20">
+          {/* Animated Background Elements */}
+          <div className="absolute inset-0 overflow-hidden">
+            <motion.div 
+              animate={{ 
+                scale: [1, 1.1, 1],
+                rotate: [0, 5, 0],
+              }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-0 opacity-40 mix-blend-overlay scale-110"
+              style={{ backgroundImage: "url('https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1400&q=80')", backgroundSize: "cover", backgroundPosition: "center" }} 
+            />
+            
+            {/* Sleek Overlays */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A12] via-[#0A0A12]/80 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A12] via-transparent to-transparent" />
+            
+            {/* Floating Particles */}
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0 }}
+                animate={{ 
+                  opacity: [0.1, 0.3, 0.1],
+                  y: [-20, 20, -20],
+                  x: [-10, 10, -10]
+                }}
+                transition={{ 
+                  duration: 5 + i, 
+                  repeat: Infinity, 
+                  delay: i * 0.5 
+                }}
+                className="absolute w-24 h-24 bg-[#8B1A4A]/10 rounded-full blur-3xl"
+                style={{ 
+                  top: `${Math.random() * 100}%`, 
+                  left: `${Math.random() * 100}%` 
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="relative z-10 h-full flex flex-col justify-center px-8 md:px-16 lg:px-24 py-12 md:py-0 max-w-3xl">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+              className="flex items-center gap-2 mb-6"
             >
-              Forgiven Shopping Centre
-            </motion.span>
-            <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-              className="font-heading text-3xl md:text-5xl lg:text-6xl font-black text-white leading-[1.05] mb-4"
+              <div className="w-8 h-[1px] bg-amber-400/50" />
+              <span className="text-amber-400 text-[10px] md:text-xs font-black uppercase tracking-[0.4em]">
+                Forgiven Shopping Centre
+              </span>
+            </motion.div>
+
+            <motion.h1 
+              initial={{ opacity: 0, y: 30 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 0.2, duration: 0.8 }}
+              className="font-heading text-4xl md:text-6xl lg:text-7xl font-black text-white leading-[1.1] mb-6"
             >
-              Elevate Your <br /><span className="italic text-amber-200">Wardrobe</span>
+              Curating <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-100 to-amber-300 italic">Excellence</span>
             </motion.h1>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-              className="text-white/50 text-sm md:text-base font-body max-w-md mb-6"
+
+            <motion.p 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              transition={{ delay: 0.4, duration: 0.8 }}
+              className="text-white/60 text-sm md:text-lg font-body max-w-md mb-10 leading-relaxed"
             >
-              Premium fashion delivered across Malawi. Order directly via WhatsApp.
+              Discover Malawi's most exclusive collection of premium fashion. Seamlessly ordered, locally delivered.
             </motion.p>
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-              <Button onClick={() => document.getElementById("products")?.scrollIntoView({ behavior: "smooth" })}
-                className="bg-white text-gray-900 hover:bg-gray-100 rounded-full px-8 h-12 font-bold gap-2 shadow-lg"
+
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 0.6, duration: 0.8 }}
+              className="flex flex-wrap gap-4"
+            >
+              <Button 
+                onClick={() => document.getElementById("products")?.scrollIntoView({ behavior: "smooth" })}
+                className="bg-[#8B1A4A] text-white hover:bg-[#A21D7F] rounded-2xl px-10 h-14 font-black gap-3 shadow-2xl shadow-[#8B1A4A]/20 group transition-all"
               >
-                Shop Now <ArrowRight className="w-4 h-4" />
+                Explore Catalog 
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
+              
+              <div className="hidden sm:flex items-center gap-4 px-6 border-l border-white/10">
+                <div className="flex -space-x-3">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="w-8 h-8 rounded-full border-2 border-[#0A0A12] bg-gray-800 overflow-hidden">
+                      <img src={`https://i.pravatar.cc/100?u=${i}`} alt="" />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                  1k+ Happy <br />Customers
+                </p>
+              </div>
             </motion.div>
           </div>
+
+          {/* Bottom Accent */}
+          <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-400/20 to-transparent" />
         </div>
       </section>
 

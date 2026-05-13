@@ -81,13 +81,13 @@ const AnalyticsPage = () => {
 
   const kpis = [
     { label: "Products", value: totalProducts, icon: Package, color: "text-primary" },
-    { label: "Orders", value: totalOrders, icon: ShoppingBag, color: "text-blue-600" },
+    { label: "Orders", value: totalOrders, icon: ShoppingBag, color: "text-[#A21D7F]" },
     { label: "Revenue", value: `MWK ${totalRevenue.toLocaleString()}`, icon: DollarSign, color: "text-emerald-600" },
-    { label: "Avg Order", value: `MWK ${avgOrderValue.toLocaleString()}`, icon: TrendingUp, color: "text-gold" },
-    { label: "WhatsApp Orders", value: whatsappOrders, icon: MessageSquare, color: "text-green-600" },
-    { label: "Conversion Rate", value: `${conversionRate}%`, icon: Percent, color: "text-purple-600" },
-    { label: "Agent Sales", value: agentOrders, icon: Users, color: "text-orange-600" },
-    { label: "UGC Videos", value: ugcContent, icon: Video, color: "text-pink-600" },
+    { label: "Avg Order", value: `MWK ${avgOrderValue.toLocaleString()}`, icon: TrendingUp, color: "text-[#A21D7F]" },
+    { label: "WhatsApp Orders", value: whatsappOrders, icon: MessageSquare, color: "text-[#A21D7F]" },
+    { label: "Conversion Rate", value: `${conversionRate}%`, icon: Percent, color: "text-[#A21D7F]" },
+    { label: "Agent Sales", value: agentOrders, icon: Users, color: "text-[#A21D7F]" },
+    { label: "UGC Videos", value: ugcContent, icon: Video, color: "text-[#A21D7F]" },
   ];
 
   return (

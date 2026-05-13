@@ -68,7 +68,7 @@ export default function AgentTrainingPage() {
   };
 
   const colorMap: Record<string, string> = {
-    pdf: "text-blue-500 bg-blue-500/10",
+    pdf: "text-primary bg-primary/10",
     video: "text-red-500 bg-red-500/10",
     link: "text-emerald-500 bg-emerald-500/10"
   };
@@ -77,7 +77,7 @@ export default function AgentTrainingPage() {
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="font-heading text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
+          <h2 className="font-heading text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-[#A21D7F]">
             Training & Enablement
           </h2>
           <p className="text-muted-foreground font-body mt-1">
