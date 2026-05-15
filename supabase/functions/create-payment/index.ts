@@ -26,7 +26,7 @@ serve(async (req) => {
 
     if (req.method === "GET") {
       const txRef = requestUrl.searchParams.get("tx_ref") ?? "";
-      const redirectUrl = requestUrl.searchParams.get("redirect_url") ?? "https://agents-forgiven-ai-commerce.vercel.app/create-payment";
+      const redirectUrl = requestUrl.searchParams.get("redirect_url") ?? "https://agents.forgivensc.com/create-payment";
 
       if (!txRef) {
         return htmlResponse("Payment reference missing", "We could not verify this payment because the transaction reference was not provided.", "error");
@@ -81,7 +81,7 @@ serve(async (req) => {
 
       // callback_url  → server-side webhook (this edge function verifies + syncs the order)
       // return_url    → where the USER'S BROWSER lands after payment (Vercel frontend)
-      const FRONTEND_URL = "https://agents-forgiven-ai-commerce.vercel.app";
+      const FRONTEND_URL = "https://agents.forgivensc.com";
       const callbackUrl = `${SUPABASE_URL}/functions/v1/create-payment`;
       const browserReturnUrl = `${FRONTEND_URL}/create-payment?tx_ref=${generatedTxRef}`;
 
@@ -256,7 +256,7 @@ function withQueryParams(target: string, params: Record<string, string>) {
 function htmlResponse(title: string, message: string, tone: "success" | "pending" | "error") {
   const isSuccess = tone === "success";
   const accentHsl = isSuccess ? "152, 60%, 42%" : tone === "pending" ? "38, 92%, 50%" : "0, 72%, 51%";
-  const redirectUrl = "https://agents-forgiven-ai-commerce.vercel.app";
+  const redirectUrl = "https://agents.forgivensc.com";
   
   return new Response(`<!doctype html>
 <html lang="en">

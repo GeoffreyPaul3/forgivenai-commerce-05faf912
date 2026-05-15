@@ -34,7 +34,7 @@ export const getRedirectUrl = (role: AppMode): string => {
   }
 
   // Production URLs
-  if (role === "vendor") return `${protocol}//vendors-forgiven-ai-commerce.vercel.app/dashboard`;
-  if (role === "agent") return `${protocol}//agents-forgiven-ai-commerce.vercel.app/dashboard`;
-  return `${protocol}//forgiven-ai-commerce.vercel.app/dashboard`;
+  if (role === "vendor") return `${protocol}//vendors.forgivensc.com/dashboard`;
+  if (role === "agent") return `${protocol}//agents.forgivensc.com/dashboard`;
+  return `${protocol}//forgivensc.com/dashboard`;
 };
