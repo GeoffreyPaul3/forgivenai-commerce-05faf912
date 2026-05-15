@@ -136,7 +136,7 @@ export default function AgentProductsPage() {
         </div>
         <div className="flex items-center gap-2 bg-muted/30 px-4 py-2 rounded-2xl border border-border">
           <Badge className="bg-gold/20 text-gold-dark hover:bg-gold/30 border-gold/30 font-bold">
-            {agent?.commission_rate ?? 5}% Commission
+            {agent?.commission_rate ?? 8}% Commission
           </Badge>
           <span className="text-sm font-body text-muted-foreground">on first orders</span>
         </div>

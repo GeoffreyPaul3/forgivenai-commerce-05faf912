@@ -54,9 +54,26 @@ const sections = [
     description: "How you earn 10% on every successful sale.",
     content: (
       <div className="space-y-4 font-body text-sm text-foreground/90">
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4">
-          <p className="font-bold text-emerald-600 text-base mb-1">Your Rate: 10% Commission Per Sale</p>
-          <p className="text-muted-foreground">Example: If a product sells for <strong>MWK 40,000</strong>, your commission is <strong>MWK 4,000</strong>.</p>
+        <div className="space-y-3">
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4">
+            <p className="font-bold text-emerald-600 text-base mb-1">Tier-Based Commission System</p>
+            <p className="text-muted-foreground text-xs">Your commission rate grows as your monthly delivered sales increase. All agents start at Tier 1.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { tier: "Tier 1", range: "MWK 0 – 200,000", rate: "8%", color: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
+              { tier: "Tier 2", range: "MWK 200K – 500K", rate: "10%", color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" },
+              { tier: "Tier 3", range: "MWK 500K – 1M", rate: "12%", color: "text-amber-500 bg-amber-500/10 border-amber-500/20" },
+              { tier: "Tier 4", range: "MWK 1M+", rate: "15%", color: "text-rose-500 bg-rose-500/10 border-rose-500/20" },
+            ].map(t => (
+              <div key={t.tier} className={`rounded-xl border p-3 text-center ${t.color}`}>
+                <p className="font-bold text-[10px] uppercase tracking-widest mb-1">{t.tier}</p>
+                <p className="text-2xl font-heading font-black">{t.rate}</p>
+                <p className="text-[10px] opacity-70 mt-0.5">{t.range}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">Example at Tier 1: Item sells for <strong>MWK 40,000</strong> → you earn <strong>MWK 3,200 (8%)</strong>. Tiers reset monthly.</p>
         </div>
         <div className="space-y-2">
           {[
@@ -140,7 +157,7 @@ const sections = [
           { step: "3", title: "Receive Proof of Payment (POP)", desc: "Ask the customer to send a screenshot of their payment." },
           { step: "4", title: "Submit Order to Admin", desc: "Send the following to Admin: POP screenshot · Customer's name · Product(s) ordered · Size/Colour · Delivery/Pickup address · Your name (Agent) · Customer's phone number" },
           { step: "5", title: "Order Confirmation", desc: "Admin verifies payment and prepares the order for delivery or pickup." },
-          { step: "6", title: "Earn Commission", desc: "Once the order is confirmed and delivered, your 10% is added to your balance." },
+          { step: "6", title: "Earn Commission", desc: "Once the order is confirmed and delivered, your commission (8–15% based on your tier) is added to your balance." },
         ].map(s => (
           <div key={s.step} className="flex gap-3 p-3 rounded-xl bg-muted/30 border border-border">
             <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">{s.step}</div>

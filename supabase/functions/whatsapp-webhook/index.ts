@@ -586,12 +586,17 @@ HOW IT WORKS:
 - Agents NEVER handle money directly — all payments go to Forgiven SC accounts.
 - Agents must collect Proof of Payment (POP) and submit order details to Admin.
 
-COMMISSION DETAILS:
-- Rate: 10% of the final sale price per delivered order.
-- Example: Item sells for MWK 40,000 → Agent earns MWK 4,000.
+COMMISSION DETAILS (TIER-BASED SYSTEM):
+Commission is NOT a flat rate — it grows with your monthly delivered sales:
+- Tier 1: MWK 0 – 200,000/month = 8% commission
+- Tier 2: MWK 200,000 – 500,000/month = 10% commission
+- Tier 3: MWK 500,000 – 1,000,000/month = 12% commission
+- Tier 4: MWK 1,000,000+/month = 15% commission
+All new agents start at Tier 1 (8%). Tiers are calculated monthly on delivered sales.
+- Example at Tier 1: Item sells for MWK 40,000 → agent earns MWK 3,200 (8%).
+- Example at Tier 4: Item sells for MWK 40,000 → agent earns MWK 6,000 (15%).
 - Commissions are recorded after the order is DELIVERED or picked up.
 - Payout: Every Friday (bank transfer only — no cash, no mobile money to agents).
-- Repeat customers: If a customer you brought buys again within 30 days, you still earn commission. After 30 days, the customer becomes a Forgiven SC customer.
 
 WHAT AGENTS CAN DO:
 - Promote and sell Forgiven SC products

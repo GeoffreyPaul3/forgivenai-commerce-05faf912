@@ -297,9 +297,31 @@ export default function AgentEarningsPage() {
           </div>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-3xl font-heading font-black text-gold">{agent.commission_rate ?? 5}%</p>
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Per sale</p>
+        <div className="text-right shrink-0">
+          <p className="text-3xl font-heading font-black text-gold">{agent.commission_rate ?? 8}%</p>
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Current Tier</p>
         </div>
+      </div>
+
+      {/* Tier Breakdown */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { tier: "Tier 1", range: "MWK 0 – 200K", rate: "8%", active: (agent.commission_rate ?? 8) === 8 },
+          { tier: "Tier 2", range: "MWK 200K – 500K", rate: "10%", active: (agent.commission_rate ?? 8) === 10 },
+          { tier: "Tier 3", range: "MWK 500K – 1M", rate: "12%", active: (agent.commission_rate ?? 8) === 12 },
+          { tier: "Tier 4", range: "MWK 1M+", rate: "15%", active: (agent.commission_rate ?? 8) === 15 },
+        ].map(t => (
+          <div key={t.tier} className={`p-3 rounded-2xl border text-center transition-all ${
+            t.active
+              ? "border-gold/40 bg-gold/10 shadow-md shadow-gold/10"
+              : "border-border bg-muted/20 opacity-50"
+          }`}>
+            <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${ t.active ? "text-gold" : "text-muted-foreground" }`}>{t.tier}</p>
+            <p className={`text-2xl font-heading font-black ${ t.active ? "text-gold" : "text-foreground" }`}>{t.rate}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">{t.range}</p>
+            {t.active && <span className="text-[9px] font-bold uppercase tracking-widest text-gold">★ Active</span>}
+          </div>
+        ))}
       </div>
 
       {/* Chart + Summary */}
