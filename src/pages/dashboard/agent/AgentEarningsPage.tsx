@@ -297,7 +297,6 @@ export default function AgentEarningsPage() {
           </div>
         </div>
         <div className="text-right shrink-0">
-        <div className="text-right shrink-0">
           <p className="text-3xl font-heading font-black text-gold">{agent.commission_rate ?? 8}%</p>
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Current Tier</p>
         </div>
