@@ -21,12 +21,13 @@ import logo from "@/assets/forgiven.png";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 const agentMenuItems = [
-  { title: "Dashboard",      url: "/dashboard",                     icon: LayoutDashboard },
-  { title: "Products",       url: "/dashboard/agent/products",      icon: ShoppingBag },
-  { title: "Promotion Kit",  url: "/dashboard/agent/content",       icon: TrendingUp },
-  { title: "My Referrals",   url: "/dashboard/agent/referrals",     icon: Users },
-  { title: "Earnings",       url: "/dashboard/agent/earnings",      icon: TrendingUp },
-  { title: "Orders Tracking",url: "/dashboard/agent/orders",        icon: PackageSearch },
+  { title: "Dashboard",        url: "/dashboard",                     icon: LayoutDashboard },
+  { title: "Products",         url: "/dashboard/agent/products",      icon: ShoppingBag },
+  { title: "Promotion Kit",    url: "/dashboard/agent/content",       icon: TrendingUp },
+  { title: "My Referrals",     url: "/dashboard/agent/referrals",     icon: Users },
+  { title: "Earnings",         url: "/dashboard/agent/earnings",      icon: TrendingUp },
+  { title: "Orders Tracking",  url: "/dashboard/agent/orders",        icon: PackageSearch },
+  { title: "Training Hub",     url: "/dashboard/agent/training",      icon: GraduationCap },
 ];
 
 function AgentSidebar() {

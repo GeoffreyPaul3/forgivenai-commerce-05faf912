@@ -550,6 +550,7 @@ const pageTitles: Record<string, string> = {
   "/dashboard/agent/earnings": "My Earnings",
   "/dashboard/agent/orders": "Orders Tracking",
   "/dashboard/agent/content": "Promotion Kit",
+  "/dashboard/agent/training": "Training Hub",
   "/dashboard/assistant": "AI Assistant",
   "/dashboard/analytics": "Analytics",
   "/dashboard/settings": "Settings",
@@ -593,6 +594,7 @@ const DashboardPage = () => {
       <Route path="agent/orders" element={<AgentOrdersPage />} />
       <Route path="agent/products" element={<AgentProductsPage />} />
       <Route path="agent/content" element={<AgentContentPage />} />
+      <Route path="agent/training" element={<AgentTrainingPage />} />
       <Route path="assistant" element={<AIAssistantPage />} />
       <Route path="analytics" element={<AnalyticsPage />} />
       <Route path="settings" element={<SettingsPage />} />
