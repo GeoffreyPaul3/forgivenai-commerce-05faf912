@@ -774,7 +774,7 @@ function AddAgentForm({ onSave, generateCode, isLoading }: { onSave: (a: any) =>
         <Input placeholder="Emergency Contact (Name & Phone)" value={form.emergency_contact} onChange={e => setForm(f => ({ ...f, emergency_contact: e.target.value }))} required />
       </div>
 
-      <Button className="w-full" disabled={isLoading || !form.name || !form.referral_code || !form.email || !form.password || !form.national_id} onClick={() => onSave({ ...form, commission_rate: parseFloat(form.commission_rate) || 10 })}>
+      <Button className="w-full" disabled={isLoading || !form.name || !form.referral_code || !form.email || !form.password || !form.national_id} onClick={() => onSave({ ...form, commission_rate: parseFloat(form.commission_rate) || 8 })}>
         {isLoading ? "Registering..." : "Register Agent"}
       </Button>
     </div>
@@ -784,7 +784,7 @@ function AddAgentForm({ onSave, generateCode, isLoading }: { onSave: (a: any) =>
 function EditAgentForm({ agent, onSave }: { agent: Agent; onSave: (d: any) => void }) {
   const [form, setForm] = useState({
     name: agent.name, phone: agent.phone || "", email: agent.email || "",
-    commission_rate: String(agent.commission_rate || 10), status: agent.status || "active",
+    commission_rate: String(agent.commission_rate || 8), status: agent.status || "active",
   });
   return (
     <div className="space-y-3">
@@ -799,7 +799,7 @@ function EditAgentForm({ agent, onSave }: { agent: Agent; onSave: (d: any) => vo
           <SelectItem value="inactive">Inactive</SelectItem>
         </SelectContent>
       </Select>
-      <Button className="w-full" onClick={() => onSave({ id: agent.id, ...form, commission_rate: parseFloat(form.commission_rate) || 10 })}>Save Changes</Button>
+      <Button className="w-full" onClick={() => onSave({ id: agent.id, ...form, commission_rate: parseFloat(form.commission_rate) || 8 })}>Save Changes</Button>
     </div>
   );
 }
