@@ -24,6 +24,7 @@ import {
   DialogDescription 
 } from "@/components/ui/dialog";
 import { Eye, Package, Ruler, Palette, Info } from "lucide-react";
+import AgentBanner from "@/components/dashboard/AgentBanner";
 
 const AgentDashboard = () => {
   const { toast } = useToast();
@@ -283,6 +284,9 @@ const AgentDashboard = () => {
           </Button>
         </div>
       </div>
+
+      {/* Mini Promotion Banner */}
+      <AgentBanner />
 
       {/* KPI Section */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
