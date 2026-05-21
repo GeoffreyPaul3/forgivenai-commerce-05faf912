@@ -52,7 +52,7 @@ export default function AuthPage() {
       if (mode === "login") {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        
+
         // Fetch user role for redirection
         const { data: profile } = await supabase
           .from("profiles")
@@ -61,7 +61,7 @@ export default function AuthPage() {
           .single();
 
         const userRole = profile?.role;
-        
+
         toast({ title: "Access Granted", description: "Authentication successful. Welcome back." });
 
         // Force redirect to correct portal if user is on the wrong one
@@ -82,23 +82,23 @@ export default function AuthPage() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { 
-            data: { 
+          options: {
+            data: {
               full_name: fullName,
               role,
               phone,
               business_name: role === 'vendor' ? businessName : undefined
-            } 
+            }
           },
         });
         if (error) throw error;
-        
+
         const isAdmin = role === 'admin';
         toast({
           title: isAdmin ? "Admin account created!" : "Account created!",
-          description: isAdmin 
-            ? "Your administrator account is active. Please sign in." 
-            : "Your account is awaiting administrator approval.",
+          description: isAdmin
+            ? "Your administrator account is active. Please sign in."
+            : "Please sign in.",
         });
 
         if (isAdmin) {
@@ -129,16 +129,16 @@ export default function AuthPage() {
   };
 
   const headings: Record<AuthMode, { title: string; sub: string }> = {
-    login:  { 
-      title: appMode === "admin" ? "Systems Access" : appMode === "agent" ? "Agents Portal Sign In" : "Vendors Portal Sign In", 
-      sub: appMode === "admin" ? "Access the central commerce control hub." : "Manage your retail operations and performance." 
+    login: {
+      title: appMode === "admin" ? "Systems Access" : appMode === "agent" ? "Agents Portal Sign In" : "Vendors Portal Sign In",
+      sub: appMode === "admin" ? "Access the central commerce control hub." : "Manage your retail operations and performance."
     },
-    signup: { 
-      title: appMode === "vendor" ? "Partner with Forgiven" : appMode === "agent" ? "Join the Commerce Network" : "Administrator Registration", 
-      sub: appMode === "vendor" ? "Register as a certified vendor to access our distribution network." : appMode === "agent" ? "Become a certified agent and earn through premium retail." : "Initialize administrative credentials for the commerce ecosystem." 
+    signup: {
+      title: appMode === "vendor" ? "Partner with Forgiven" : appMode === "agent" ? "Join the Commerce Network" : "Administrator Registration",
+      sub: appMode === "vendor" ? "Register as a certified vendor to access our distribution network." : appMode === "agent" ? "Become a certified agent and earn through premium retail." : "Initialize administrative credentials for the commerce ecosystem."
     },
-    forgot: { title: "Credential Recovery",      sub: "Enter your registered email to receive a secure reset link." },
-    reset:  { title: "Update Credentials",        sub: "Establish a new secure password for your account." },
+    forgot: { title: "Credential Recovery", sub: "Enter your registered email to receive a secure reset link." },
+    reset: { title: "Update Credentials", sub: "Establish a new secure password for your account." },
   };
 
   const formContent = (
@@ -245,10 +245,10 @@ export default function AuthPage() {
           <Button type="submit" disabled={loading} className="w-full h-12 bg-gold hover:bg-gold-light text-maroon-dark font-bold rounded-xl mt-6 group shadow-lg shadow-gold/10 transition-all active:scale-95">
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
               <>
-                {mode === "login"  && "Sign In"}
+                {mode === "login" && "Sign In"}
                 {mode === "signup" && "Create Account"}
                 {mode === "forgot" && "Send Reset Link"}
-                {mode === "reset"  && "Update Password"}
+                {mode === "reset" && "Update Password"}
                 {mode !== "forgot" && <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />}
               </>
             )}
