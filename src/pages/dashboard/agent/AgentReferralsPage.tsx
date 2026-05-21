@@ -166,7 +166,7 @@ export default function AgentReferralsPage() {
             <div className="flex items-center gap-2">
               <Zap className="w-3.5 h-3.5 text-emerald-500" />
               <span className="text-xs text-muted-foreground font-body">
-                Earn <strong className="text-emerald-600">{agent.commission_rate ?? 5}%</strong> commission on first orders
+                Earn <strong className="text-emerald-600">{agent.commission_rate ?? 5}%</strong> commission on all attributed orders
               </span>
             </div>
           </div>

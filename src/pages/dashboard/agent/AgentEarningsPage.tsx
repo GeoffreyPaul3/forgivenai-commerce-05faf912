@@ -293,7 +293,7 @@ export default function AgentEarningsPage() {
           </div>
           <div>
             <p className="font-bold text-sm">Your Commission Rate</p>
-            <p className="text-xs text-muted-foreground font-body">Earned on every first order from your referrals</p>
+            <p className="text-xs text-muted-foreground font-body">Earned on every referred order placed using your link/code</p>
           </div>
         </div>
         <div className="text-right shrink-0">
@@ -631,14 +631,13 @@ export default function AgentEarningsPage() {
         </CardContent>
       </Card>
 
-      {/* Policy reminder */}
       <div className="p-4 rounded-2xl border border-border bg-muted/20 flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <div className="text-xs text-muted-foreground font-body">
-          <p className="font-bold text-foreground mb-1">Commission Policy</p>
+          <p className="font-bold text-foreground mb-1">Commission & Attribution Policy</p>
           <p>
-            Commissions are earned <strong>only on the first order</strong> placed by each customer you refer.
-            Repeat purchases from the same customer do not generate additional commissions — the platform manages long-term customer retention.
+            Commissions are earned on <strong>every order</strong> successfully placed through your agent referral path (link, code, or WhatsApp checkout). 
+            If a customer purchases directly through FSC channels without active referral attribution, no commission applies.
           </p>
         </div>
       </div>

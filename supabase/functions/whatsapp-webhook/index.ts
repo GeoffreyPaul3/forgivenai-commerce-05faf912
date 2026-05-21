@@ -295,13 +295,18 @@ serve(async (req) => {
         .eq("phone", customerPhone)
         .single();
       
-      // Referral detection: Scan body for FGV-XXXXXX or AGT-XXXXXX pattern
+      // ── Referral Detection (Order-Level Attribution Model) ──
+      // Scan message body for FGV-XXXXXX or AGT-XXXXXX pattern
       const refMatch = body.match(/(?:FGV|AGT)-([A-Z0-9]{4,8})/i);
       const referralCode = refMatch ? refMatch[0].toUpperCase() : null;
-      let agentId = null;
+      let agentId: string | null = null;
+      // attributionSource: 'code' = referral code typed in message,
+      //                    'link' = agent set on conversation from prior referral link click,
+      //                    null   = no active attribution (direct FSC sale)
+      let attributionSource: string | null = null;
 
       if (referralCode) {
-        // Try FGV- prefix first (native), then check agents by code fragment
+        // Referral code detected in this message body → source is 'code'
         const { data: agent } = await supabase
           .from("agents")
           .select("id, referral_code")
@@ -309,7 +314,8 @@ serve(async (req) => {
           .single();
         if (agent) {
           agentId = agent.id;
-          console.log(`✅ Referral detected: ${referralCode} → agent ${agentId}`);
+          attributionSource = "code";
+          console.log(`✅ Referral code detected: ${referralCode} → agent ${agentId}`);
         } else {
           console.log(`⚠️ Referral code ${referralCode} not matched to any agent`);
         }
@@ -334,17 +340,21 @@ serve(async (req) => {
           .single();
         convo = newConvo;
       } else {
-        // Persist agent_id on the conversation if we just detected one (referral code in this message)
+        // Persist agent_id on the conversation if we just detected one via referral code
         const updatePayload: Record<string, any> = { last_message_at: new Date().toISOString() };
         if (agentId) updatePayload.agent_id = agentId;
         await supabase.from("conversations").update(updatePayload).eq("id", convo.id);
-        // Fall back to the stored agent_id if the current message has no referral code
-        if (!agentId && convo.agent_id) agentId = convo.agent_id;
-        // Ultimate fallback: check if the customer already has a first_agent_id assigned
-        if (!agentId && customer?.first_agent_id) {
-          agentId = customer.first_agent_id;
-          console.log(`[DEBUG] No code/convo agent found. Falling back to customer's first_agent_id: ${agentId}`);
+        // Fall back to the conversation's stored agent_id (set when customer clicked a referral link)
+        // This covers the case where customer clicked a link earlier but didn't include the code in this message
+        if (!agentId && convo.agent_id) {
+          agentId = convo.agent_id;
+          attributionSource = "link"; // Agent was set via prior referral link click on this conversation
+          console.log(`[Attribution] Using conversation agent_id (link attribution): ${agentId}`);
         }
+        // NOTE: We intentionally do NOT fall back to customer.first_agent_id here.
+        // That was the old "customer ownership" model. Under the new order-level
+        // attribution model, if there is no active referral on this conversation,
+        // this is a direct FSC sale — no commission applies.
       }
 
       if (!convo) return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
@@ -446,8 +456,9 @@ serve(async (req) => {
                 await supabase.from("conversations").update({ pending_order: null }).eq("id", convo.id);
               }
 
-              // Create order
+              // Create order (order-level attribution model)
               const isFirstOrder = customer ? (customer.total_orders === 0) : true;
+              const orderAttributionTs = agentId ? new Date().toISOString() : null;
               const { data: newOrder, error: orderError } = await supabase.from("orders").insert({
                 customer_phone: customerPhone,
                 customer_name:  custName,
@@ -464,10 +475,22 @@ serve(async (req) => {
                 channel: "whatsapp",
                 agent_id: agentId,
                 is_first_order: isFirstOrder,
+                // ── Order-Level Attribution Fields ──
+                attributed_agent_id:   agentId,
+                attribution_source:    agentId ? (attributionSource ?? "whatsapp") : "direct",
+                attribution_timestamp: orderAttributionTs,
+                order_source_type:     "whatsapp",
                 notes: `Delivery Address: ${custAddress} | Contact: ${custPhone} | Courier: ${custCourier}`,
                 courier_name: custCourier,
                 status: "pending",
               }).select().single();
+
+              // Clear conversation agent_id after order is placed.
+              // This ensures the next independent purchase by this customer
+              // is treated as a direct FSC sale unless a new referral is active.
+              if (newOrder) {
+                await supabase.from("conversations").update({ agent_id: null }).eq("id", convo.id);
+              }
 
               if (orderError || !newOrder) throw new Error(`Order creation failed: ${orderError?.message}`);
               console.log(`✅ Order created (YES intercept): ${newOrder.id}`);
@@ -727,8 +750,9 @@ ${productList}`;
         await sendWhatsApp(from, cleanText, undefined, TEMPLATES.ORDER_CONFIRMATION);
         await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: cleanText });
 
-        // Create order record
+        // Create order record (order-level attribution model)
         const isFirstOrder = customer ? (customer.total_orders === 0) : true;
+        const orderAttributionTs = agentId ? new Date().toISOString() : null;
         const { data: newOrder, error: orderError } = await supabase.from("orders").insert({
           customer_phone: customerPhone,
           customer_name: orderData.customer_name,
@@ -745,10 +769,22 @@ ${productList}`;
           channel: "whatsapp",
           agent_id: agentId,
           is_first_order: isFirstOrder,
+          // ── Order-Level Attribution Fields ──
+          attributed_agent_id:   agentId,
+          attribution_source:    agentId ? (attributionSource ?? "whatsapp") : "direct",
+          attribution_timestamp: orderAttributionTs,
+          order_source_type:     "whatsapp",
           notes: `Delivery Address: ${orderData.address} | Contact: ${orderData.phone} | Courier: ${orderData.courier || 'Unspecified'}`,
           courier_name: orderData.courier || 'Unspecified',
           status: "pending",
         }).select().single();
+
+        // Clear conversation agent_id after order is placed.
+        // This ensures the next independent purchase by this customer
+        // is treated as a direct FSC sale unless a new referral is active.
+        if (newOrder) {
+          await supabase.from("conversations").update({ agent_id: null }).eq("id", convo.id);
+        }
 
         if (orderError) {
           console.error("Failed to create order:", orderError);

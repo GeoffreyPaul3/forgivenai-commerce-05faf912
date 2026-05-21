@@ -138,7 +138,7 @@ export default function AgentProductsPage() {
           <Badge className="bg-gold/20 text-gold-dark hover:bg-gold/30 border-gold/30 font-bold">
             {agent?.commission_rate ?? 8}% Commission
           </Badge>
-          <span className="text-sm font-body text-muted-foreground">on first orders</span>
+          <span className="text-sm font-body text-muted-foreground">on every referred order</span>
         </div>
       </div>
 

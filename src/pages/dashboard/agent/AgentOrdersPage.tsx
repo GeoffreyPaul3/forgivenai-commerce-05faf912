@@ -282,11 +282,10 @@ export default function AgentOrdersPage() {
         </CardContent>
       </Card>
 
-      {/* Info */}
       <div className="p-4 rounded-2xl border border-border bg-muted/20 flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <p className="text-xs text-muted-foreground font-body">
-          <strong className="text-foreground">Only first orders count</strong> — commissions are earned on each referred customer's first purchase only.
+          <strong className="text-foreground">Commissions are earned on every order</strong> — commissions are calculated for every successful order carrying your referral code or link.
           Track your order statuses here to know when commissions are ready for payout.
         </p>
       </div>

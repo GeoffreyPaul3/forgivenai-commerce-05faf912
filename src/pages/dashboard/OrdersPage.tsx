@@ -152,7 +152,19 @@ const OrdersPage = () => {
 
   const createOrder = useMutation({
     mutationFn: async (order: any) => {
-      const { error } = await supabase.from("orders").insert(order);
+      // For agent-created orders, inject order-level attribution fields
+      // so commission is correctly attributed under the per-order model.
+      const enrichedOrder = profile?.role === "agent" && agentId
+        ? {
+            ...order,
+            agent_id:              agentId,
+            attributed_agent_id:   agentId,
+            attribution_source:    "assisted_checkout",
+            attribution_timestamp: new Date().toISOString(),
+            order_source_type:     "agent",
+          }
+        : order;
+      const { error } = await supabase.from("orders").insert(enrichedOrder);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -491,3 +503,4 @@ function AddOrderForm({ onSave }: { onSave: (o: any) => void }) {
 }
 
 export default OrdersPage;
+
