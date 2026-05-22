@@ -274,6 +274,15 @@ const AgentsPage = () => {
   const totalSales = Object.values(agentStats).reduce((s, a) => s + a.sales, 0);
   const totalCommission = Object.values(agentStats).reduce((s, a) => s + a.commission, 0);
 
+  // Top 5 agents by total sales — derived from agentStats already in memory, no extra query
+  const topAgents = useMemo(() =>
+    [...(agents || [])]
+      .filter(a => (agentStats[a.id]?.sales || 0) > 0)
+      .sort((a, b) => (agentStats[b.id]?.sales || 0) - (agentStats[a.id]?.sales || 0))
+      .slice(0, 5),
+    [agents, agentStats]
+  );
+
   const filteredAgents = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return agents || [];
@@ -349,6 +358,72 @@ const AgentsPage = () => {
               </motion.div>
             ))}
           </div>
+
+          {/* ── Top Performers Leaderboard ── */}
+          {topAgents.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                  <TrendingUp className="w-3.5 h-3.5 text-gold" /> Top Performers
+                </h3>
+                <span className="text-[10px] text-muted-foreground font-body">By total sales volume</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {topAgents.map((agent, rank) => {
+                  const st = agentStats[agent.id] || { sales: 0, orderCount: 0, commission: 0 };
+                  const medals = ["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49", "4", "5"];
+                  const isTop = rank === 0;
+                  return (
+                    <motion.div
+                      key={agent.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: rank * 0.06 }}
+                      className={`relative p-4 rounded-2xl border flex flex-col gap-2 overflow-hidden transition-all hover:shadow-md ${
+                        isTop ? "bg-gold/5 border-gold/30 shadow-sm" :
+                        rank === 1 ? "bg-muted/40 border-border/50" :
+                        "bg-muted/20 border-border/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xl leading-none">{medals[rank]}</span>
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] font-black uppercase px-2 py-0 rounded-md ${
+                            isTop ? "border-gold/40 text-gold bg-gold/10" : ""
+                          }`}
+                        >
+                          Rank #{rank + 1}
+                        </Badge>
+                      </div>
+                      <div className="mt-1">
+                        <p className={`font-black text-sm tracking-tight truncate ${isTop ? "text-gold" : ""}`}>
+                          {agent.name}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{agent.referral_code}</p>
+                      </div>
+                      <div className="border-t border-border/30 pt-2 space-y-1.5">
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-muted-foreground">Sales</span>
+                          <span className={`font-black ${isTop ? "text-gold" : "text-foreground"}`}>
+                            MWK {st.sales.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-muted-foreground">Orders</span>
+                          <span className="font-bold">{st.orderCount}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-muted-foreground">Customers</span>
+                          <span className="font-bold">{st.customerCount ?? 0}</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-3xl border border-border/50 bg-card overflow-hidden shadow-sm">
             <div className="p-4 border-b border-border/50 md:hidden">

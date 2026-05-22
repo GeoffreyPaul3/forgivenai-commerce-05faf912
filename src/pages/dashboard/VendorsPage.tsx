@@ -20,7 +20,8 @@ import { toast, useToast } from "@/hooks/use-toast";
 import { 
   Store, Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Star, 
   MapPin, Phone, User, Loader2, Clock, AlertTriangle, Wallet, 
-  CheckCircle2, BarChart3, TrendingUp, Filter, ShieldCheck, Timer
+  CheckCircle2, BarChart3, TrendingUp, Filter, ShieldCheck, Timer,
+  Package, ShoppingCart
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -54,6 +55,12 @@ const VendorsPage = () => {
   const [viewVendor, setViewVendor] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("vendors");
+  const [viewProfileTab, setViewProfileTab] = useState("details");
+
+  // Reset to Details tab whenever a different vendor profile is opened
+  useEffect(() => {
+    if (viewVendor) setViewProfileTab("details");
+  }, [viewVendor?.id]);
 
   const { data: vendors, isLoading } = useQuery({
     queryKey: ["vendors"],
@@ -97,6 +104,81 @@ const VendorsPage = () => {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Fetch vendor's products + orders whenever a profile dialog is open
+  const { data: vendorProfileData, isLoading: isLoadingVendorProfile } = useQuery({
+    queryKey: ["vendor-profile-data", viewVendor?.id],
+    enabled: !!viewVendor,
+    queryFn: async () => {
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, name, price, status, stock_quantity, images, category")
+        .eq("vendor_id", viewVendor!.id)
+        .order("created_at", { ascending: false });
+
+      const productIds = new Set((products || []).map((p: any) => p.id));
+
+      let orders: any[] = [];
+      if (productIds.size > 0) {
+        const { data: allOrders } = await supabase
+          .from("orders")
+          .select("id, customer_name, total, status, currency, created_at, items")
+          .order("created_at", { ascending: false })
+          .limit(500);
+
+        orders = (allOrders || []).filter((order: any) => {
+          const items = Array.isArray(order.items) ? order.items : [];
+          return items.some((item: any) => productIds.has(item.product_id));
+        });
+      }
+
+      return { products: products || [], orders };
+    },
+  });
+
+  // Per-vendor order counts for the management table
+  const { data: vendorStats } = useQuery({
+    queryKey: ["vendor-stats-counts"],
+    queryFn: async () => {
+      const { data: vendorProds } = await supabase
+        .from("products")
+        .select("id, vendor_id")
+        .not("vendor_id", "is", null);
+
+      // vendorId → Set<productId>
+      const vpMap = new Map<string, Set<string>>();
+      for (const p of vendorProds || []) {
+        if (!p.vendor_id) continue;
+        if (!vpMap.has(p.vendor_id)) vpMap.set(p.vendor_id, new Set());
+        vpMap.get(p.vendor_id)!.add(p.id);
+      }
+
+      const { data: allOrders } = await supabase
+        .from("orders")
+        .select("id, items");
+
+      // vendorId → order count
+      const orderCount = new Map<string, number>();
+      for (const order of allOrders || []) {
+        const items = Array.isArray(order.items) ? (order.items as any[]) : [];
+        const seen = new Set<string>();
+        for (const item of items) {
+          for (const [vid, pids] of vpMap.entries()) {
+            if (pids.has(item.product_id) && !seen.has(vid)) {
+              seen.add(vid);
+              orderCount.set(vid, (orderCount.get(vid) || 0) + 1);
+            }
+          }
+        }
+      }
+
+      // vendorId → product count
+      const productCount = new Map<string, number>();
+      for (const [vid, pids] of vpMap.entries()) productCount.set(vid, pids.size);
+
+      return { orderCount, productCount };
     },
   });
 
@@ -265,6 +347,7 @@ const VendorsPage = () => {
                   <TableHead>Location</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Class</TableHead>
+                  <TableHead>Orders</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right pr-6">Actions</TableHead>
                 </TableRow>
@@ -273,14 +356,14 @@ const VendorsPage = () => {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 7 }).map((__, j) => (
+                      {Array.from({ length: 8 }).map((__, j) => (
                         <TableCell key={j} className={j === 0 ? "pl-6" : ""}><div className="h-4 rounded bg-muted animate-pulse" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : filteredVendors.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-20 text-muted-foreground font-body">
+                    <TableCell colSpan={8} className="text-center py-20 text-muted-foreground font-body">
                       <Store className="w-12 h-12 mx-auto mb-4 opacity-20" />
                       <p className="text-lg font-bold">No vendors found</p>
                       <p className="text-sm">Try adjusting your search terms</p>
@@ -323,6 +406,18 @@ const VendorsPage = () => {
                             Class {cls.label}
                           </Badge>
                         ); })()}
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const cnt = vendorStats?.orderCount.get(vendor.id) || 0;
+                          const pCnt = vendorStats?.productCount.get(vendor.id) || 0;
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-sm font-black text-foreground">{cnt}</span>
+                              <span className="text-[10px] text-muted-foreground font-body">{pCnt} product{pCnt !== 1 ? "s" : ""}</span>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <Badge variant={vendor.status === "active" ? "default" : "secondary"} className="capitalize text-[10px] font-black px-3 rounded-lg">
@@ -663,65 +758,165 @@ const VendorsPage = () => {
                </div>
             </div>
             
-            <div className="md:w-2/3 p-6 sm:p-8 space-y-6 sm:space-y-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
-                  <div className="flex items-center gap-2 mb-2 text-muted-foreground"><User className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Primary Contact</span></div>
-                  <p className="font-black text-sm tracking-tight">{viewVendor?.contact_person}</p>
-                </div>
-                <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
-                  <div className="flex items-center gap-2 mb-2 text-muted-foreground"><Phone className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Contact Phone</span></div>
-                  <p className="font-black text-sm tracking-tight">{viewVendor?.phone}</p>
-                </div>
-                <div className="p-4 rounded-3xl bg-muted/30 border border-border/50 col-span-2">
-                  <div className="flex items-center gap-2 mb-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Warehouse & Logistics Address</span></div>
-                  <p className="font-black text-sm tracking-tight leading-snug">{viewVendor?.address || "Not specified"}</p>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-6 rounded-3xl bg-gold/5 border-2 border-gold/10 shadow-sm">
-                  <div>
-                     <p className="text-[10px] font-black uppercase text-gold/80 tracking-widest mb-1">Performance Index</p>
-                     <p className="text-xs text-muted-foreground font-body max-w-[200px]">Aggregate score based on speed, reliability & fulfillment</p>
+            <div className="md:w-2/3 p-6 sm:p-8 flex flex-col gap-4">
+              <Tabs value={viewProfileTab} onValueChange={setViewProfileTab}>
+                <TabsList className="bg-muted/50 p-1 rounded-2xl border border-border/50 w-full mb-4">
+                  <TabsTrigger value="details" className="flex-1 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm text-[10px] font-black uppercase tracking-wider">
+                    Details
+                  </TabsTrigger>
+                  <TabsTrigger value="products" className="flex-1 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 justify-center">
+                    <Package className="w-3 h-3" />
+                    Products{vendorProfileData?.products?.length ? ` (${vendorProfileData.products.length})` : ""}
+                  </TabsTrigger>
+                  <TabsTrigger value="orders" className="flex-1 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 justify-center">
+                    <ShoppingCart className="w-3 h-3" />
+                    Orders{vendorProfileData?.orders?.length ? ` (${vendorProfileData.orders.length})` : ""}
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* ── Details Tab (all original content preserved) ── */}
+                <TabsContent value="details" className="m-0 space-y-6 outline-none">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
+                      <div className="flex items-center gap-2 mb-2 text-muted-foreground"><User className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Primary Contact</span></div>
+                      <p className="font-black text-sm tracking-tight">{viewVendor?.contact_person}</p>
+                    </div>
+                    <div className="p-4 rounded-3xl bg-muted/30 border border-border/50">
+                      <div className="flex items-center gap-2 mb-2 text-muted-foreground"><Phone className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Contact Phone</span></div>
+                      <p className="font-black text-sm tracking-tight">{viewVendor?.phone}</p>
+                    </div>
+                    <div className="p-4 rounded-3xl bg-muted/30 border border-border/50 col-span-2">
+                      <div className="flex items-center gap-2 mb-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-black tracking-widest">Warehouse & Logistics Address</span></div>
+                      <p className="font-black text-sm tracking-tight leading-snug">{viewVendor?.address || "Not specified"}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 bg-background px-6 py-3 rounded-2xl shadow-md border border-gold/10">
-                     <Star className="w-6 h-6 fill-gold text-gold" />
-                     <span className="text-4xl font-heading font-black text-gold tracking-tighter">{viewVendor?.score}%</span>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-6 rounded-3xl bg-gold/5 border-2 border-gold/10 shadow-sm">
+                      <div>
+                         <p className="text-[10px] font-black uppercase text-gold/80 tracking-widest mb-1">Performance Index</p>
+                         <p className="text-xs text-muted-foreground font-body max-w-[200px]">Aggregate score based on speed, reliability & fulfillment</p>
+                      </div>
+                      <div className="flex items-center gap-3 bg-background px-6 py-3 rounded-2xl shadow-md border border-gold/10">
+                         <Star className="w-6 h-6 fill-gold text-gold" />
+                         <span className="text-4xl font-heading font-black text-gold tracking-tighter">{viewVendor?.score}%</span>
+                      </div>
+                    </div>
+                    <div className="p-6 rounded-3xl bg-primary/5 border border-primary/10">
+                      <p className="text-[10px] text-primary uppercase font-black tracking-widest mb-4">Payout Method Details</p>
+                      <div className="bg-background/80 p-5 rounded-2xl border border-primary/10 shadow-inner">
+                        {(() => {
+                          try {
+                            const payout = JSON.parse(viewVendor?.payment_details || "{}");
+                            if (payout.type === 'bank') {
+                              return (
+                                <div className="space-y-2">
+                                  <div className="flex justify-between text-xs border-b border-border/50 pb-2"><span className="text-muted-foreground">Bank</span><span className="font-bold">{payout.bank_name}</span></div>
+                                  <div className="flex justify-between text-xs border-b border-border/50 pb-2"><span className="text-muted-foreground">Account #</span><span className="font-bold font-mono">{payout.account_number}</span></div>
+                                  <div className="flex justify-between text-xs border-b border-border/50 pb-2"><span className="text-muted-foreground">Branch</span><span className="font-bold">{payout.branch_name}</span></div>
+                                  <div className="flex justify-between text-xs pt-1"><span className="text-muted-foreground">Account Holder</span><span className="font-bold">{payout.account_holder}</span></div>
+                                </div>
+                              );
+                            } else if (payout.type === 'mobile') {
+                              return (
+                                <div className="space-y-2">
+                                  <div className="flex justify-between text-xs border-b border-border/50 pb-2"><span className="text-muted-foreground">Provider</span><span className="font-bold capitalize">{payout.provider}</span></div>
+                                  <div className="flex justify-between text-xs border-b border-border/50 pb-2"><span className="text-muted-foreground">Mobile Number</span><span className="font-bold font-mono">{payout.phone_number}</span></div>
+                                  <div className="flex justify-between text-xs pt-1"><span className="text-muted-foreground">Account Name</span><span className="font-bold">{payout.account_name}</span></div>
+                                </div>
+                              );
+                            }
+                          } catch (e) { /* Fallback to raw text */ }
+                          return <p className="text-sm font-bold leading-relaxed font-body text-foreground/80">{viewVendor?.payment_details || "No payment information provided."}</p>;
+                        })()}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="p-6 rounded-3xl bg-primary/5 border border-primary/10">
-                  <p className="text-[10px] text-primary uppercase font-black tracking-widest mb-4">Payout Method Details</p>
-                  <div className="bg-background/80 p-5 rounded-2xl border border-primary/10 shadow-inner">
-                    {(() => {
-                      try {
-                        const payout = JSON.parse(viewVendor?.payment_details || "{}");
-                        if (payout.type === 'bank') {
-                          return (
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-xs border-b border-border/50 pb-2"><span className="text-muted-foreground">Bank</span><span className="font-bold">{payout.bank_name}</span></div>
-                              <div className="flex justify-between text-xs border-b border-border/50 pb-2"><span className="text-muted-foreground">Account #</span><span className="font-bold font-mono">{payout.account_number}</span></div>
-                              <div className="flex justify-between text-xs border-b border-border/50 pb-2"><span className="text-muted-foreground">Branch</span><span className="font-bold">{payout.branch_name}</span></div>
-                              <div className="flex justify-between text-xs pt-1"><span className="text-muted-foreground">Account Holder</span><span className="font-bold">{payout.account_holder}</span></div>
+                </TabsContent>
+
+                {/* ── Products Tab ── */}
+                <TabsContent value="products" className="m-0 outline-none">
+                  {isLoadingVendorProfile ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map(i => <div key={i} className="h-14 rounded-2xl bg-muted animate-pulse" />)}
+                    </div>
+                  ) : !vendorProfileData?.products?.length ? (
+                    <div className="text-center py-14 text-muted-foreground">
+                      <Package className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                      <p className="font-bold text-sm">No products listed</p>
+                      <p className="text-xs mt-1">This vendor has no products in the catalog yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
+                      {vendorProfileData.products.map((product: any) => (
+                        <div key={product.id} className="flex items-center gap-3 p-3 rounded-2xl bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
+                          <div className="w-10 h-10 rounded-xl bg-background border border-border/50 overflow-hidden flex-shrink-0">
+                            {product.images?.[0] ? (
+                              <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center"><Package className="w-5 h-5 text-muted-foreground/40" /></div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm truncate">{product.name}</p>
+                            <p className="text-[10px] text-muted-foreground font-body">{product.category || "Uncategorised"} · Stock: {product.stock_quantity ?? "—"}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-black text-sm text-primary">MWK {Number(product.price).toLocaleString()}</p>
+                            <Badge variant={product.status === "active" ? "default" : "secondary"} className="text-[9px] font-black uppercase px-2 py-0 rounded-md mt-0.5">
+                              {product.status || "active"}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* ── Orders Tab ── */}
+                <TabsContent value="orders" className="m-0 outline-none">
+                  {isLoadingVendorProfile ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map(i => <div key={i} className="h-14 rounded-2xl bg-muted animate-pulse" />)}
+                    </div>
+                  ) : !vendorProfileData?.orders?.length ? (
+                    <div className="text-center py-14 text-muted-foreground">
+                      <ShoppingCart className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                      <p className="font-bold text-sm">No orders yet</p>
+                      <p className="text-xs mt-1">Orders containing this vendor's products will appear here.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
+                      {vendorProfileData.orders.map((order: any) => (
+                        <div key={order.id} className="flex items-center justify-between p-3 rounded-2xl bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <ShoppingCart className="w-4 h-4 text-primary" />
                             </div>
-                          );
-                        } else if (payout.type === 'mobile') {
-                          return (
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-xs border-b border-border/50 pb-2"><span className="text-muted-foreground">Provider</span><span className="font-bold capitalize">{payout.provider}</span></div>
-                              <div className="flex justify-between text-xs border-b border-border/50 pb-2"><span className="text-muted-foreground">Mobile Number</span><span className="font-bold font-mono">{payout.phone_number}</span></div>
-                              <div className="flex justify-between text-xs pt-1"><span className="text-muted-foreground">Account Name</span><span className="font-bold">{payout.account_name}</span></div>
+                            <div>
+                              <p className="font-bold text-sm">{order.customer_name}</p>
+                              <p className="text-[10px] text-muted-foreground font-mono">#{order.id.slice(0, 8)} · {new Date(order.created_at).toLocaleDateString()}</p>
                             </div>
-                          );
-                        }
-                      } catch (e) { /* Fallback to raw text */ }
-                      return <p className="text-sm font-bold leading-relaxed font-body text-foreground/80">{viewVendor?.payment_details || "No payment information provided."}</p>;
-                    })()}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex gap-4 pt-4">
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-black text-sm text-primary">{order.currency} {Number(order.total).toLocaleString()}</p>
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-block mt-0.5 ${
+                              order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                              order.status === 'shipped'   ? 'bg-primary/90 text-white' :
+                              order.status === 'pending'   ? 'bg-yellow-100 text-yellow-800' :
+                              order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                              'bg-muted text-muted-foreground'
+                            }`}>{order.status}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+
+              {/* Action buttons always visible at bottom */}
+              <div className="flex gap-4 pt-2 border-t border-border/30">
                 <Button onClick={() => setViewVendor(null)} variant="outline" className="flex-1 rounded-2xl h-12 font-bold">Close Profile</Button>
                 <Button onClick={() => { setEditVendor(viewVendor); setViewVendor(null); }} className="flex-1 rounded-2xl h-12 font-bold bg-primary shadow-lg shadow-primary/20">Edit Vendor</Button>
               </div>

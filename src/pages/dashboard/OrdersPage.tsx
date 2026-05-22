@@ -21,6 +21,19 @@ function getConfirmDelay(order: Order): { mins: number; state: "ok" | "flagged" 
   return { mins, state: "ok" };
 }
 
+/** Determines whether an order originated from an agent, a vendor product, or in-house */
+function getOrderSource(
+  order: Order,
+  vendorProductIds?: Set<string>
+): "agent" | "vendor" | "inhouse" {
+  if (order.agent_id) return "agent";
+  if (vendorProductIds && vendorProductIds.size > 0) {
+    const items = Array.isArray(order.items) ? (order.items as any[]) : [];
+    if (items.some(item => vendorProductIds.has(item.product_id))) return "vendor";
+  }
+  return "inhouse";
+}
+
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
   confirmed: "bg-primary/10 text-primary",
@@ -99,6 +112,17 @@ const OrdersPage = () => {
       const { data } = await supabase.from("agents").select("id").eq("user_id", profile!.id).maybeSingle();
       return data?.id;
     }
+  });
+
+  // Admin-only: build a Set of product IDs that belong to any vendor so we can
+  // label orders containing those products as "Vendor Product" in the list & detail.
+  const { data: vendorProductIds } = useQuery({
+    queryKey: ["vendor-product-ids"],
+    enabled: profile?.role === "admin",
+    queryFn: async () => {
+      const { data } = await supabase.from("products").select("id").not("vendor_id", "is", null);
+      return new Set((data || []).map((p: any) => p.id as string));
+    },
   });
 
   const { data: myProducts } = useQuery({
@@ -232,7 +256,12 @@ const OrdersPage = () => {
                   <h4 className="font-heading text-sm font-semibold">{order.customer_name || "Unknown Customer"}</h4>
                   <p className="text-xs text-muted-foreground font-body">
                     {order.customer_phone || order.customer_email || "No contact"} • {order.channel} 
-                    {order.agent_id ? " • Agent Referral" : " • In-house"} • {new Date(order.created_at).toLocaleDateString()}
+                    {(() => {
+                      const src = getOrderSource(order, vendorProductIds);
+                      if (src === "agent")  return " • Agent Referral";
+                      if (src === "vendor") return " • Vendor Product";
+                      return " • In-house";
+                    })()} • {new Date(order.created_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -308,7 +337,12 @@ const OrdersPage = () => {
                       <DollarSign className="w-3 h-3" /> Order Value
                     </p>
                     <p className="font-black text-2xl text-primary">{selectedOrder.currency} {selectedOrder.total.toLocaleString()}</p>
-                    <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter mt-1">{selectedOrder.channel} channel {selectedOrder.agent_id ? " • Agent Referral" : " • In-house"}</p>
+                     <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter mt-1">{selectedOrder.channel} channel {(() => {
+                        const src = getOrderSource(selectedOrder, vendorProductIds);
+                        if (src === "agent")  return " • Agent Referral";
+                        if (src === "vendor") return " • Vendor Product";
+                        return " • In-house";
+                      })()}</p>
                   </div>
                 </div>
 

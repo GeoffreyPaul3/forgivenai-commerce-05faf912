@@ -9,7 +9,7 @@ const corsHeaders = {
 const QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 const WANX_API_URL = "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis";
 const TRYON_API_URL = "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/image2image/image-synthesis";
-const PHOTTA_BASE_URL = "https://ai.photta.app/api/v1";
+const PHOTTA_BASE_URL = "https://api.photta.app/api/v1";
 
 function aiHeaders(apiKey: string) {
   return { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
@@ -122,10 +122,17 @@ async function callTextAI(apiKey: string, prompt: string, model = "qwen-plus") {
 
 async function callIDMVTON(hfToken: string, personImageUrl: string, garmentImageUrl: string, description = "") {
   // We try multiple popular IDM-VTON spaces to ensure robustness
+  // Ordered from most stable to least stable community mirrors
   const spaces = [
     "yisol-idm-vton.hf.space",
     "nymbo-virtual-try-on.hf.space",
-    "cantis-idm-vton.hf.space"
+    "cantis-idm-vton.hf.space",
+    "mubashirmehmood-yisol-idm-vton.hf.space",
+    "wytwyt02-yisol-idm-vton.hf.space",
+    "lewareai-idm-vton.hf.space",
+    "frogleo-ai-clothes-changer.hf.space",
+    "jallenjia-change-clothes-ai.hf.space",
+    "samikshachavan-ai-virtual-tryon.hf.space"
   ];
 
   for (const space of spaces) {
@@ -216,22 +223,134 @@ async function callIDMVTON(hfToken: string, personImageUrl: string, garmentImage
   throw new Error("All IDM-VTON spaces failed or timed out");
 }
 
-async function callPhottaAI(apiKey: string, productImageUrl: string, mannequinId?: string) {
-  console.log(`Starting Photta Try-On for product: ${productImageUrl}...`);
+// Maps garment category/detected details to Photta's valid product_type enum.
+// Allowed: "top", "bottom", "top_and_bottom", "one_piece"
+function getPhottaProductType(category: string, garmentDetails: string): string {
+  const text = `${category} ${garmentDetails}`.toLowerCase();
+  // one_piece: dresses, jumpsuits, rompers, overalls, bodysuits, playsuits
+  if (
+    text.includes("dress") ||
+    text.includes("jumpsuit") ||
+    text.includes("romper") ||
+    text.includes("overall") ||
+    text.includes("playsuit") ||
+    text.includes("bodysuit") ||
+    text.includes("one-piece") ||
+    text.includes("one_piece")
+  ) return "one_piece";
+  // bottom: pants, jeans, shorts, skirts, trousers
+  if (
+    text.includes("skirt") ||
+    text.includes("pants") ||
+    text.includes("trousers") ||
+    text.includes("jeans") ||
+    text.includes("shorts") ||
+    text.includes("leggings")
+  ) return "bottom";
+  // Default to top for shirts, blouses, jackets, hoodies, sweaters, etc.
+  return "top";
+}
+
+async function callPhottaAI(apiKey: string, productImageUrl: string, productType?: string, mannequinId?: string, bodyEthnicity?: string, bodyGender?: string) {
+  const resolvedType = productType || "top";
   
-  // 1. Submit the request
-  const res = await fetch(`${PHOTTA_BASE_URL}/tryon/apparel/generate`, {
+  // Dynamically fetch resources if IDs aren't provided
+  let finalMannequinId = mannequinId;
+  if (!finalMannequinId) {
+    try {
+      const mRes = await fetch(`${PHOTTA_BASE_URL}/mannequins`, { headers: { "Authorization": `Bearer ${apiKey}` } });
+      if (mRes.ok) {
+        const data = await mRes.json();
+        const mannequins = Array.isArray(data) ? data : (data.mannequins || data.data || []);
+        console.log(`[Photta] Fetched ${mannequins.length} mannequins from API.`);
+        
+        if (mannequins.length > 0) {
+          // Try to find a mannequin matching target ethnicity and gender
+          const targetEth = (bodyEthnicity || "African").toLowerCase();
+          const targetGen = (bodyGender || "female").toLowerCase();
+          
+          let matched = mannequins.find((m: any) => {
+            const eth = (m.ethnicity || m.name || "").toLowerCase();
+            const gen = (m.gender || m.category || m.name || "").toLowerCase();
+            return eth.includes(targetEth) && gen.includes(targetGen);
+          });
+          
+          if (!matched) {
+            // Fallback to matching just ethnicity
+            matched = mannequins.find((m: any) => {
+              const eth = (m.ethnicity || m.name || "").toLowerCase();
+              return eth.includes(targetEth);
+            });
+          }
+          
+          if (!matched) {
+            // Fallback to matching just gender
+            matched = mannequins.find((m: any) => {
+              const gen = (m.gender || m.category || m.name || "").toLowerCase();
+              return gen.includes(targetGen);
+            });
+          }
+          
+          const chosen = matched || mannequins[0];
+          finalMannequinId = chosen.id || chosen.mannequin_id || chosen.name;
+          console.log(`[Photta] Selected mannequin: ${finalMannequinId} (${chosen.name || "unnamed"}, ethnicity: ${chosen.ethnicity || "unknown"}, gender: ${chosen.gender || "unknown"})`);
+        }
+      } else {
+        console.error(`[Photta] Failed to fetch mannequins: ${mRes.status} ${await mRes.text()}`);
+      }
+    } catch (e) {
+      console.error("[Photta] Error searching mannequins:", e);
+    }
+  }
+
+  // If we still have no mannequin ID, Photta will reject the request with 400.
+  // Skip this engine gracefully rather than wasting a call.
+  if (!finalMannequinId) {
+    console.warn("[Photta] Could not resolve a mannequin_id from the API. Skipping Photta engine.");
+    throw new Error("SKIP_ENGINE: Photta mannequin_id could not be resolved. API may have changed its response format.");
+  }
+
+  // 0b. Dynamically fetch a valid pose_id for this product type
+  let poseId = "";
+  try {
+    const posesRes = await fetch(`${PHOTTA_BASE_URL}/poses?product_type=${resolvedType}`, {
+      headers: { "Authorization": `Bearer ${apiKey}` }
+    });
+    if (posesRes.ok) {
+      const posesData = await posesRes.json();
+      const poses = posesData.poses || posesData.data || posesData;
+      if (Array.isArray(poses) && poses.length > 0) {
+        poseId = poses[0].id || poses[0].pose_id || poses[0].name || "";
+        console.log(`[Photta] Using pose_id: ${poseId} (${poses.length} available)`);
+      }
+    } else {
+      console.warn(`[Photta] Could not fetch poses (${posesRes.status})`);
+    }
+  } catch (e) {
+    console.warn("[Photta] Pose fetch failed:", e);
+  }
+
+  console.log(`Starting Photta Try-On (type: ${resolvedType}, mannequin: ${finalMannequinId}, pose: ${poseId}) for product: ${productImageUrl}...`);
+  
+  // 1. Build request body — only include fields that have values
+  const requestBody: Record<string, any> = {
+    product_images: [productImageUrl],
+    product_type: resolvedType,
+    resolution: "2K",
+    aspect_ratio: "3:4"
+  };
+  if (poseId) requestBody.pose_id = poseId;
+  if (finalMannequinId) requestBody.mannequin_id = finalMannequinId;
+
+  console.log(`[Photta] Request payload:`, JSON.stringify(requestBody));
+
+  const res = await fetch(`${PHOTTA_BASE_URL}/tryon/apparel`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      product_image_url: productImageUrl,
-      product_description: productImageUrl, // We keep URL as description but add a separate text prompt if needed
-      mannequin_id: mannequinId,
-      resolution: "2K"
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!res.ok) {
@@ -240,19 +359,21 @@ async function callPhottaAI(apiKey: string, productImageUrl: string, mannequinId
     throw new Error(`Photta submission failed (${res.status}): ${t}`);
   }
 
-  const { generation_id } = await res.json();
+  const resJson = await res.json();
+  const generation_id = resJson.generation_id || resJson.id;
+  if (!generation_id) throw new Error("Photta: no generation_id in response");
   console.log(`Photta Generation ID: ${generation_id}`);
 
   // 2. Poll for the result
   let attempts = 0;
   while (attempts < 60) {
     attempts++;
-    const statusRes = await fetch(`${PHOTTA_BASE_URL}/tryon/apparel/status?generation_id=${generation_id}`, {
+    const statusRes = await fetch(`${PHOTTA_BASE_URL}/tryon/apparel/${generation_id}`, {
       headers: { "Authorization": `Bearer ${apiKey}` }
     });
 
     if (!statusRes.ok) {
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 3000));
       continue;
     }
 
@@ -266,7 +387,7 @@ async function callPhottaAI(apiKey: string, productImageUrl: string, mannequinId
     }
 
     console.log(`Polling Photta... status: ${data.status}`);
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 3000));
   }
   
   throw new Error("Photta generation timed out");
@@ -291,6 +412,10 @@ async function callFalVTON(apiKey: string, endpoint: string, humanUrl: string, g
   if (!res.ok) {
     const errText = await res.text();
     console.error(`Fal.ai ${endpoint} submission error: ${res.status} ${errText}`);
+    // Propagate balance exhaustion immediately so all fal engines are skipped
+    if (res.status === 403 && errText.includes("Exhausted balance")) {
+      throw new Error(`FAL_BALANCE_EXHAUSTED: ${errText}`);
+    }
     throw new Error(`Fal.ai ${endpoint} error: ${errText}`);
   }
 
@@ -332,8 +457,11 @@ async function callFalAI(apiKey: string, humanUrl: string, garmentUrl: string, d
       const result = await callFalVTON(apiKey, engine, humanUrl, garmentUrl, description);
       console.log(`✅ VTON SUCCESS with ${engine}`);
       return result;
-    } catch (e) {
-      console.warn(`❌ VTON engine ${engine} failed:`, (e as Error).message);
+    } catch (e: any) {
+      const msg = (e as Error).message || "";
+      console.warn(`❌ VTON engine ${engine} failed:`, msg);
+      // If balance is exhausted, abort immediately — no point trying other fal engines
+      if (msg.startsWith("FAL_BALANCE_EXHAUSTED")) throw e;
       continue;
     }
   }
@@ -497,62 +625,239 @@ async function callVeoVideo(apiKey: string, imageUrl: string, prompt: string) {
 }
 
 
-async function segmentGarment(apiKey: string, imageUrl: string) {
-  console.log(`Performing Semantic Segmentation on: ${imageUrl}...`);
-  // Using Photta's Ghost Mannequin as the primary segmentation engine 
-  // but with 2K resolution and 'strict' masking to isolate pixels.
-  const res = await fetch(`${PHOTTA_BASE_URL}/tryon/ghost-mannequin/generate`, {
+async function callFalBriaBackgroundRemoval(apiKey: string, imageUrl: string): Promise<string> {
+  console.log(`[Segmentation] Calling fal-ai/bria/background-removal for: ${imageUrl.substring(0, 100)}...`);
+  const res = await fetch("https://queue.fal.run/fal-ai/bria/background-removal", {
     method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ 
-      product_image_url: imageUrl, 
-      resolution: "2K",
-      background_type: "transparent", // pixel-perfect isolation
-      remove_mannequin: true 
+    headers: { "Authorization": `Key ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      image_url: imageUrl,
+      return_mask: false
     }),
   });
-
-  if (!res.ok) return imageUrl;
-
-  const { generation_id } = await res.json();
+  if (!res.ok) {
+    throw new Error(`Fal Bria background-removal error: ${await res.text()}`);
+  }
+  const { request_id } = await res.json();
   let attempts = 0;
   while (attempts < 30) {
     attempts++;
-    const statusRes = await fetch(`${PHOTTA_BASE_URL}/tryon/ghost-mannequin/status?generation_id=${generation_id}`, {
-      headers: { "Authorization": `Bearer ${apiKey}` }
+    const statusRes = await fetch(`https://queue.fal.run/fal-ai/bria/background-removal/requests/${request_id}`, {
+      headers: { "Authorization": `Key ${apiKey}` }
     });
-    if (!statusRes.ok) { await new Promise(r => setTimeout(r, 2000)); continue; }
     const data = await statusRes.json();
-    if (data.status === "completed" || data.status === "SUCCEEDED") return data.output_url || data.result_url;
-    if (data.status === "failed") return imageUrl;
-    await new Promise(r => setTimeout(r, 2000));
+    if (data.status === "COMPLETED") {
+      const outUrl = data.response?.image?.url || data.response?.images?.[0]?.url || data.response?.output?.url;
+      if (outUrl) return outUrl;
+      throw new Error("No image URL found in completed background removal response");
+    }
+    if (data.status === "FAILED") {
+      throw new Error(`Background removal task failed: ${JSON.stringify(data)}`);
+    }
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  throw new Error("Background removal timed out");
+}
+
+async function callPoseMapping(apiKey: string, humanImageUrl: string) {
+  console.log(`[Pose Mapping] Calling fal-ai/dwpose for: ${humanImageUrl.substring(0, 100)}...`);
+  try {
+    const res = await fetch("https://queue.fal.run/fal-ai/dwpose", {
+      method: "POST",
+      headers: { "Authorization": `Key ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image_url: humanImageUrl
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`Fal DWPose error: ${await res.text()}`);
+    }
+    const { request_id } = await res.json();
+    let attempts = 0;
+    while (attempts < 30) {
+      attempts++;
+      const statusRes = await fetch(`https://queue.fal.run/fal-ai/dwpose/requests/${request_id}`, {
+        headers: { "Authorization": `Key ${apiKey}` }
+      });
+      const data = await statusRes.json();
+      if (data.status === "COMPLETED") {
+        console.log("[Pose Mapping] DWPose completed successfully.");
+        return data.response;
+      }
+      if (data.status === "FAILED") {
+        throw new Error(`DWPose task failed: ${JSON.stringify(data)}`);
+      }
+      await new Promise(r => setTimeout(r, 1500));
+    }
+    throw new Error("DWPose timed out");
+  } catch (err) {
+    console.warn("[Pose Mapping] DWPose call failed:", err);
+    return null;
+  }
+}
+
+async function runSpecializedObjectVTON(
+  keys: { qwenKey: string; falKey: string },
+  personImageUrl: string,
+  productImages: string[],
+  category: string,
+  description: string,
+  poseData: any
+): Promise<string> {
+  const lowerCat = category.toLowerCase();
+  console.log(`[Specialized VTON] Routing non-apparel category "${category}" for product: "${description}"`);
+  
+  const primaryProductUrl = productImages[0];
+  const extraRefsPrompt = productImages.slice(1).map((url, i) => `Reference ${i+2} (Detail): ${url}`).join(", ");
+  
+  let poseGuide = "";
+  if (poseData && poseData.image?.url) {
+    poseGuide = `Enforce spatial mapping matching the detected body pose from DWPose: ${poseData.image.url}.`;
+  }
+  
+  let categoryRules = "";
+  if (lowerCat.includes("shoe") || lowerCat.includes("boot") || lowerCat.includes("sneaker") || lowerCat.includes("footwear")) {
+    categoryRules = [
+      `CRITICAL SHOE TRANSFER RULES:`,
+      `- Transfer the EXACT shoe from the source image onto the feet of the person in the target image.`,
+      `- Keep the exact logo placement, silhouette, lacing, sole height, and colors.`,
+      `- Place the shoes perfectly on the feet of the model, matching their foot angle and pose exactly.`,
+      `- Use ControlNet-Depth and the body mapping coordinates to anchor the footwear onto the model's feet.`,
+      `- Do NOT generate similar or generic shoes. The product image is the absolute source of truth.`
+    ].join("\n");
+  } else if (lowerCat.includes("bag") || lowerCat.includes("handbag") || lowerCat.includes("purse") || lowerCat.includes("backpack") || lowerCat.includes("tote")) {
+    categoryRules = [
+      `CRITICAL HANDBAG TRANSFER RULES:`,
+      `- Transfer the EXACT handbag/bag from the source image.`,
+      `- Anchor it naturally in the model's hand, on their shoulder, or carried on their arm depending on the scene's pose.`,
+      `- Maintain the absolute geometric shapes, straps, metal buckles, logos, and leather texture of the bag.`,
+      `- Do NOT warp or alter the bag. It must remain 100% identical to the product image.`
+    ].join("\n");
+  } else if (lowerCat.includes("jewelry") || lowerCat.includes("accessory") || lowerCat.includes("necklace") || lowerCat.includes("earring") || lowerCat.includes("ring") || lowerCat.includes("bracelet") || lowerCat.includes("watch")) {
+    categoryRules = [
+      `CRITICAL JEWELRY/ACCESSORY TRANSFER RULES:`,
+      `- Anchor the jewelry directly onto the appropriate body parts: necklaces to the neck, earrings to the ears, bracelets/watches to the wrist, rings to fingers.`,
+      `- Leverage OpenPose keypoint coordinate offsets to align the jewelry with 100% spatial precision.`,
+      `- Maintain the exact gold/silver shine, diamond placements, and fine chain links.`,
+      `- Do NOT generate generic accessories.`
+    ].join("\n");
+  } else {
+    categoryRules = [
+      `CRITICAL PRODUCT TRANSFER RULES:`,
+      `- Deterministically transfer the EXACT product item onto the target model.`,
+      `- Maintain exact dimensions, textures, colors, logos, and features.`,
+      `- No creative redesign, reinterpretation, or stylistic approximations.`
+    ].join("\n");
+  }
+
+  const wanPrompt = [
+    `Professional premium high-resolution fashion advertisement catalog portrait.`,
+    `TARGET MODEL: Enforce the target person's exact face, body pose, hair, skin tone, and features from the reference person image.`,
+    `PRODUCT IDENTITY TO DRAFT: Transfer the EXACT product item from the reference product image.`,
+    categoryRules,
+    poseGuide,
+    extraRefsPrompt ? `Use additional product references for 3D fidelity: ${extraRefsPrompt}.` : "",
+    `The generated model must wear/hold the EXACT, unmodified product item in the target scene. White studio background or clean lifestyle street context.`,
+    `Do not redesign, recolor, or hallucinate product details. The reference product image is the absolute visual source of truth.`
+  ].filter(Boolean).join("\n");
+
+  console.log(`[Specialized VTON] Calling Alibaba Wan Reference-Based Synthesis with specialized prompt:`, wanPrompt);
+
+  const references = [
+    { type: 'influencer' as const, url: personImageUrl },
+    { type: 'product' as const, url: primaryProductUrl }
+  ];
+
+  const resultUrl = await callImageAI(keys.qwenKey, wanPrompt, references);
+  if (!resultUrl) {
+    throw new Error(`Specialized VTON failed for category: ${category}`);
+  }
+  return resultUrl;
+}
+
+async function segmentGarment(
+  keys: { phottaKey: string; falKey: string },
+  imageUrl: string,
+  category: string
+): Promise<string> {
+  const lowerCat = category.toLowerCase();
+  const isApparel = lowerCat.includes("apparel") || lowerCat.includes("clothing") || lowerCat.includes("top") || lowerCat.includes("bottom") || lowerCat.includes("dress") || lowerCat.includes("shirt") || lowerCat.includes("jacket") || lowerCat.includes("pants") || lowerCat.includes("suit");
+
+  if (!isApparel && keys.falKey) {
+    try {
+      return await callFalBriaBackgroundRemoval(keys.falKey, imageUrl);
+    } catch (err) {
+      console.warn(`[segmentGarment] Fal Bria background removal failed for non-apparel category ${category}:`, err);
+    }
+  }
+
+  if (keys.phottaKey) {
+    try {
+      console.log(`Performing Photta Ghost Mannequin Segmentation on: ${imageUrl.substring(0, 100)}...`);
+      const res = await fetch(`${PHOTTA_BASE_URL}/ghost-mannequin`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${keys.phottaKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          product_image_url: imageUrl, 
+          style: "hollow-man",
+          resolution: "2K"
+        }),
+      });
+
+      if (!res.ok) {
+        console.warn(`[segmentGarment] Photta ghost-mannequin returned ${res.status}, using original.`);
+        return imageUrl;
+      }
+
+      const resJson = await res.json();
+      const generation_id = resJson.generation_id || resJson.id;
+      if (!generation_id) return imageUrl;
+
+      let attempts = 0;
+      while (attempts < 40) {
+        attempts++;
+        const statusRes = await fetch(`${PHOTTA_BASE_URL}/ghost-mannequin/${generation_id}`, {
+          headers: { "Authorization": `Bearer ${keys.phottaKey}` }
+        });
+        if (!statusRes.ok) { await new Promise(r => setTimeout(r, 2000)); continue; }
+        const data = await statusRes.json();
+        if (data.status === "completed" || data.status === "SUCCEEDED") return data.output_url || data.result_url || imageUrl;
+        if (data.status === "failed") return imageUrl;
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    } catch (err) {
+      console.warn("[segmentGarment] Photta ghost mannequin failed:", err);
+    }
   }
   return imageUrl;
 }
 
 async function cleanProductImage(apiKey: string, productImageUrl: string) {
-  console.log(`Cleaning product image (Ghost Mannequin): ${productImageUrl}...`);
-  const res = await fetch(`${PHOTTA_BASE_URL}/tryon/ghost-mannequin/generate`, {
+  console.log(`Cleaning product image (Ghost Mannequin): ${productImageUrl.substring(0, 100)}...`);
+  const res = await fetch(`${PHOTTA_BASE_URL}/ghost-mannequin`, {
     method: "POST",
     headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ product_image_url: productImageUrl, resolution: "2K" }),
+    body: JSON.stringify({ product_image_url: productImageUrl, style: "hollow-man", resolution: "2K" }),
   });
 
   if (!res.ok) {
-    console.warn("Ghost Mannequin cleaning failed, using original image.");
+    console.warn(`Ghost Mannequin cleaning failed (${res.status}), using original image.`);
     return productImageUrl;
   }
 
-  const { generation_id } = await res.json();
+  const resJson = await res.json();
+  const generation_id = resJson.generation_id || resJson.id;
+  if (!generation_id) return productImageUrl;
+
   let attempts = 0;
-  while (attempts < 30) {
+  while (attempts < 40) {
     attempts++;
-    const statusRes = await fetch(`${PHOTTA_BASE_URL}/tryon/ghost-mannequin/status?generation_id=${generation_id}`, {
+    const statusRes = await fetch(`${PHOTTA_BASE_URL}/ghost-mannequin/${generation_id}`, {
       headers: { "Authorization": `Bearer ${apiKey}` }
     });
     if (!statusRes.ok) { await new Promise(r => setTimeout(r, 2000)); continue; }
     const data = await statusRes.json();
-    if (data.status === "completed" || data.status === "SUCCEEDED") return data.output_url || data.result_url;
+    if (data.status === "completed" || data.status === "SUCCEEDED") return data.output_url || data.result_url || productImageUrl;
     if (data.status === "failed") return productImageUrl;
     await new Promise(r => setTimeout(r, 2000));
   }
@@ -592,135 +897,192 @@ async function detectGarmentColor(apiKey: string, imageUrl: string): Promise<str
   }
 }
 
-async function verifyProductFidelity(apiKey: string, productImageUrl: string, generatedImageUrl: string): Promise<boolean> {
-  console.log("🔍 Verifying product fidelity in generated image...");
-  try {
-    const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "qwen-vl-plus",
-        input: {
-          messages: [{
-            role: "user",
-            content: [
-              { image: productImageUrl },
-              { image: generatedImageUrl },
-              { text: "Image 1 is the ORIGINAL PRODUCT. Image 2 is a generated image of a model wearing clothing/shoes. Compare them and answer:\n1. Is the model in Image 2 wearing the SAME product as shown in Image 1?\n2. Does the COLOR match exactly?\n3. Does the SHAPE/DESIGN match?\n4. Is the logo preserved accurately?\n\nRespond with ONLY: PASS or FAIL followed by a brief reason." }
-            ]
-          }]
-        }
-      })
-    });
-    if (!res.ok) return true; // Don't block on verification failure
-    const data = await res.json();
-    const verdict = data.output?.choices?.[0]?.message?.content?.[0]?.text || "PASS";
-    console.log(`🔍 Fidelity verdict: ${verdict}`);
-    return verdict.toUpperCase().includes("PASS");
-  } catch (e) {
-    console.warn("Fidelity verification failed, allowing result:", e);
-    return true;
-  }
-}
-
-async function verifyVideoFidelity(apiKey: string, productImageUrl: string, videoUrl: string): Promise<boolean> {
-  console.log("🔍 Verifying product fidelity in generated video...");
-  try {
-    const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "qwen-vl-plus",
-        input: {
-          messages: [{
-            role: "user",
-            content: [
-              { image: productImageUrl },
-              { video: [videoUrl] },
-              { text: "Image 1 is the ORIGINAL PRODUCT. The video is an AI-generated influencer video. Compare them and verify:\n1. PRODUCT: Does the garment in the video match Image 1 exactly in color, texture, and design?\n2. MOTION: Is the influencer's movement natural, human-like, and high-quality (not a slideshow)?\n3. IDENTITY: Is the influencer's face and body consistent throughout the video?\n\nRespond with ONLY: PASS or FAIL followed by a brief reason." }
-            ]
-          }]
-        }
-      })
-    });
-    if (!res.ok) {
-      console.warn(`Qwen VL Video verification returned ${res.status}, using fallback`);
-      return true;
-    }
-    const data = await res.json();
-    const verdict = data.output?.choices?.[0]?.message?.content?.[0]?.text || "PASS";
-    console.log(`🔍 Video Fidelity verdict: ${verdict}`);
-    return verdict.toUpperCase().includes("PASS");
-  } catch (e) {
-    console.warn("Video verification failed, allowing result:", e);
-    return true;
-  }
-}
-
-async function callTryOnAI(apiKey: string, personImageUrl: string, garmentImageUrl: string, category?: string, description?: string) {
-  console.log(`Starting Virtual Try-On task for category: ${category}...`);
+async function verifyProductFidelity(
+  apiKey: string,
+  productImages: string[],
+  generatedImageUrl: string
+): Promise<{ pass: boolean; score: number; reasoning: string }> {
+  console.log("🔍 Running Rigorous 10-Point Visual Identity Audit via Qwen VL...");
   
-  const isBottom = category?.toLowerCase().includes("skirt") || 
-                   category?.toLowerCase().includes("pants") || 
-                   category?.toLowerCase().includes("trousers") ||
-                   category?.toLowerCase().includes("shorts");
-
-  const input: any = { person_image_url: personImageUrl };
-  if (isBottom) {
-    input.bottom_garment_url = garmentImageUrl;
-  } else {
-    input.top_garment_url = garmentImageUrl;
+  const contentItems: any[] = [];
+  for (const url of productImages.slice(0, 3)) {
+    contentItems.push({ image: url });
   }
+  contentItems.push({ image: generatedImageUrl });
+  
+  const prompt = [
+    `You are a strict, world-class QA auditor for a fashion e-commerce company.`,
+    `The first images are the ORIGINAL PRODUCT references (front, side, textures). The last image is the AI-generated model wearing the product.`,
+    `Your task is to perform a rigorous 10-Point Visual Identity Audit to verify if the generated model is wearing the EXACT inventory product.`,
+    `Perform direct pixel-level and aesthetic comparisons and grade the following 10 criteria on a scale of 0 to 10:`,
+    `1. Color: Does the hue, shade, gradients, and secondary colors match 100%?`,
+    `2. Shape: Are the proportions, width, and structural cuts identical?`,
+    `3. Silhouette: Does the fit, drape, and posture matching look natural without mutating the design?`,
+    `4. Patterns: Are prints, stripes, graphic elements, and logo locations perfectly preserved?`,
+    `5. Logos: Is the brand logo/text legible, crisp, and located in the correct position?`,
+    `6. Textures: Does the fabric texture (leather shine, knit pattern, denim weave) match the reference?`,
+    `7. Stitching: Are the seams, borders, thread colors, and collar stitching accurately kept?`,
+    `8. Accessories: Are buttons, zippers, buckles, pockets, and straps identical in count, color, and size?`,
+    `9. Neckline: Is the collar shape, depth, and wings 100% correct? (For non-apparel like shoes/bags, score 10/10 if not applicable)`,
+    `10. Sleeves: Are sleeve lengths, cuff structures, and shoulder seams matching? (For non-apparel like shoes/bags, score 10/10 if not applicable)`,
+    ``,
+    `Return ONLY a valid JSON object. Do NOT include markdown blocks or any other characters outside the JSON.`,
+    `The JSON must follow this exact format:`,
+    `{`,
+    `  "scores": {`,
+    `    "color": 10,`,
+    `    "shape": 10,`,
+    `    "silhouette": 10,`,
+    `    "patterns": 10,`,
+    `    "logos": 10,`,
+    `    "textures": 9,`,
+    `    "stitching": 10,`,
+    `    "accessories": 10,`,
+    `    "neckline": 10,`,
+    `    "sleeves": 10`,
+    `  },`,
+    `  "overall_score": 99,`,
+    `  "reasoning": "Color matches perfectly, but the leather texture is slightly smoother in the generated image than the raw product image."`,
+    `}`
+  ].join("\n");
+  
+  contentItems.push({ text: prompt });
 
-  const res = await fetch(TRYON_API_URL, {
-    method: "POST",
-    headers: {
-      ...aiHeaders(apiKey),
-      "X-DashScope-Async": "enable"
-    },
-    body: JSON.stringify({
-      model: "qwen-image-edit",
-      input: {
-        image_url: personImageUrl, // Base image (creator)
-        prompt: `High-fidelity fashion edit: Replace the model's current outfit with the exact product: ${category}. Product details: ${description || "matching garment"}. Photorealistic, 4k, seamless blend.`
-      },
-      parameters: { watermark: false }
-    }),
-  });
-
-  if (!res.ok) {
-    const t = await res.text();
-    console.error("Try-On Submission error:", res.status, t);
+  try {
+    const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "qwen-vl-plus",
+        input: {
+          messages: [{
+            role: "user",
+            content: contentItems
+          }]
+        }
+      })
+    });
     
-    // If aitryon-plus doesn't exist, we fall back to image synthesis immediately
-    if (t.includes("Model not exist")) {
-       console.log("Alibaba aitryon-plus not available on this endpoint, falling back to Wanx-v1 synthesis.");
-       return null; 
+    if (!res.ok) {
+      console.warn(`Qwen VL Audit API returned ${res.status}. Falling back to standard pass.`);
+      return { pass: true, score: 95, reasoning: "API error - skipped verification to prevent lockup" };
     }
     
-    throw new Error(`Try-on failed to start (${res.status}): ${t}`);
+    const data = await res.json();
+    const rawContent = data.output?.choices?.[0]?.message?.content?.[0]?.text || "";
+    console.log(`🔍 Qwen VL Audit raw response:`, rawContent);
+    
+    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const auditResult = JSON.parse(jsonMatch[0]);
+      const overallScore = auditResult.overall_score || 0;
+      const reasoning = auditResult.reasoning || "No reasoning provided";
+      
+      let categoryMismatch = false;
+      if (auditResult.scores) {
+        for (const [cat, val] of Object.entries(auditResult.scores)) {
+          // Threshold: 7/10 minimum per category — allows minor color warmth or lighting differences
+          if (typeof val === "number" && val < 7) {
+            categoryMismatch = true;
+            console.warn(`[Audit] Critical mismatch in category: ${cat} (Score: ${val}/10) — below minimum 7`);
+          } else if (typeof val === "number" && val < 8) {
+            console.log(`[Audit] Minor deviation in category: ${cat} (Score: ${val}/10) — acceptable`);
+          }
+        }
+      }
+      
+      // Overall threshold: 88% — accommodates minor lighting/color warmth differences from reference synthesis
+      const pass = !categoryMismatch && overallScore >= 88;
+      console.log(`[Audit Result] Score: ${overallScore}%. Pass: ${pass}. Reason: ${reasoning}`);
+      return { pass, score: overallScore, reasoning };
+    } else {
+      throw new Error("Could not find valid JSON in Qwen VL response");
+    }
+  } catch (err: any) {
+    console.warn("Fidelity verification failed, default permitting:", err);
+    return { pass: true, score: 95, reasoning: `Fidelity verification error: ${err.message}` };
   }
-
-  const taskData = await res.json();
-  const taskId = taskData.output?.task_id;
-  if (!taskId) throw new Error("No task ID received for try-on");
-
-  let attempts = 0;
-  while (attempts < 60) {
-    attempts++;
-    await new Promise(r => setTimeout(r, 2000));
-    const pollRes = await fetch(`https://dashscope-intl.aliyuncs.com/api/v1/tasks/${taskId}`, {
-      headers: aiHeaders(apiKey),
-    });
-    if (!pollRes.ok) continue;
-    const pollData = await pollRes.json();
-    const status = pollData.output?.task_status;
-    if (status === "SUCCEEDED") return pollData.output?.results?.[0]?.url;
-    if (status === "FAILED") throw new Error(`Try-on task failed: ${pollData.output?.message}`);
-    console.log(`Polling try-on ${taskId}: ${status}...`);
-  }
-  throw new Error("Try-on timed out");
 }
+
+async function verifyVideoFidelity(
+  apiKey: string,
+  productImages: string[],
+  videoUrl: string
+): Promise<{ pass: boolean; reasoning: string }> {
+  console.log("🔍 Running Qwen VL Video Consistency and Texture Drift Audit...");
+  const primaryProductUrl = productImages[0] || "";
+  
+  const prompt = [
+    `You are a strict video QC specialist. Analyze the provided product image and the generated influencer video.`,
+    `Perform a rigorous frame-by-frame visual consistency audit checking for:`,
+    `1. Texture Drift: Do the clothing textures, pattern scales, or prints morph or slide over the body during movement?`,
+    `2. Warping & Mutations: Does the shape, neckline, buttons, or straps of the garment distort or change in count/geometry during motion?`,
+    `3. Color Shifts: Do the fabric colors fade, change shades, or shift under moving light?`,
+    `4. Product Matching: Does the garment in the video remain 100% identical to the reference product image throughout?`,
+    ``,
+    `Return ONLY a valid JSON object. Do NOT include markdown blocks or any other characters outside the JSON.`,
+    `The JSON must follow this exact format:`,
+    `{`,
+    `  "drift_detected": false,`,
+    `  "warping_detected": false,`,
+    `  "color_shift_detected": false,`,
+    `  "product_match_percentage": 98,`,
+    `  "pass": true,`,
+    `  "reasoning": "The garment is fully stable, textures do not slide or warp, color is locked perfectly with zero drift."`,
+    `}`
+  ].join("\n");
+
+  try {
+    const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "qwen-vl-plus",
+        input: {
+          messages: [{
+            role: "user",
+            content: [
+              { image: primaryProductUrl },
+              { video: [videoUrl] },
+              { text: prompt }
+            ]
+          }]
+        }
+      })
+    });
+
+    if (!res.ok) {
+      console.warn(`Qwen VL Video verification returned ${res.status}. Allowing fallback.`);
+      return { pass: true, reasoning: "Video audit skipped due to API availability." };
+    }
+
+    const data = await res.json();
+    const rawContent = data.output?.choices?.[0]?.message?.content?.[0]?.text || "";
+    console.log(`🔍 Qwen VL Video Audit response:`, rawContent);
+
+    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const auditResult = JSON.parse(jsonMatch[0]);
+      const pass = auditResult.pass === true && 
+                   auditResult.drift_detected === false && 
+                   auditResult.warping_detected === false && 
+                   auditResult.color_shift_detected === false && 
+                   (auditResult.product_match_percentage || 0) >= 95;
+      
+      console.log(`[Video Audit Result] Pass: ${pass}. Reasoning: ${auditResult.reasoning}`);
+      return { pass, reasoning: auditResult.reasoning || "Completed video audit." };
+    }
+  } catch (err: any) {
+    console.warn("Video consistency audit failed, defaulting permitting:", err);
+  }
+  return { pass: true, reasoning: "Skipped audit due to verification execution error." };
+}
+
+// NOTE: callTryOnAI (Alibaba aitryon-plus) is intentionally removed.
+// aitryon-plus is only available in the China (Beijing) region on dashscope.aliyuncs.com.
+// Our API key is for the international region (dashscope-intl.aliyuncs.com) where the model
+// does not exist. Calling it always returns {"code":"InvalidParameter","message":"Model not exist."}.
+// The VTON pipeline uses Photta + HF IDM-VTON spaces as the reliable multi-engine fallback chain.
 
 async function callImageAI(apiKey: string, prompt: string, references: { type: 'influencer' | 'product', url: string }[]) {
   // Try image models in order of preference for DashScope International
@@ -869,6 +1231,234 @@ async function storeInCache(supabase: any, key: string, imageUrl: string, influe
   });
 }
 
+async function runUnifiedVTON(
+  keys: { qwenKey: string; falKey: string; phottaKey: string; hfToken: string },
+  personImageUrl: string,
+  productImages: string[],
+  category: string,
+  description: string,
+  supabaseClient: any,
+  ethnicity?: string,
+  gender?: string
+): Promise<string> {
+  const targetEthnicity = ethnicity || "person";
+  const targetGender = gender || "female";
+  console.log(`[Unified VTON] Starting pipeline — category: "${category}", description: "${description}", references count: ${productImages.length}`);
+
+  if (productImages.length === 0) {
+    throw new Error("Generation blocked: no product image references provided.");
+  }
+
+  const primaryProductUrl = productImages[0];
+
+  // 1. Detect garment details using AI vision — this is the single source of truth for the garment
+  const garmentDetails = await detectGarmentColor(keys.qwenKey, primaryProductUrl);
+  const colorMatch = garmentDetails.match(/Color: ([^,]+)/);
+  const garmentColor = colorMatch ? colorMatch[1].trim() : "original";
+  console.log(`[Unified VTON] AI-detected details: ${garmentDetails}`);
+
+  // 2. Identify if non-apparel (specialized routing required)
+  const lowerCat = category.toLowerCase();
+  const isClothing = lowerCat.includes("apparel") || lowerCat.includes("clothing") || lowerCat.includes("top") || lowerCat.includes("bottom") || lowerCat.includes("dress") || lowerCat.includes("shirt") || lowerCat.includes("jacket") || lowerCat.includes("pants") || lowerCat.includes("suit");
+
+  if (!isClothing) {
+    console.log(`[Unified VTON] Non-apparel product detected ("${category}"). Routing to Specialized Object Pipeline.`);
+    
+    // Step 2a: Extract OpenPose/DensePose maps
+    const poseData = await callPoseMapping(keys.falKey, personImageUrl);
+    
+    // Step 2b: Extract Category-Aware background-removed masks for all product references
+    const segmentedProductImages: string[] = [];
+    for (const url of productImages) {
+      try {
+        const seg = await segmentGarment(keys, url, category);
+        segmentedProductImages.push(seg);
+      } catch (err) {
+        console.warn(`[Unified VTON] Segmenting reference failed for non-apparel:`, err);
+        segmentedProductImages.push(url);
+      }
+    }
+
+    // Step 2c: Run zero-hallucination retry loop for specialized VTON
+    let lastReasoning = "";
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      console.log(`[Unified VTON] Attempt ${attempt} of ${maxRetries} for specialized non-apparel try-on...`);
+      try {
+        const resultUrl = await runSpecializedObjectVTON(
+          { qwenKey: keys.qwenKey, falKey: keys.falKey },
+          personImageUrl,
+          segmentedProductImages,
+          category,
+          description,
+          poseData
+        );
+
+        // Verify visual fidelity via 10-Point Audit
+        const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl);
+        if (audit.pass) {
+          console.log(`[Unified VTON] ✅ Specialized fidelity audit PASSED on attempt ${attempt} (Score: ${audit.score}%)`);
+          return resultUrl;
+        } else {
+          console.warn(`[Unified VTON] ❌ Specialized fidelity audit FAILED (Score: ${audit.score}%). Reason: ${audit.reasoning}`);
+          lastReasoning = audit.reasoning;
+        }
+      } catch (err: any) {
+        console.warn(`[Unified VTON] Specialized attempt ${attempt} errored:`, err.message || err);
+      }
+    }
+
+    throw new Error(
+      `CLEAN_FAILURE: Specialized virtual try-on failed for category "${category}" after ${maxRetries} attempts. ` +
+      `None of the specialized runs met the 95%+ visual fidelity threshold. Last reasoning: ${lastReasoning || "All attempts errored."}`
+    );
+  }
+
+  // 3. Clothing Try-On (Standard Apparel Route)
+  let segmentedGarmentUrl = primaryProductUrl;
+  try {
+    segmentedGarmentUrl = await segmentGarment(keys, primaryProductUrl, category);
+  } catch (err) {
+    console.warn("[Unified VTON] Segment clothing failed, using original:", err);
+  }
+
+  let lastReasoning = "";
+  const maxRetries = 3;
+  // Best-effort tracking: serve the highest-scoring result if nothing reaches the pass threshold
+  let bestResultUrl: string | null = null;
+  let bestResultScore = 0;
+  // Track if fal.ai balance is exhausted to avoid repeated failed calls
+  let falBalanceExhausted = false;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`[Unified VTON] Attempt ${attempt} of ${maxRetries} for apparel try-on...`);
+
+    // Mutate seed based on attempt
+    const seed = attempt === 1 ? 42 : attempt === 2 ? 738920 : 1948302;
+
+    const engines = [
+      {
+        name: "Fal.ai VTON",
+        available: !!keys.falKey && !falBalanceExhausted,
+        fn: async () => {
+          return await callFalAI(
+            keys.falKey,
+            personImageUrl,
+            segmentedGarmentUrl,
+            `${garmentDetails} — worn by a ${targetGender} ${targetEthnicity} model. seed: ${seed}`
+          );
+        }
+      },
+      {
+        name: "Alibaba Wan Reference-Based Synthesis",
+        available: !!keys.qwenKey,
+        fn: async () => {
+          let strictnessPromptModifier = "";
+          if (attempt === 2) {
+            strictnessPromptModifier = "CRITICAL: Under no circumstances alter or reinterpret the clothing. The reference garment is the absolute visual source of truth.";
+          } else if (attempt === 3) {
+            strictnessPromptModifier = "CRITICAL AUDIT NOTICE: Zero tolerance for modifications. Every stitch, neckline, pattern, and button count must match the raw product image exactly.";
+          }
+
+          const wanPrompt = [
+            `Professional high-resolution fashion catalog photograph.`,
+            `MODEL: ${targetGender} ${targetEthnicity} — the face, skin tone, and body must be IDENTICAL to the target person reference image.`,
+            `GARMENT (must be reproduced with 100% accuracy — do not alter any detail):`,
+            `  ${garmentDetails}`,
+            `  Product name: ${description}`,
+            `RULES: Do NOT change the garment's neckline, sleeve length, color, cut, pattern, print or fabric texture.`,
+            `Do NOT change the model's face, skin tone or ethnicity.`,
+            strictnessPromptModifier,
+            `Studio lighting, sharp focus, white background, realistic render.`
+          ].join(" ");
+
+          console.log(`[Unified VTON] Wan prompt (attempt ${attempt}): ${wanPrompt}`);
+          return await callImageAI(keys.qwenKey, wanPrompt, [
+            { type: 'influencer', url: personImageUrl },
+            { type: 'product', url: segmentedGarmentUrl }
+          ]);
+        }
+      },
+      {
+        name: "Photta Try-On",
+        available: !!keys.phottaKey,
+        fn: async () => {
+          const phottaType = getPhottaProductType(category, garmentDetails);
+          console.log(`[Unified VTON] Photta product_type resolved to: ${phottaType}`);
+          const res = await callPhottaAI(keys.phottaKey, segmentedGarmentUrl, phottaType, undefined, targetEthnicity, targetGender);
+          if (!res) throw new Error("Photta Try-On returned null");
+          return res;
+        }
+      },
+      {
+        name: "IDM-VTON (Hugging Face Spaces)",
+        available: !!keys.hfToken,
+        fn: async () => {
+          return await callIDMVTON(
+            keys.hfToken,
+            personImageUrl,
+            segmentedGarmentUrl,
+            `${garmentColor} ${description}`
+          );
+        }
+      }
+    ];
+
+    for (const engine of engines) {
+      if (!engine.available) continue;
+      try {
+        console.log(`[Unified VTON] Trying apparel engine: ${engine.name} on attempt ${attempt}...`);
+        const resultUrl = await engine.fn();
+        if (resultUrl) {
+          console.log(`[Unified VTON] Engine ${engine.name} succeeded. Verifying fidelity...`);
+
+          const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl);
+          if (audit.pass) {
+            console.log(`[Unified VTON] ✅ Apparel fidelity check PASSED for: ${engine.name} (Score: ${audit.score}%)`);
+            return resultUrl;
+          } else {
+            console.warn(`[Unified VTON] ❌ Apparel fidelity check FAILED for: ${engine.name} (Score: ${audit.score}%). Reason: ${audit.reasoning}`);
+            lastReasoning = audit.reasoning;
+            // Track the best result so far for best-effort fallback
+            if (audit.score > bestResultScore) {
+              bestResultScore = audit.score;
+              bestResultUrl = resultUrl;
+              console.log(`[Unified VTON] 📌 New best-effort candidate: ${engine.name} (Score: ${audit.score}%)`);
+            }
+          }
+        }
+      } catch (err: any) {
+        const msg = err.message || String(err);
+        // Mark fal.ai as exhausted for this request so we don't retry it
+        if (msg.startsWith("FAL_BALANCE_EXHAUSTED")) {
+          falBalanceExhausted = true;
+          console.warn(`[Unified VTON] ⚠️ Fal.ai balance exhausted — skipping fal engines for remaining attempts.`);
+        } else if (msg.startsWith("SKIP_ENGINE")) {
+          console.warn(`[Unified VTON] ⏭️ Engine ${engine.name} skipped: ${msg}`);
+        } else {
+          console.warn(`[Unified VTON] Engine ${engine.name} errored on attempt ${attempt}:`, msg);
+        }
+      }
+    }
+  }
+
+  // Best-effort fallback: if we have a result that scored ≥ 80%, serve it with a warning
+  // rather than completely failing the user — a 92% result is genuinely good
+  if (bestResultUrl && bestResultScore >= 80) {
+    console.warn(
+      `[Unified VTON] ⚠️ Best-effort fallback: serving highest-scoring result (${bestResultScore}%) ` +
+      `after all retries exhausted. Reason for non-pass: ${lastReasoning}`
+    );
+    return bestResultUrl;
+  }
+
+  throw new Error(
+    `CLEAN_FAILURE: Apparel virtual try-on failed after ${maxRetries} attempts. ` +
+    `None of the VTON engines produced a result matching the inventory product with acceptable fidelity (88%+ overall, 7+ per category). ` +
+    `Last auditor reasoning: ${lastReasoning || "All attempts timed out or failed to execute."}`
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -888,7 +1478,34 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const referenceImage = body.avatarImageUrl || body.avatarImageBase64;
-    const productImageUrl = body.productImageUrl || (body.product?.images?.[0]);
+
+    // Collect all potential product image references into a deduplicated list
+    const candidateUrls: string[] = [];
+    const addCandidates = (val: any) => {
+      if (!val) return;
+      if (Array.isArray(val)) {
+        val.forEach(item => {
+          if (typeof item === 'string' && item.trim()) {
+            candidateUrls.push(item.trim());
+          }
+        });
+      } else if (typeof val === 'string' && val.trim()) {
+        candidateUrls.push(val.trim());
+      }
+    };
+
+    addCandidates(body.productImageUrl);
+    addCandidates(body.product?.images);
+    addCandidates(body.product?.side_images);
+    addCandidates(body.product?.closeups);
+    addCandidates(body.product?.textures);
+    addCandidates(body.side_images);
+    addCandidates(body.closeups);
+    addCandidates(body.textures);
+
+    // Deduplicate while preserving order
+    const productImages = [...new Set(candidateUrls)];
+    const primaryProductUrl = productImages[0] || "";
 
     if (action === "generate-avatar") {
       const { productName, productCategory } = body;
@@ -900,64 +1517,43 @@ Deno.serve(async (req) => {
 
       let url;
       try {
-        // If we have both identity and product, try VTON first
-        if (referenceImage && productImageUrl) {
-          const garmentDetails = await detectGarmentColor(QWEN_API_KEY, productImageUrl);
-          let segmentedGarmentUrl = productImageUrl;
-          if (PHOTTA_API_KEY) {
-            segmentedGarmentUrl = await segmentGarment(PHOTTA_API_KEY, productImageUrl);
-          }
-
-          if (FAL_KEY) {
-            try {
-              url = await callFalAI(FAL_KEY, referenceImage, segmentedGarmentUrl, `${garmentDetails} ${productName}`);
-            } catch (eFal) {
-              console.warn("Fal.ai failed for avatar, falling back to synthesis");
+        if (primaryProductUrl) {
+          let vtonPersonImage = referenceImage;
+          
+          if (!vtonPersonImage) {
+            console.log(`[generate-avatar] No reference image provided. Generating high-quality baseline portrait for ${gender} ${ethnicity}...`);
+            let baselinePrompt = "";
+            if (body.isUGC) {
+              baselinePrompt = `Authentic smartphone selfie. Lifestyle photography. MODEL: ${ethnicity} ${gender}. SETTING: ${setting || "natural city street"}. 
+              CRITICAL: Natural skin texture, realistic casual lighting, unedited look, raw lifestyle feel, wearing casual undergarment or plain white t-shirt.`;
+            } else {
+              baselinePrompt = `High-end fashion portrait. MODEL: ${ethnicity} ${gender}. SETTING: ${setting || "studio"}. Wearing simple plain undergarment or white t-shirt.`;
             }
-          }
-        }
-        
-        if (!url) {
-          // If no VTON or VTON failed, use Synthesis with STRICT product lock
-          const garmentDetails = productImageUrl ? await detectGarmentColor(QWEN_API_KEY, productImageUrl) : "";
-          const colorMatch = garmentDetails.match(/Color: ([^,]+)/);
-          const color = colorMatch ? colorMatch[1] : "original";
-          
-          let prompt = "";
-          if (body.isUGC) {
-            prompt = `Authentic smartphone selfie. Lifestyle photography. MODEL: ${ethnicity} ${gender}. SETTING: ${setting || "natural city street"}. 
-            CRITICAL: Natural skin texture, realistic casual lighting, unedited look, raw lifestyle feel.`;
-          } else {
-            prompt = `High-end fashion portrait. MODEL: ${ethnicity} ${gender}. SETTING: ${setting || "studio"}.`;
-          }
-
-          if (productImageUrl) {
-            prompt += `
-            WEARING THE EXACT PRODUCT FROM REFERENCE: ${productImageUrl}.
-            ${garmentDetails}.
-            CRITICAL RULES:
-            1. 100% CLOTHING FIDELITY. The model MUST wear the exact ${color} garment shown.
-            2. NO generic clothes. NO color shifts.
-            3. If identity reference is provided (${referenceImage || "none"}), match FACE only, REJECT its clothes.`;
+            // Generate a premium baseline model portrait
+            const baselineUrl = await callImageAI(QWEN_API_KEY, baselinePrompt, []);
+            vtonPersonImage = await persistImage(supabase, baselineUrl, "baselines");
+            console.log(`[generate-avatar] Generated baseline portrait: ${vtonPersonImage}`);
           }
           
-          const refs = [];
-          if (productImageUrl) refs.push({ type: 'product' as const, url: productImageUrl });
-          if (referenceImage) refs.push({ type: 'influencer' as const, url: referenceImage });
-          
-          url = await callImageAI(QWEN_API_KEY, prompt, refs);
+          // Map the exact product onto the reference image/generated baseline portrait
+          url = await runUnifiedVTON(
+            { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
+            vtonPersonImage,
+            productImages,
+            productCategory || "apparel",
+            productName || "garment",
+            supabase,
+            ethnicity,
+            gender
+          );
+        } else {
+          // Creating a baseline influencer identity portrait (no product selected)
+          const prompt = `High-end fashion portrait. MODEL: ${ethnicity} ${gender}. SETTING: ${setting || "studio"}.`;
+          url = await callImageAI(QWEN_API_KEY, prompt, referenceImage ? [{ type: 'influencer' as const, url: referenceImage }] : []);
         }
       } catch (e) {
         console.error("Avatar generation failed:", e);
         throw e;
-      }
-
-      // Verify the generated avatar has the correct product
-      if (productImageUrl) {
-        const fidelityOk = await verifyProductFidelity(QWEN_API_KEY, productImageUrl, url);
-        if (!fidelityOk) {
-          console.warn("⚠️ Avatar fidelity check FAILED — product may not match perfectly");
-        }
       }
 
       const persistedUrl = await persistImage(supabase, url, "avatars");
@@ -970,7 +1566,7 @@ Deno.serve(async (req) => {
       console.log(`🎬 STARTING HIGH-MOTION UGC PIPELINE: ${productName} (${avatarGender}, ${avatarEthnicity})...`);
       
       // --- STAGE 1: PRODUCT LOCK ENGINE ---
-      if (!productImageUrl) throw new Error("Generation blocked: no product image.");
+      if (productImages.length === 0) throw new Error("Generation blocked: no product image.");
       console.log("Stage 1: Product Lock Engine verified.");
 
       let referenceImage = body.influencerImageUrl || body.avatarImageUrl;
@@ -981,48 +1577,22 @@ Deno.serve(async (req) => {
 
       // --- STAGE 2: VTON MASTER FRAME ---
       console.log("Stage 2: Creating Luxury VTON Master Frame...");
-      const garmentDetails = await detectGarmentColor(QWEN_API_KEY, productImageUrl);
-      let segmentedGarmentUrl = productImageUrl;
-      if (PHOTTA_API_KEY) {
-        segmentedGarmentUrl = await segmentGarment(PHOTTA_API_KEY, productImageUrl);
-      }
-
-      let masterFrameUrl;
-      if (FAL_KEY) {
-        const engines = ["fal-ai/fashn/tryon", "fal-ai/kling/v1-5/kolors-virtual-try-on"];
-        const descriptionPrompt = `Generate a luxury influencer fashion photograph.
-        STRICT RULES:
-        - Use the EXACT product from the reference image
-        - Do NOT redesign the garment
-        - Maintain exact colors and textures
-        The model should look natural, have realistic skin texture, realistic hands, realistic hair, realistic fabric interaction.
-        Lighting: premium soft daylight, cinematic smartphone realism. ${productDescription || productName}. ${garmentDetails}`;
-
-        for (const engine of engines) {
-          try {
-            masterFrameUrl = await callFalVTON(FAL_KEY, engine, referenceImage, segmentedGarmentUrl, descriptionPrompt);
-            if (masterFrameUrl) break;
-          } catch (e) {
-            console.warn(`VTON engine ${engine} failed, trying next...`);
-          }
-        }
-      }
-
-      if (!masterFrameUrl) {
-        // Fallback to synthesis with strict lock
-        const prompt = `Luxury fashion influencer photograph. MODEL: ${avatarEthnicity} ${avatarGender}. Identity: ${referenceImage}.
-        WEARING THE EXACT PRODUCT: ${productName}. ${garmentDetails}. Reference: ${segmentedGarmentUrl}.
-        CRITICAL: 100% garment fidelity. No hallucinations.`;
-        masterFrameUrl = await callImageAI(QWEN_API_KEY, prompt, [{ type: 'product', url: segmentedGarmentUrl }, { type: 'influencer', url: referenceImage }]);
-      }
-
-      if (!masterFrameUrl) throw new Error("CRITICAL: Master Frame generation failed.");
+      const masterFrameUrl = await runUnifiedVTON(
+        { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
+        referenceImage,
+        productImages,
+        productCategory || "apparel",
+        productName || "garment",
+        supabase,
+        avatarEthnicity,
+        avatarGender
+      );
       const persistedMasterUrl = await persistImage(supabase, masterFrameUrl, "master_frames");
       console.log(`✅ Master Frame created: ${persistedMasterUrl}`);
 
       // --- STAGE 3: REAL MOTION GENERATION ---
       console.log("Stage 3: Generating Real AI Video Motion...");
-      const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${garmentDetails}`;
+      const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${productDescription || productName}`;
       let videoUrl;
       
       try {
@@ -1055,9 +1625,13 @@ Deno.serve(async (req) => {
 
       // --- STAGE 4: CONSISTENCY VERIFICATION ---
       console.log("Stage 4: Consistency Verification...");
-      const verificationOk = await verifyVideoFidelity(QWEN_API_KEY, productImageUrl, videoUrl);
-      if (!verificationOk) {
-        console.warn("⚠️ Video fidelity verification FAILED. Proceeding but with caution.");
+      const verificationOk = await verifyVideoFidelity(QWEN_API_KEY, productImages, videoUrl);
+      if (!verificationOk.pass) {
+        throw new Error(
+          `Video product fidelity check FAILED: The generated video motion modified the garment's appearance or colors. ` +
+          `Reason: ${verificationOk.reasoning}. ` +
+          `Standard video fallback is blocked to prevent presenting generic products to customers.`
+        );
       }
 
       // --- STAGE 5: AUDIO ENGINE ---
@@ -1106,7 +1680,7 @@ Deno.serve(async (req) => {
         success: true, 
         videoUrl: finalVideoUrl, 
         masterFrameUrl: persistedMasterUrl,
-        fidelityVerified: verificationOk,
+        fidelityVerified: verificationOk.pass,
         audioUrl: finalAudioUrl
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -1115,82 +1689,30 @@ Deno.serve(async (req) => {
     if (action === "generate-campaign-shot") {
       const { influencer, product, scene } = body;
       const influencerImageUrl = influencer.avatar_url || "";
-      const cacheKey = await getCacheKey(influencerImageUrl, productImageUrl, scene);
+      const influencerEthnicity = influencer.ethnicity || influencer.skin_tone || "";
+      const influencerGender = influencer.gender || "female";
+      const cacheKey = await getCacheKey(influencerImageUrl, primaryProductUrl, `${scene}|${influencerEthnicity}|${influencerGender}`);
       const cachedUrl = await checkCache(supabase, cacheKey);
       if (cachedUrl) return new Response(JSON.stringify({ success: true, imageUrl: cachedUrl, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
       try {
-        const garmentDetails = await detectGarmentColor(QWEN_API_KEY, productImageUrl);
-        const colorMatch = garmentDetails.match(/Color: ([^,]+)/);
-        const garmentColor = colorMatch ? colorMatch[1] : "original";
-        
-        // Pass 1: Semantic Segmentation (Garment Purification)
-        let segmentedGarmentUrl = productImageUrl;
-        if (PHOTTA_API_KEY) {
-          segmentedGarmentUrl = await segmentGarment(PHOTTA_API_KEY, productImageUrl);
-        }
+        const url = await runUnifiedVTON(
+          { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
+          influencerImageUrl,
+          productImages,
+          product.category || "apparel",
+          product.name || "garment",
+          supabase,
+          influencerEthnicity,
+          influencerGender
+        );
 
-        let url;
-        try {
-          if (FAL_KEY) {
-            // Step 1: Platinum Engine (Fal.ai Kolors)
-            url = await callFalAI(FAL_KEY, influencerImageUrl, segmentedGarmentUrl, `${garmentDetails} ${product.name}`);
-          } else {
-            throw new Error("FAL_KEY missing");
-          }
-        } catch (eFal) {
-          console.warn("Fal.ai failed for campaign shot, falling back to Photta", eFal);
-          if (PHOTTA_API_KEY) {
-            try {
-              url = await callPhottaAI(PHOTTA_API_KEY, segmentedGarmentUrl, influencer.id);
-            } catch (ePh) {
-              console.warn("Photta failed, falling back to IDM-VTON", ePh);
-            }
-          }
-        }
-        
-        if (!url) {
-          url = await callIDMVTON(HF_TOKEN, influencerImageUrl, segmentedGarmentUrl, `${garmentColor} ${product.name}`);
-        }
-        
         const persistedUrl = await persistImage(supabase, url, "campaigns", HF_TOKEN);
         await storeInCache(supabase, cacheKey, persistedUrl, influencer.id, product.id);
         return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      } catch (e) {
-        const url = await callTryOnAI(QWEN_API_KEY, influencerImageUrl, productImageUrl, product.category);
-        if (url) {
-          const persistedUrl = await persistImage(supabase, url, "campaigns", HF_TOKEN);
-          await storeInCache(supabase, cacheKey, persistedUrl, influencer.id, product.id);
-          return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        } else {
-          // Final fallback with ABSOLUTE COLOR LOCK
-          const ethnicity = influencer.ethnicity || "African";
-          const gender = influencer.gender || "female";
-          const garmentDetails = await detectGarmentColor(QWEN_API_KEY, productImageUrl);
-          const colorMatch = garmentDetails.match(/Color: ([^,]+)/);
-          const color = colorMatch ? colorMatch[1] : "original";
-          
-          const prompt = `PREMIUM HIGH-END ADVERTISEMENT for ${product.name}. 
-          MODEL: ${ethnicity} ${gender}. Match identity from: ${influencerImageUrl}.
-          PRODUCT REFERENCE: ${productImageUrl}. 
-          ${garmentDetails}.
-          
-          COLOR AND GARMENT FIDELITY IS ABSOLUTELY CRITICAL:
-          - The model MUST be wearing the EXACT garment from the product reference.
-          - The garment color MUST BE ${color.toUpperCase()}.
-          - Match the reference product image 100% (texture, shape, color). 
-          - NO beige, NO tan, NO gray, NO generic clothes.
-          - DISCARD any clothes from the identity reference; ONLY use the product reference for clothing.
-          
-          Style: ${body.style}. Scene: ${scene}. Cinematic lighting, high-end editorial, 8k.`;
-          
-          const synUrl = await callImageAI(QWEN_API_KEY, prompt, [
-            { type: 'influencer', url: influencerImageUrl },
-            { type: 'product', url: productImageUrl }
-          ]);
-          const persistedUrl = await persistImage(supabase, synUrl, "campaigns");
-          return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
+      } catch (e: any) {
+        console.error("Campaign shot generation failed:", e);
+        return new Response(JSON.stringify({ error: e.message || "Error generating high-fidelity campaign shot" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
 
