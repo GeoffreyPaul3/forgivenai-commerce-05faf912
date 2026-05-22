@@ -63,8 +63,8 @@ const VendorPortal = () => {
     queryKey: ["vendor-products", vendor?.id],
     enabled: !!vendor?.id,
     queryFn: async () => {
-      const { data } = await (supabase as any).from("products").select("id").eq("vendor_id", vendor.id);
-      return (data || []).map(p => p.id);
+      const { data } = await (supabase as any).from("products").select("id, name").eq("vendor_id", vendor.id);
+      return data || [];
     },
   });
 
@@ -73,9 +73,17 @@ const VendorPortal = () => {
     enabled: !!myProducts && myProducts.length > 0,
     queryFn: async () => {
       const { data } = await (supabase as any).from("orders").select("*").order("created_at", { ascending: false });
+      
+      const productIds = new Set((myProducts || []).map(p => p.id));
+      const cleanNames = new Set((myProducts || []).map(p => p.name ? p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : ""));
+
       // Filtering in JS for demonstration; in production use Postgres JSON containment or join table
       return (data || []).filter(order => 
-        (order.items as any[]).some(item => myProducts?.includes(item.product_id))
+        (order.items as any[]).some(item => {
+          if (item.product_id && productIds.has(item.product_id)) return true;
+          const cleanedName = item.name ? item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : "";
+          return cleanedName && cleanNames.has(cleanedName);
+        })
       );
     },
   });

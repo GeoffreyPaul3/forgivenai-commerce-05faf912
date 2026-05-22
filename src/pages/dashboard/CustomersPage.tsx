@@ -55,7 +55,7 @@ const CustomersPage = () => {
       
       let query = supabase
         .from("customers")
-        .select(`*, first_agent:agents(name)`)
+        .select(`*, first_agent:agents!customers_first_agent_id_fkey(name)`)
         .order("created_at", { ascending: false });
       
       if (profile?.role === "agent" && agentId) {

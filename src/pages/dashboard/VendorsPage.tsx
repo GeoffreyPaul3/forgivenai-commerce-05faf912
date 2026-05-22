@@ -83,14 +83,19 @@ const VendorsPage = () => {
       
       const { data: vendorProducts } = await supabase
         .from("products")
-        .select("id")
+        .select("id, name")
         .not("vendor_id", "is", null);
         
-      const vendorProductIds = new Set((vendorProducts || []).map(p => p.id));
+      const productIds = new Set((vendorProducts || []).map(p => p.id));
+      const cleanNames = new Set((vendorProducts || []).map(p => p.name ? p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : ""));
       
       return (data || []).filter(order => {
         const items = Array.isArray(order.items) ? order.items : [];
-        return items.some((item: any) => vendorProductIds.has(item.product_id));
+        return items.some((item: any) => {
+          if (item.product_id && productIds.has(item.product_id)) return true;
+          const cleanedName = item.name ? item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : "";
+          return cleanedName && cleanNames.has(cleanedName);
+        });
       });
     },
   });
@@ -119,6 +124,7 @@ const VendorsPage = () => {
         .order("created_at", { ascending: false });
 
       const productIds = new Set((products || []).map((p: any) => p.id));
+      const cleanNames = new Set((products || []).map((p: any) => p.name ? p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : ""));
 
       let orders: any[] = [];
       if (productIds.size > 0) {
@@ -130,7 +136,11 @@ const VendorsPage = () => {
 
         orders = (allOrders || []).filter((order: any) => {
           const items = Array.isArray(order.items) ? order.items : [];
-          return items.some((item: any) => productIds.has(item.product_id));
+          return items.some((item: any) => {
+            if (item.product_id && productIds.has(item.product_id)) return true;
+            const cleanedName = item.name ? item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : "";
+            return cleanedName && cleanNames.has(cleanedName);
+          });
         });
       }
 
@@ -144,15 +154,21 @@ const VendorsPage = () => {
     queryFn: async () => {
       const { data: vendorProds } = await supabase
         .from("products")
-        .select("id, vendor_id")
+        .select("id, name, vendor_id")
         .not("vendor_id", "is", null);
 
-      // vendorId → Set<productId>
-      const vpMap = new Map<string, Set<string>>();
+      // vendorId → { ids: Set<string>, cleanNames: Set<string> }
+      const vpMap = new Map<string, { ids: Set<string>; cleanNames: Set<string> }>();
       for (const p of vendorProds || []) {
         if (!p.vendor_id) continue;
-        if (!vpMap.has(p.vendor_id)) vpMap.set(p.vendor_id, new Set());
-        vpMap.get(p.vendor_id)!.add(p.id);
+        if (!vpMap.has(p.vendor_id)) {
+          vpMap.set(p.vendor_id, { ids: new Set(), cleanNames: new Set() });
+        }
+        const entry = vpMap.get(p.vendor_id)!;
+        entry.ids.add(p.id);
+        if (p.name) {
+          entry.cleanNames.add(p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase());
+        }
       }
 
       const { data: allOrders } = await supabase
@@ -165,8 +181,11 @@ const VendorsPage = () => {
         const items = Array.isArray(order.items) ? (order.items as any[]) : [];
         const seen = new Set<string>();
         for (const item of items) {
-          for (const [vid, pids] of vpMap.entries()) {
-            if (pids.has(item.product_id) && !seen.has(vid)) {
+          const itemCleanedName = item.name ? item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : "";
+          for (const [vid, entry] of vpMap.entries()) {
+            const hasMatch = (item.product_id && entry.ids.has(item.product_id)) || 
+                             (itemCleanedName && entry.cleanNames.has(itemCleanedName));
+            if (hasMatch && !seen.has(vid)) {
               seen.add(vid);
               orderCount.set(vid, (orderCount.get(vid) || 0) + 1);
             }
@@ -176,7 +195,7 @@ const VendorsPage = () => {
 
       // vendorId → product count
       const productCount = new Map<string, number>();
-      for (const [vid, pids] of vpMap.entries()) productCount.set(vid, pids.size);
+      for (const [vid, entry] of vpMap.entries()) productCount.set(vid, entry.ids.size);
 
       return { orderCount, productCount };
     },

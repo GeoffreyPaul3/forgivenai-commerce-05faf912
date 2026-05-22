@@ -108,7 +108,12 @@ export default function VendorPerformancePage() {
     const map: Record<string, { name: string; revenue: number; orders: number }> = {};
     (allOrders || []).forEach((o: any) => {
       (o.items as any[]).forEach((item: any) => {
-        const prod = (products || []).find((p: any) => p.id === item.product_id);
+        const prod = (products || []).find((p: any) => {
+          if (item.product_id && p.id === item.product_id) return true;
+          const cleanedItemName = item.name ? item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : "";
+          const cleanedProdName = p.name ? p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : "";
+          return cleanedItemName && cleanedProdName && cleanedItemName === cleanedProdName;
+        });
         if (prod) {
           if (!map[prod.id]) map[prod.id] = { name: prod.name, revenue: 0, orders: 0 };
           map[prod.id].revenue += (item.price || prod.price || 0) * (item.quantity || 1);

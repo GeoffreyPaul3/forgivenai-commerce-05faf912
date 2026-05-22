@@ -169,8 +169,8 @@ function OverviewPage() {
     queryKey: ["vendor-products", vendorId],
     enabled: !!vendorId,
     queryFn: async () => {
-      const { data } = await supabase.from("products").select("id").eq("vendor_id", vendorId!);
-      return (data || []).map(p => p.id);
+      const { data } = await supabase.from("products").select("id, name").eq("vendor_id", vendorId!);
+      return data || [];
     }
   });
 
@@ -201,8 +201,15 @@ function OverviewPage() {
 
       let filteredOrders = orders.data || [];
       if (profile?.role === "vendor" && myProducts) {
+        const productIds = new Set(myProducts.map(p => p.id));
+        const cleanNames = new Set(myProducts.map(p => p.name ? p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : ""));
+
         filteredOrders = filteredOrders.filter((o: any) => 
-          (o.items as any[]).some(item => myProducts.includes(item.product_id))
+          (o.items as any[]).some(item => {
+            if (item.product_id && productIds.has(item.product_id)) return true;
+            const cleanedName = item.name ? item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : "";
+            return cleanedName && cleanNames.has(cleanedName);
+          })
         );
       }
 
@@ -241,8 +248,15 @@ function OverviewPage() {
 
       if (profile?.role === "vendor") {
         if (!myProducts) return [];
+        const productIds = new Set(myProducts.map(p => p.id));
+        const cleanNames = new Set(myProducts.map(p => p.name ? p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : ""));
+
         filtered = filtered.filter((o: any) => 
-          (o.items as any[]).some(item => myProducts.includes(item.product_id))
+          (o.items as any[]).some(item => {
+            if (item.product_id && productIds.has(item.product_id)) return true;
+            const cleanedName = item.name ? item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : "";
+            return cleanedName && cleanNames.has(cleanedName);
+          })
         ).slice(0, 6);
       }
 

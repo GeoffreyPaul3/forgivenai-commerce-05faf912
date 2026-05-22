@@ -24,12 +24,21 @@ function getConfirmDelay(order: Order): { mins: number; state: "ok" | "flagged" 
 /** Determines whether an order originated from an agent, a vendor product, or in-house */
 function getOrderSource(
   order: Order,
-  vendorProductIds?: Set<string>
+  vendorProducts?: { id: string; name: string }[]
 ): "agent" | "vendor" | "inhouse" {
   if (order.agent_id) return "agent";
-  if (vendorProductIds && vendorProductIds.size > 0) {
+  if (vendorProducts && vendorProducts.length > 0) {
     const items = Array.isArray(order.items) ? (order.items as any[]) : [];
-    if (items.some(item => vendorProductIds.has(item.product_id))) return "vendor";
+    const productIds = new Set(vendorProducts.map(p => p.id));
+    const cleanNames = new Set(vendorProducts.map(p => p.name ? p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : ""));
+    
+    if (items.some(item => {
+      if (item.product_id && productIds.has(item.product_id)) return true;
+      const cleanedName = item.name ? item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : "";
+      return cleanedName && cleanNames.has(cleanedName);
+    })) {
+      return "vendor";
+    }
   }
   return "inhouse";
 }
@@ -114,14 +123,14 @@ const OrdersPage = () => {
     }
   });
 
-  // Admin-only: build a Set of product IDs that belong to any vendor so we can
+  // Admin-only: fetch products belonging to any vendor so we can
   // label orders containing those products as "Vendor Product" in the list & detail.
-  const { data: vendorProductIds } = useQuery({
-    queryKey: ["vendor-product-ids"],
+  const { data: vendorProducts } = useQuery({
+    queryKey: ["vendor-products-list"],
     enabled: profile?.role === "admin",
     queryFn: async () => {
-      const { data } = await supabase.from("products").select("id").not("vendor_id", "is", null);
-      return new Set((data || []).map((p: any) => p.id as string));
+      const { data } = await supabase.from("products").select("id, name").not("vendor_id", "is", null);
+      return data || [];
     },
   });
 
@@ -129,8 +138,8 @@ const OrdersPage = () => {
     queryKey: ["vendor-products", vendorId],
     enabled: !!vendorId,
     queryFn: async () => {
-      const { data } = await supabase.from("products").select("id").eq("vendor_id", vendorId!);
-      return (data || []).map(p => p.id);
+      const { data } = await supabase.from("products").select("id, name").eq("vendor_id", vendorId!);
+      return data || [];
     }
   });
 
@@ -154,8 +163,15 @@ const OrdersPage = () => {
       let filtered = data || [];
       if (profile?.role === "vendor") {
         if (!myProducts) return [];
+        const productIds = new Set(myProducts.map(p => p.id));
+        const cleanNames = new Set(myProducts.map(p => p.name ? p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : ""));
+        
         filtered = filtered.filter((o: any) => 
-          (o.items as any[]).some(item => myProducts.includes(item.product_id))
+          (o.items as any[]).some(item => {
+            if (item.product_id && productIds.has(item.product_id)) return true;
+            const cleanedName = item.name ? item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : "";
+            return cleanedName && cleanNames.has(cleanedName);
+          })
         );
       }
       
@@ -257,7 +273,7 @@ const OrdersPage = () => {
                   <p className="text-xs text-muted-foreground font-body">
                     {order.customer_phone || order.customer_email || "No contact"} • {order.channel} 
                     {(() => {
-                      const src = getOrderSource(order, vendorProductIds);
+                      const src = getOrderSource(order, vendorProducts);
                       if (src === "agent")  return " • Agent Referral";
                       if (src === "vendor") return " • Vendor Product";
                       return " • In-house";
@@ -338,7 +354,7 @@ const OrdersPage = () => {
                     </p>
                     <p className="font-black text-2xl text-primary">{selectedOrder.currency} {selectedOrder.total.toLocaleString()}</p>
                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter mt-1">{selectedOrder.channel} channel {(() => {
-                        const src = getOrderSource(selectedOrder, vendorProductIds);
+                        const src = getOrderSource(selectedOrder, vendorProducts);
                         if (src === "agent")  return " • Agent Referral";
                         if (src === "vendor") return " • Vendor Product";
                         return " • In-house";

@@ -56,25 +56,33 @@ export default function VendorDashboard() {
 
   const { data: vendor, isLoading: vendorLoading } = useVendorProfile(session?.user?.id);
 
-  const { data: vendorProductIds } = useQuery({
-    queryKey: ["vendor-product-ids-dash", vendor?.id],
+  const { data: vendorProductsData } = useQuery({
+    queryKey: ["vendor-products-data-dash", vendor?.id],
     enabled: !!vendor?.id,
     queryFn: async () => {
-      const { data } = await (supabase as any).from("products").select("id").eq("vendor_id", vendor.id);
-      return (data || []).map((p: any) => p.id) as string[];
+      const { data } = await (supabase as any).from("products").select("id, name").eq("vendor_id", vendor.id);
+      return data || [];
     },
   });
 
   const { data: allOrders } = useQuery({
-    queryKey: ["vendor-all-orders-dash", vendorProductIds],
-    enabled: !!vendorProductIds && vendorProductIds.length > 0,
+    queryKey: ["vendor-all-orders-dash", vendorProductsData],
+    enabled: !!vendorProductsData && vendorProductsData.length > 0,
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("orders")
         .select("id, customer_name, customer_phone, total, status, channel, vendor_confirmation_status, created_at, items")
         .order("created_at", { ascending: false });
+
+      const productIds = new Set((vendorProductsData || []).map(p => p.id));
+      const cleanNames = new Set((vendorProductsData || []).map(p => p.name ? p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : ""));
+
       return (data || []).filter((o: any) =>
-        (o.items as any[]).some((item: any) => vendorProductIds?.includes(item.product_id))
+        (o.items as any[]).some((item: any) => {
+          if (item.product_id && productIds.has(item.product_id)) return true;
+          const cleanedName = item.name ? item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase() : "";
+          return cleanedName && cleanNames.has(cleanedName);
+        })
       );
     },
   });
