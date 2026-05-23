@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { useVendorProfile } from "./VendorDashboard";
 
 const statusConfig: Record<string, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
   pending:    { label: "Pending",    color: "text-amber-500",  bg: "bg-amber-500/5",  border: "border-amber-500/20",  icon: Clock },
+  paid:       { label: "Paid",       color: "text-[#A21D7F]",  bg: "bg-[#A21D7F]/5",  border: "border-[#A21D7F]/20",  icon: CheckCircle2 },
   confirmed:  { label: "Confirmed",  color: "text-[#A21D7F]",   bg: "bg-[#A21D7F]/5",   border: "border-[#A21D7F]/20",   icon: Package },
   processing: { label: "Processing", color: "text-primary",      bg: "bg-primary/5",      border: "border-primary/20",    icon: Package },
   shipped:    { label: "Shipped",    color: "text-primary",      bg: "bg-primary/5",      border: "border-primary/20",    icon: Truck },
@@ -40,18 +41,21 @@ export default function VendorOrdersPage() {
 
   const { data: vendor, isLoading: vendorLoading } = useVendorProfile(session?.user?.id);
 
-  const { data: vendorProductIds } = useQuery({
-    queryKey: ["vendor-product-ids-orders", vendor?.id],
+  const { data: vendorProducts } = useQuery({
+    queryKey: ["vendor-products-orders-lookup", vendor?.id],
     enabled: !!vendor?.id,
     queryFn: async () => {
-      const { data } = await (supabase as any).from("products").select("id").eq("vendor_id", vendor.id);
-      return (data || []).map((p: any) => p.id) as string[];
+      const { data } = await (supabase as any)
+        .from("products")
+        .select("id, name, vendor_cost")
+        .eq("vendor_id", vendor.id);
+      return data || [];
     },
   });
 
   const { data: orders, isLoading: ordersLoading } = useQuery({
-    queryKey: ["vendor-orders-page", vendorProductIds],
-    enabled: !!vendorProductIds && vendorProductIds.length > 0,
+    queryKey: ["vendor-orders-page", vendorProducts],
+    enabled: !!vendorProducts && vendorProducts.length > 0,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .rpc("get_vendor_orders", { p_vendor_id: vendor.id });
@@ -59,6 +63,47 @@ export default function VendorOrdersPage() {
       return data || [];
     },
   });
+
+  const processedOrders = useMemo(() => {
+    const list = orders || [];
+    if (list.length === 0 || !vendorProducts) return [];
+
+    const productCostMap = new Map<string, number>();
+    const productNameCostMap = new Map<string, number>();
+    
+    vendorProducts.forEach((p: any) => {
+      if (p.vendor_cost) {
+        productCostMap.set(p.id, p.vendor_cost);
+        if (p.name) {
+          productNameCostMap.set(p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase(), p.vendor_cost);
+        }
+      }
+    });
+
+    return list.map((order: any) => {
+      let vendor_amount = 0;
+      const items = Array.isArray(order.items) ? order.items : [];
+      
+      items.forEach((item: any) => {
+        let cost = 0;
+        if (item.product_id && productCostMap.has(item.product_id)) {
+          cost = productCostMap.get(item.product_id) || 0;
+        } else if (item.name) {
+          const cleanedName = item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase();
+          cost = productNameCostMap.get(cleanedName) || 0;
+        }
+        
+        if (cost > 0) {
+          vendor_amount += cost * (parseInt(item.quantity) || 1);
+        }
+      });
+
+      return {
+        ...order,
+        vendor_amount: vendor_amount || order.vendor_amount || 0,
+      };
+    });
+  }, [orders, vendorProducts]);
 
   const { data: vendorPayouts } = useQuery({
     queryKey: ["vendor-payouts-summary", vendor?.id],
@@ -104,8 +149,8 @@ export default function VendorOrdersPage() {
 
   const kpis = [
     { label: "Confirmed Payouts", value: `MWK ${(vendorPayouts || []).filter((p: any) => p.status === 'paid').reduce((s: number, p: any) => s + (p.amount || 0), 0).toLocaleString()}`, icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-500/5", border: "border-emerald-500/20" },
-    { label: "Pending Payouts", value: `MWK ${(orders || []).filter((o: any) => o.status === 'delivered' && o.vendor_confirmation_status === 'accepted').reduce((s: number, o: any) => s + (o.vendor_amount || 0), 0).toLocaleString()}`, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/5", border: "border-amber-500/20" },
-    { label: "Total Orders", value: orders?.length ?? 0, icon: ShoppingBag, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
+    { label: "Pending Payouts", value: `MWK ${(processedOrders || []).filter((o: any) => (o.status === 'delivered' || o.status === 'paid') && o.vendor_confirmation_status === 'accepted').reduce((s: number, o: any) => s + (o.vendor_amount || 0), 0).toLocaleString()}`, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/5", border: "border-amber-500/20" },
+    { label: "Total Orders", value: processedOrders?.length ?? 0, icon: ShoppingBag, color: "text-primary", bg: "bg-primary/5", border: "border-primary/20" },
     { label: "Performance Class", value: `Class ${vendor?.class || '—'}`, icon: Star, color: "text-gold", bg: "bg-gold/5", border: "border-gold/20" },
   ];
 
@@ -189,7 +234,7 @@ export default function VendorOrdersPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : (orders || []).length === 0 ? (
+                ) : (processedOrders || []).length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-24">
                       <div className="flex flex-col items-center gap-4">
@@ -201,7 +246,7 @@ export default function VendorOrdersPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : (orders || []).map((order: any) => {
+                ) : (processedOrders || []).map((order: any) => {
                   const orderCfg = statusConfig[order.status] || statusConfig.pending;
                   const StatusIcon = orderCfg.icon;
                   const confirmStatus = order.vendor_confirmation_status || "pending";

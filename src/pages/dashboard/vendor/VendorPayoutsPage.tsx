@@ -42,18 +42,21 @@ export default function VendorPayoutsPage() {
     },
   });
 
-  const { data: vendorProductIds } = useQuery({
-    queryKey: ["vendor-product-ids-payouts", vendor?.id],
+  const { data: vendorProducts } = useQuery({
+    queryKey: ["vendor-products-payouts-lookup", vendor?.id],
     enabled: !!vendor?.id,
     queryFn: async () => {
-      const { data } = await (supabase as any).from("products").select("id").eq("vendor_id", vendor.id);
-      return (data || []).map((p: any) => p.id) as string[];
+      const { data } = await (supabase as any)
+        .from("products")
+        .select("id, name, vendor_cost")
+        .eq("vendor_id", vendor.id);
+      return data || [];
     },
   });
 
   const { data: allOrders } = useQuery({
-    queryKey: ["vendor-orders-payouts", vendorProductIds],
-    enabled: !!vendorProductIds && vendorProductIds.length > 0,
+    queryKey: ["vendor-orders-payouts", vendorProducts],
+    enabled: !!vendorProducts && vendorProducts.length > 0,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .rpc("get_vendor_orders", { p_vendor_id: vendor.id });
@@ -62,16 +65,57 @@ export default function VendorPayoutsPage() {
     },
   });
 
+  const processedOrders = useMemo(() => {
+    const list = allOrders || [];
+    if (list.length === 0 || !vendorProducts) return [];
+
+    const productCostMap = new Map<string, number>();
+    const productNameCostMap = new Map<string, number>();
+    
+    vendorProducts.forEach((p: any) => {
+      if (p.vendor_cost) {
+        productCostMap.set(p.id, p.vendor_cost);
+        if (p.name) {
+          productNameCostMap.set(p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase(), p.vendor_cost);
+        }
+      }
+    });
+
+    return list.map((order: any) => {
+      let vendor_amount = 0;
+      const items = Array.isArray(order.items) ? order.items : [];
+      
+      items.forEach((item: any) => {
+        let cost = 0;
+        if (item.product_id && productCostMap.has(item.product_id)) {
+          cost = productCostMap.get(item.product_id) || 0;
+        } else if (item.name) {
+          const cleanedName = item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase();
+          cost = productNameCostMap.get(cleanedName) || 0;
+        }
+        
+        if (cost > 0) {
+          vendor_amount += cost * (parseInt(item.quantity) || 1);
+        }
+      });
+
+      return {
+        ...order,
+        vendor_amount: vendor_amount || order.vendor_amount || 0,
+      };
+    });
+  }, [allOrders, vendorProducts]);
+
   const stats = useMemo(() => {
-    const totalRevenue = (allOrders || []).reduce((s: number, o: any) => s + (o.total || 0), 0);
+    const orders = processedOrders;
+    const totalRevenue = orders.reduce((s: number, o: any) => s + (o.vendor_amount || 0), 0);
     const totalPaid = (payouts || []).filter((p: any) => p.status === "paid").reduce((s: number, p: any) => s + (p.amount || 0), 0);
     const totalPending = (payouts || []).filter((p: any) => p.status === "pending").reduce((s: number, p: any) => s + (p.amount || 0), 0);
     
-    // Use explicit vendor_amount from DB
-    const vendorShare = (allOrders || []).reduce((s: number, o: any) => s + (o.vendor_amount || 0), 0);
+    const vendorShare = totalRevenue;
     const balance = vendorShare - totalPaid;
     return { totalRevenue, vendorShare, totalPaid, totalPending, balance };
-  }, [allOrders, payouts]);
+  }, [processedOrders, payouts]);
 
   const handleWithdraw = () => {
     setWithdrawing(true);
@@ -114,8 +158,8 @@ export default function VendorPayoutsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {[
           {
-            label: "Total Revenue", value: `MWK ${stats.totalRevenue.toLocaleString()}`,
-            sub: "All orders combined", icon: DollarSign, color: "text-[#A21D7F]", bg: "bg-[#A21D7F]/5", border: "border-[#A21D7F]/20",
+            label: "Gross Earnings", value: `MWK ${stats.totalRevenue.toLocaleString()}`,
+            sub: "All your products combined", icon: DollarSign, color: "text-[#A21D7F]", bg: "bg-[#A21D7F]/5", border: "border-[#A21D7F]/20",
           },
           {
             label: "Your Net Earnings", value: `MWK ${stats.vendorShare.toLocaleString()}`,
@@ -163,7 +207,7 @@ export default function VendorPayoutsPage() {
           </CardHeader>
           <CardContent className="pt-5 space-y-4">
             {[
-              { label: "Gross Marketplace Sales", value: stats.totalRevenue, color: "bg-[#A21D7F]" },
+              { label: "Gross Earnings", value: stats.totalRevenue, color: "bg-[#A21D7F]" },
               { label: "My Net Earnings", value: stats.vendorShare, color: "bg-primary" },
               { label: "Successfully Withdrawn", value: stats.totalPaid, color: "bg-emerald-500", negative: true },
               { label: "Available for Payout", value: Math.max(0, stats.balance), color: "bg-gold" },

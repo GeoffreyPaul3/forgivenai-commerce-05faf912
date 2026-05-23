@@ -60,7 +60,7 @@ export default function VendorDashboard() {
     queryKey: ["vendor-products-data-dash", vendor?.id],
     enabled: !!vendor?.id,
     queryFn: async () => {
-      const { data } = await (supabase as any).from("products").select("id, name").eq("vendor_id", vendor.id);
+      const { data } = await (supabase as any).from("products").select("id, name, vendor_cost").eq("vendor_id", vendor.id);
       return data || [];
     },
   });
@@ -100,13 +100,54 @@ export default function VendorDashboard() {
     },
   });
 
-  const stats = useMemo(() => {
+  const processedOrders = useMemo(() => {
     const orders = allOrders || [];
+    if (orders.length === 0 || !vendorProductsData) return [];
+
+    const productCostMap = new Map<string, number>();
+    const productNameCostMap = new Map<string, number>();
+    
+    vendorProductsData.forEach((p: any) => {
+      if (p.vendor_cost) {
+        productCostMap.set(p.id, p.vendor_cost);
+        if (p.name) {
+          productNameCostMap.set(p.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase(), p.vendor_cost);
+        }
+      }
+    });
+
+    return orders.map((order: any) => {
+      let vendor_amount = 0;
+      const items = Array.isArray(order.items) ? order.items : [];
+      
+      items.forEach((item: any) => {
+        let cost = 0;
+        if (item.product_id && productCostMap.has(item.product_id)) {
+          cost = productCostMap.get(item.product_id) || 0;
+        } else if (item.name) {
+          const cleanedName = item.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase();
+          cost = productNameCostMap.get(cleanedName) || 0;
+        }
+        
+        if (cost > 0) {
+          vendor_amount += cost * (parseInt(item.quantity) || 1);
+        }
+      });
+
+      return {
+        ...order,
+        vendor_amount: vendor_amount || order.vendor_amount || 0,
+      };
+    });
+  }, [allOrders, vendorProductsData]);
+
+  const stats = useMemo(() => {
+    const orders = processedOrders;
     const revenue = orders.reduce((s: number, o: any) => s + (o.vendor_amount || 0), 0);
     const pending = orders.filter((o: any) => o.vendor_confirmation_status === "pending" || !o.vendor_confirmation_status).length;
     const delivered = orders.filter((o: any) => o.status === "delivered").length;
     return { revenue, orderCount: orders.length, pending, delivered };
-  }, [allOrders]);
+  }, [processedOrders]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -257,16 +298,16 @@ export default function VendorDashboard() {
                   <TableRow className="bg-muted/30 border-0">
                     <TableHead className="pl-6">Customer</TableHead>
                     <TableHead>Channel</TableHead>
-                    <TableHead>Total</TableHead>
+                    <TableHead>Payout</TableHead>
                     <TableHead className="pr-6">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(!allOrders || allOrders.length === 0) ? (
+                  {(!processedOrders || processedOrders.length === 0) ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-10 text-muted-foreground font-body">No orders found.</TableCell>
                     </TableRow>
-                  ) : (allOrders.slice(0, 5).map(order => (
+                  ) : (processedOrders.slice(0, 5).map(order => (
                     <TableRow key={order.id} className="hover:bg-muted/20 transition-colors border-b border-border/50">
                       <TableCell className="pl-6 py-4">
                         <div className="flex flex-col">
@@ -279,12 +320,12 @@ export default function VendorDashboard() {
                           {order.channel || "whatsapp"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-bold text-sm">MWK {order.total.toLocaleString()}</TableCell>
+                      <TableCell className="font-bold text-sm text-emerald-600">MWK {(order.vendor_amount || 0).toLocaleString()}</TableCell>
                       <TableCell className="pr-6">
                         <Badge className={`text-[10px] font-bold uppercase ${
-                          order.status === 'delivered' ? 'bg-emerald-500/10 text-emerald-500' : 
-                          order.status === 'shipped' ? 'bg-blue-500/10 text-blue-500' :
-                          'bg-amber-500/10 text-amber-500'
+                          order.status === 'delivered' || order.status === 'paid' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 
+                          order.status === 'shipped' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
+                          'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                         }`}>
                           {order.status}
                         </Badge>
