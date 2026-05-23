@@ -464,14 +464,14 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
     if (e.target.files) {
       const files = Array.from(e.target.files);
       const totalFiles = previewUrls.length + files.length;
-      if (totalFiles > 2) {
-        toast({ title: "Maximum 2 images allowed", variant: "destructive" });
+      if (totalFiles > 5) {
+        toast({ title: "Maximum 5 images allowed", variant: "destructive" });
         return;
       }
-      const newFiles = [...imageFiles, ...files].slice(0, 2);
+      const newFiles = [...imageFiles, ...files].slice(0, 5);
       setImageFiles(newFiles);
       
-      const newPreviews = [...previewUrls, ...files.map(f => URL.createObjectURL(f))].slice(0, 2);
+      const newPreviews = [...previewUrls, ...files.map(f => URL.createObjectURL(f))].slice(0, 5);
       setPreviewUrls(newPreviews);
     }
   };
@@ -520,7 +520,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
       }
 
       const existingUrls = previewUrls.filter(url => !url.startsWith('blob:'));
-      const finalImages = [...existingUrls, ...uploadedUrls].slice(0, 2);
+      const finalImages = [...existingUrls, ...uploadedUrls].slice(0, 5);
 
       const cost = parseFloat(form.vendor_cost.replace(/,/g, ''));
       const calculatedPrice = Math.ceil((cost + operationsCost) / 0.55);
@@ -654,7 +654,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
                 </div>
               </div>
               <div className="space-y-4">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Product Images (Max 2)</label>
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Product Images (Max 5)</label>
                 <div className="flex flex-wrap gap-4">
                   {previewUrls.map((url, idx) => (
                     <div key={idx} className="relative w-24 h-24 rounded-xl border border-border/50 overflow-hidden bg-muted/20 shadow-inner group">
@@ -668,7 +668,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
                     </div>
                   ))}
                   
-                  {previewUrls.length < 2 && (
+                  {previewUrls.length < 5 && (
                     <label className="w-24 h-24 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/50 bg-muted/10 cursor-pointer hover:bg-muted/20 hover:border-primary/50 transition-all group">
                       <div className="w-8 h-8 rounded-full bg-background shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
                         <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
