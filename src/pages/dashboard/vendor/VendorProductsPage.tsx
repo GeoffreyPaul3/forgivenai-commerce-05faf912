@@ -284,7 +284,19 @@ export default function VendorProductsPage() {
                   <div className="p-6 space-y-4">
                     <div>
                       <p className="font-heading font-black text-sm truncate tracking-tight">{product.name}</p>
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">{product.category || 'Uncategorized'}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                        <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mr-1">{product.category || 'Uncategorized'}</span>
+                        {product.metadata?.sku && (
+                          <Badge variant="outline" className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-muted/30 border-muted-foreground/15 text-muted-foreground">
+                            {product.metadata.sku}
+                          </Badge>
+                        )}
+                        {product.metadata?.vendor_sku && (
+                          <Badge variant="outline" className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/5 border-primary/20 text-primary">
+                            POS: {product.metadata.vendor_sku}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between pb-2 border-b border-border/50">
@@ -355,6 +367,33 @@ export default function VendorProductsPage() {
   );
 }
 
+const STANDARD_SIZES = [
+  "XS", "S", "M", "L", "XL", "XXL", "3XL", 
+  "One Size", 
+  "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"
+];
+
+const STANDARD_COLORS = [
+  { name: "Black", hex: "#000000" },
+  { name: "White", hex: "#ffffff" },
+  { name: "Grey", hex: "#808080" },
+  { name: "Navy", hex: "#000080" },
+  { name: "Blue", hex: "#3b82f6" },
+  { name: "Light Blue", hex: "#93c5fd" },
+  { name: "Green", hex: "#22c55e" },
+  { name: "Olive", hex: "#808000" },
+  { name: "Red", hex: "#ef4444" },
+  { name: "Pink", hex: "#ec4899" },
+  { name: "Orange", hex: "#f97316" },
+  { name: "Yellow", hex: "#eab308" },
+  { name: "Brown", hex: "#78350f" },
+  { name: "Tan", hex: "#d2b48c" },
+  { name: "Beige", hex: "#f5f5dc" },
+  { name: "Gold", hex: "#ffd700" },
+  { name: "Silver", hex: "#c0c0c0" },
+  { name: "Rose Gold", hex: "#b76e79" },
+];
+
 function VendorProductDialog({ product, open, onClose, onSave, isNew, operationsCost }: {
   product: any | null; open: boolean; onClose: () => void; onSave: (p: any) => void; isNew?: boolean; operationsCost: number;
 }) {
@@ -376,6 +415,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
     colors: [] as string[],
     newSize: "",
     newColor: "",
+    vendor_sku: "",
   });
 
   useEffect(() => {
@@ -394,6 +434,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
         colors: product.colors || [],
         newSize: "",
         newColor: "",
+        vendor_sku: product.metadata?.vendor_sku || "",
       });
       setPreviewUrls(product.images || []);
       setImageFiles([]);
@@ -412,6 +453,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
         colors: [],
         newSize: "",
         newColor: "",
+        vendor_sku: "",
       });
       setPreviewUrls([]);
       setImageFiles([]);
@@ -437,27 +479,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
   const removeImage = (idx: number) => {
     const urlToRemove = previewUrls[idx];
     
-    // If it's a new file (blob URL), we also need to remove it from imageFiles
     if (urlToRemove.startsWith("blob:")) {
-      const fileIdx = imageFiles.findIndex(f => URL.createObjectURL(f) === urlToRemove || true); // This is an approximation, but works since order is maintained
-      const newFiles = [...imageFiles];
-      // A better way to map blob URLs to files is strictly index-based logic:
-      // However, since we just append, any blob URL is at the end. 
-      // Actually, let's just clear the specific index.
-    }
-    
-    // Simpler logic for removal:
-    const newPreviews = [...previewUrls];
-    newPreviews.splice(idx, 1);
-    setPreviewUrls(newPreviews);
-    
-    // Since blob tracking is tricky with splices, let's just reset files if they remove a blob, 
-    // or keep a map. For simplicity, we just filter files based on remaining blob URLs.
-    // Actually, to be perfectly safe, if they remove an image, we just wipe `imageFiles` and make them re-select if it was a new file, 
-    // OR we just assume they are removing from the array.
-    // Let's implement robust removal:
-    if (urlToRemove.startsWith("blob:")) {
-      // It's a new file. We remove the file that corresponds to this index (offset by existing non-blob URLs)
       const existingCount = previewUrls.filter(u => !u.startsWith("blob:")).length;
       const fileIndex = idx - existingCount;
       if (fileIndex >= 0) {
@@ -466,6 +488,10 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
         setImageFiles(newFiles);
       }
     }
+    
+    const newPreviews = [...previewUrls];
+    newPreviews.splice(idx, 1);
+    setPreviewUrls(newPreviews);
   };
 
   const handleSave = async () => {
@@ -503,6 +529,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
       if (!product) {
         metadata = { ...metadata, sku: `FSC-VEN-${Math.random().toString(36).substring(2, 8).toUpperCase()}` };
       }
+      metadata = { ...metadata, vendor_sku: form.vendor_sku?.trim() || null };
 
       const data: any = {
         name: form.name,
@@ -531,6 +558,13 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
   const addTag = (type: "sizes" | "colors") => {
     const val = type === "sizes" ? form.newSize.trim() : form.newColor.trim();
     if (!val) return;
+    if (form[type].includes(val)) {
+      setForm(f => ({
+        ...f,
+        [type === "sizes" ? "newSize" : "newColor"]: "",
+      }));
+      return;
+    }
     setForm(f => ({
       ...f,
       [type]: [...f[type], val],
@@ -543,6 +577,22 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
       ...f,
       [type]: f[type].filter((_, i) => i !== idx),
     }));
+  };
+
+  const toggleSize = (size: string) => {
+    setForm(f => {
+      const exists = f.sizes.includes(size);
+      const newSizes = exists ? f.sizes.filter(s => s !== size) : [...f.sizes, size];
+      return { ...f, sizes: newSizes };
+    });
+  };
+
+  const toggleColor = (colorName: string) => {
+    setForm(f => {
+      const exists = f.colors.includes(colorName);
+      const newColors = exists ? f.colors.filter(c => c !== colorName) : [...f.colors, colorName];
+      return { ...f, colors: newColors };
+    });
   };
 
   return (
@@ -560,14 +610,28 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
             {/* Column 1: Basic Identity */}
             <div className="space-y-6">
               <div className="space-y-3">
-                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Product Identity</label>
+                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Product Identity</label>
                 <div className="space-y-4">
-                  <Input 
-                    placeholder="SKU (Auto-generated on save)" 
-                    value={product ? ((product as any).metadata?.sku || "") : ""} 
-                    disabled 
-                    className="font-body h-12 rounded-xl bg-muted/50 border-border/50 text-muted-foreground font-mono disabled:opacity-70" 
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-bold text-muted-foreground/75 uppercase tracking-widest px-0.5">Admin SKU (Auto)</span>
+                      <Input 
+                        placeholder="SKU (Auto)" 
+                        value={product ? ((product as any).metadata?.sku || "") : ""} 
+                        disabled 
+                        className="font-body h-11 rounded-xl bg-muted/50 border-border/50 text-muted-foreground font-mono disabled:opacity-70 text-xs" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-bold text-muted-foreground/75 uppercase tracking-widest px-0.5">Your POS SKU</span>
+                      <Input 
+                        placeholder="e.g. POS-SKU-123" 
+                        value={form.vendor_sku} 
+                        onChange={e => setForm(f => ({ ...f, vendor_sku: e.target.value }))} 
+                        className="font-body h-11 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all text-xs font-mono" 
+                      />
+                    </div>
+                  </div>
                   <Input placeholder="Product name *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
                   <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
                     <SelectTrigger className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all text-left">
@@ -704,29 +768,87 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
                  <div className="space-y-2">
                     <label className="text-[10px] font-black text-muted-foreground uppercase px-1">Size Variants</label>
                     <div className="flex gap-2">
-                      <Input value={form.newSize} onChange={e => setForm(f => ({ ...f, newSize: e.target.value }))} onKeyDown={e => e.key === "Enter" && addTag("sizes")} placeholder="XL, 42..." className="h-10 rounded-xl text-xs bg-muted/20" />
+                      <Input value={form.newSize} onChange={e => setForm(f => ({ ...f, newSize: e.target.value }))} onKeyDown={e => e.key === "Enter" && addTag("sizes")} placeholder="Add custom size..." className="h-10 rounded-xl text-xs bg-muted/20" />
                       <Button size="icon" variant="secondary" className="h-10 w-10 rounded-xl" onClick={() => addTag("sizes")}><Plus className="w-4 h-4" /></Button>
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-2">
+                    
+                    {/* Selected size badges */}
+                    <div className="flex flex-wrap gap-2 pt-1">
                       {form.sizes.map((s, i) => (
-                        <Badge key={i} variant="secondary" className="gap-2 text-[10px] font-black uppercase px-3 py-1 rounded-lg bg-background border border-border/50 shadow-sm">
+                        <Badge key={i} variant="secondary" className="gap-2 text-[10px] font-black uppercase px-3 py-1 rounded-lg bg-background border border-border/50 shadow-sm animate-in fade-in zoom-in-95">
                           {s} <Trash2 className="w-3 h-3 cursor-pointer text-destructive/60 hover:text-destructive transition-colors" onClick={() => removeTag("sizes", i)} />
                         </Badge>
                       ))}
                     </div>
+
+                    {/* Predefined standard size options */}
+                    <div className="space-y-1.5 pt-2 border-t border-border/40">
+                      <span className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-wider">Quick Select Standard Sizes:</span>
+                      <div className="flex flex-wrap gap-1.5 max-h-[110px] overflow-y-auto pr-1 custom-scrollbar">
+                        {STANDARD_SIZES.map((size) => {
+                          const isSelected = form.sizes.includes(size);
+                          return (
+                            <button
+                              key={size}
+                              type="button"
+                              onClick={() => toggleSize(size)}
+                              className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition-all duration-200 active:scale-95 ${
+                                isSelected
+                                  ? "bg-primary text-white border-primary shadow-md shadow-primary/10 hover:bg-primary/95"
+                                  : "bg-muted/10 text-muted-foreground border-border/40 hover:border-muted-foreground/30 hover:bg-muted/20"
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                  </div>
+
                  <div className="space-y-2">
                     <label className="text-[10px] font-black text-muted-foreground uppercase px-1">Color Variants</label>
                     <div className="flex gap-2">
-                      <Input value={form.newColor} onChange={e => setForm(f => ({ ...f, newColor: e.target.value }))} onKeyDown={e => e.key === "Enter" && addTag("colors")} placeholder="Red, Tan..." className="h-10 rounded-xl text-xs bg-muted/20" />
+                      <Input value={form.newColor} onChange={e => setForm(f => ({ ...f, newColor: e.target.value }))} onKeyDown={e => e.key === "Enter" && addTag("colors")} placeholder="Add custom color..." className="h-10 rounded-xl text-xs bg-muted/20" />
                       <Button size="icon" variant="secondary" className="h-10 w-10 rounded-xl" onClick={() => addTag("colors")}><Plus className="w-4 h-4" /></Button>
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-2">
+
+                    {/* Selected color badges */}
+                    <div className="flex flex-wrap gap-2 pt-1">
                       {form.colors.map((c, i) => (
-                        <Badge key={i} variant="secondary" className="gap-2 text-[10px] font-black uppercase px-3 py-1 rounded-lg bg-background border border-border/50 shadow-sm">
+                        <Badge key={i} variant="secondary" className="gap-2 text-[10px] font-black uppercase px-3 py-1 rounded-lg bg-background border border-border/50 shadow-sm animate-in fade-in zoom-in-95">
                           {c} <Trash2 className="w-3 h-3 cursor-pointer text-destructive/60 hover:text-destructive transition-colors" onClick={() => removeTag("colors", i)} />
                         </Badge>
                       ))}
+                    </div>
+
+                    {/* Predefined standard color options */}
+                    <div className="space-y-1.5 pt-2 border-t border-border/40">
+                      <span className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-wider">Quick Select Standard Colors:</span>
+                      <div className="flex flex-wrap gap-1.5 max-h-[110px] overflow-y-auto pr-1 custom-scrollbar">
+                        {STANDARD_COLORS.map((color) => {
+                          const isSelected = form.colors.includes(color.name);
+                          const isWhite = color.name.toLowerCase() === "white";
+                          return (
+                            <button
+                              key={color.name}
+                              type="button"
+                              onClick={() => toggleColor(color.name)}
+                              className={`flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-black uppercase rounded-lg border transition-all duration-200 active:scale-95 ${
+                                isSelected
+                                  ? "bg-primary text-white border-primary shadow-md shadow-primary/10 hover:bg-primary/95"
+                                  : "bg-muted/10 text-muted-foreground border-border/40 hover:border-muted-foreground/30 hover:bg-muted/20"
+                              }`}
+                            >
+                              <span
+                                className={`w-2.5 h-2.5 rounded-full shrink-0 ${isWhite ? "border border-muted-foreground/20" : ""}`}
+                                style={{ backgroundColor: color.hex }}
+                              />
+                              {color.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                  </div>
               </div>
