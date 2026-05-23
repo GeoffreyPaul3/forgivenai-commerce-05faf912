@@ -720,12 +720,6 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
                   </div>
 
                 </div>
-                <div className="bg-primary/10 p-4 rounded-2xl flex gap-3 items-start border border-primary/20 shadow-inner">
-                   <TrendingUp className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                   <p className="text-[10px] text-primary/80 leading-relaxed font-bold">
-                     FSC PRICING ENGINE ACTIVE: The platform automatically determines the final selling price. You will receive your exact Vendor Cost upon successful fulfillment.
-                   </p>
-                </div>
               </div>
             </div>
 
