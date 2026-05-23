@@ -657,14 +657,21 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Product Images (Max 5)</label>
                 <div className="flex flex-wrap gap-4">
                   {previewUrls.map((url, idx) => (
-                    <div key={idx} className="relative w-24 h-24 rounded-xl border border-border/50 overflow-hidden bg-muted/20 shadow-inner group">
-                      <img src={url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
-                      <button
-                        onClick={() => removeImage(idx)}
-                        className="absolute inset-0 m-auto w-8 h-8 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-lg"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                    <div key={idx} className="relative w-24 h-24 group">
+                      <div className="w-full h-full rounded-xl border border-border/50 overflow-hidden bg-muted/20 shadow-inner relative">
+                        <img src={url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover group-hover:opacity-40 transition-opacity" />
+                        <button
+                          onClick={() => removeImage(idx)}
+                          className="absolute inset-0 m-auto w-8 h-8 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-lg"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      {/* Floating full-size preview on hover */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 h-64 rounded-2xl border border-border bg-popover shadow-2xl p-1.5 pointer-events-none opacity-0 scale-95 translate-y-2 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-200 z-50 overflow-hidden">
+                        <img src={url} alt={`Full Preview ${idx + 1}`} className="w-full h-full object-contain rounded-xl bg-background" />
+                      </div>
                     </div>
                   ))}
                   
