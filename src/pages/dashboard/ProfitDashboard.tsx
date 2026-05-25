@@ -30,7 +30,7 @@ const ProfitDashboard = () => {
       const { data, error } = await supabase
         .from("orders")
         .select("total, gross_margin, base_profit, surplus_profit, surplus_type, status, created_at")
-        .eq("status", "delivered")
+        .in("status", ["paid", "confirmed", "processing", "shipped", "delivered"])
         .gte("created_at", cutoffDate.toISOString());
       
       if (error) throw error;
