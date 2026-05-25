@@ -41,7 +41,7 @@ serve(async (req) => {
         userPrompt = context || "Hello";
         break;
       case "profit-insights":
-        systemPrompt = "You are a senior AI business strategist for Forgiven Shopping Centre. Analyze the provided profit metrics (Revenue, Base Profit, Surplus) and provide exactly 2 distinct, highly strategic business insights. Each insight must be a JSON object in this format: { \"title\": \"...\", \"content\": \"...\", \"type\": \"positive\" | \"warning\" }. Return ONLY a JSON array containing these 2 objects.";
+        systemPrompt = "You are a senior AI business strategist for Forgiven Shopping Centre in Malawi. Analyze the provided profit metrics (Revenue, Base Profit, Surplus) in MWK currency and provide exactly 2 distinct, highly strategic business insights. Format all currency figures using 'MWK' (e.g., MWK 183,281.08) and never use '$' or 'USD'. Each insight must be a JSON object in this format: { \"title\": \"...\", \"content\": \"...\", \"type\": \"positive\" | \"warning\" }. Return ONLY a JSON array containing these 2 objects.";
         userPrompt = `Metrics Analysis Request: ${context}`;
         break;
       default:

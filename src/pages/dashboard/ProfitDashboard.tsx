@@ -87,6 +87,7 @@ const ProfitDashboard = () => {
     enabled: !!metrics.totalRevenue,
     queryFn: async () => {
       const context = JSON.stringify({
+        currency: "MWK",
         revenue: metrics.totalRevenue,
         baseProfit: metrics.totalBaseProfit,
         surplus: metrics.totalSurplus,
@@ -106,11 +107,20 @@ const ProfitDashboard = () => {
       
       try {
         // Parse the JSON array from AI response
-        return JSON.parse(data.content);
+        const parsed = JSON.parse(data.content);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item: any) => ({
+            ...item,
+            title: item.title?.replace(/\$/g, "MWK "),
+            content: item.content?.replace(/\$/g, "MWK ")
+          }));
+        }
+        return parsed;
       } catch (e) {
         console.warn("AI didn't return valid JSON, using fallback formatting", e);
+        const cleanedContent = (data.content || "").replace(/\$/g, "MWK ");
         return [
-          { title: "Financial Analysis", content: data.content.slice(0, 200) + "...", type: "positive" }
+          { title: "Financial Analysis", content: cleanedContent.slice(0, 200) + "...", type: "positive" }
         ];
       }
     },
