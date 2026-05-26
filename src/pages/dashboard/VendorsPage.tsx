@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -48,14 +48,22 @@ function getDelayStatus(createdAt: string) {
 
 const VendorsPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [editVendor, setEditVendor] = useState<any>(null);
   const [viewVendor, setViewVendor] = useState<any>(null);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("vendors");
+  const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") || "vendors");
   const [viewProfileTab, setViewProfileTab] = useState("details");
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   // Reset to Details tab whenever a different vendor profile is opened
   useEffect(() => {

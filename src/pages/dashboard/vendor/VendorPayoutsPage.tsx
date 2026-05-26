@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { useVendorProfile } from "./VendorDashboard";
 
 export default function VendorPayoutsPage() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<any>(null);
   const [withdrawing, setWithdrawing] = useState(false);
 
@@ -117,15 +118,37 @@ export default function VendorPayoutsPage() {
     return { totalRevenue, vendorShare, totalPaid, totalPending, balance };
   }, [processedOrders, payouts]);
 
-  const handleWithdraw = () => {
+  const handleWithdraw = async () => {
+    if (stats.balance <= 0 || !vendor?.id) return;
     setWithdrawing(true);
-    setTimeout(() => {
-      setWithdrawing(false);
+    try {
+      const { error } = await (supabase as any)
+        .from("vendor_payouts")
+        .insert({
+          vendor_id: vendor.id,
+          amount: stats.balance,
+          status: "pending",
+          notes: "Vendor withdrawal request",
+        });
+
+      if (error) throw error;
+
       toast({
         title: "Withdrawal Request Submitted 🎉",
-        description: "Your request has been sent to admin. Processing within 24 hours.",
+        description: `Your request for MWK ${stats.balance.toLocaleString()} has been sent to admin. Processing within 24 hours.`,
       });
-    }, 1500);
+
+      queryClient.invalidateQueries({ queryKey: ["vendor-payouts-page", vendor.id] });
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Withdrawal Failed",
+        description: err.message || "An error occurred while submitting your withdrawal request.",
+        variant: "destructive",
+      });
+    } finally {
+      setWithdrawing(false);
+    }
   };
 
   return (

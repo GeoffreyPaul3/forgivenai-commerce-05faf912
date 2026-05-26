@@ -37,9 +37,18 @@ const ProductsPage = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [vendorFilter, setVendorFilter] = useState("all");
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [page, setPage] = useState(1);
+
+  const { data: allVendors } = useQuery({
+    queryKey: ["vendors-all-list"],
+    queryFn: async () => {
+      const { data } = await supabase.from("vendors").select("id, business_name").eq("status", "active");
+      return data || [];
+    },
+  });
 
   const { data: profile } = useQuery({
     queryKey: ["user-profile"],
@@ -76,15 +85,20 @@ const ProductsPage = () => {
   });
 
   const { data: products, isLoading } = useQuery({
-    queryKey: ["products-all-synced", search, categoryFilter, profile?.role, vendorId],
+    queryKey: ["products-all-synced", categoryFilter, vendorFilter, profile?.role, vendorId],
     enabled: !!profile,
     queryFn: async () => {
       // 1. Fetch local products
       let query = supabase.from("products").select("*").order("created_at", { ascending: false });
-      if (search) query = query.ilike("name", `%${search}%`);
       if (categoryFilter !== "all") query = query.eq("category", categoryFilter);
       if (profile?.role === "vendor" && vendorId) {
         query = query.eq("vendor_id", vendorId);
+      } else if (vendorFilter !== "all") {
+        if (vendorFilter === "in_house") {
+          query = query.is("vendor_id", null);
+        } else {
+          query = query.eq("vendor_id", vendorFilter);
+        }
       }
       const { data: local, error } = await query;
       if (error) throw error;
@@ -105,13 +119,11 @@ const ProductsPage = () => {
             status: p.isActive ? "active" : "archived",
             isLive: true,
             created_at: p.createdAt,
-            vendor_id: null
+            vendor_id: null,
+            metadata: p.metadata || {}
           }));
           
           let filteredLive = mappedLive;
-          if (search) {
-            filteredLive = mappedLive.filter((p: any) => p.name.toLowerCase().includes(search.toLowerCase()));
-          }
           if (categoryFilter !== "all") {
             filteredLive = filteredLive.filter((p: any) => p.category === categoryFilter);
           }
@@ -136,10 +148,44 @@ const ProductsPage = () => {
     },
   });
 
-  useEffect(() => { setPage(1); }, [search, categoryFilter]);
+  const duplicateSKUs = useMemo(() => {
+    if (!products) return new Set<string>();
+    const skusCount = new Map<string, number>();
+    products.forEach((p: any) => {
+      const adminSku = p.metadata?.sku;
+      const vendorSku = p.metadata?.vendor_sku;
+      if (adminSku) {
+        const cleanAdmin = adminSku.toLowerCase().trim();
+        skusCount.set(cleanAdmin, (skusCount.get(cleanAdmin) || 0) + 1);
+      }
+      if (vendorSku) {
+        const cleanVendor = vendorSku.toLowerCase().trim();
+        skusCount.set(cleanVendor, (skusCount.get(cleanVendor) || 0) + 1);
+      }
+    });
+    const duplicates = new Set<string>();
+    skusCount.forEach((count, sku) => {
+      if (count > 1) duplicates.add(sku);
+    });
+    return duplicates;
+  }, [products]);
 
-  const totalPages = Math.ceil((products?.length || 0) / PAGE_SIZE);
-  const paginatedProducts = products?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) || [];
+  const filteredProductsList = useMemo(() => {
+    if (!products) return [];
+    if (!search.trim()) return products;
+    const searchLower = search.toLowerCase().trim();
+    return products.filter((p: any) => {
+      const nameMatch = p.name?.toLowerCase().includes(searchLower);
+      const skuMatch = p.metadata?.sku?.toLowerCase().includes(searchLower);
+      const vendorSkuMatch = p.metadata?.vendor_sku?.toLowerCase().includes(searchLower);
+      return nameMatch || skuMatch || vendorSkuMatch;
+    });
+  }, [products, search]);
+
+  useEffect(() => { setPage(1); }, [search, categoryFilter, vendorFilter]);
+
+  const totalPages = Math.ceil((filteredProductsList?.length || 0) / PAGE_SIZE);
+  const paginatedProducts = filteredProductsList?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) || [];
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -211,6 +257,20 @@ const ProductsPage = () => {
             ))}
           </SelectContent>
         </Select>
+        {profile?.role !== "vendor" && (
+          <Select value={vendorFilter} onValueChange={setVendorFilter}>
+            <SelectTrigger className="w-[180px] bg-card">
+              <SelectValue placeholder="All Vendors" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Vendors</SelectItem>
+              <SelectItem value="in_house">In-House Products</SelectItem>
+              {allVendors?.map(v => (
+                <SelectItem key={v.id} value={v.id}>{v.business_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Product Grid */}
@@ -233,11 +293,16 @@ const ProductsPage = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {paginatedProducts.map((product, idx) => (
-            <motion.div
-              key={product.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+          {paginatedProducts.map((product, idx) => {
+            const isDuplicateSku = (product as any).metadata?.sku && duplicateSKUs.has((product as any).metadata.sku.toLowerCase().trim());
+            const isDuplicateVendorSku = (product as any).metadata?.vendor_sku && duplicateSKUs.has((product as any).metadata.vendor_sku.toLowerCase().trim());
+            const hasDuplicate = isDuplicateSku || isDuplicateVendorSku;
+
+            return (
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05, duration: 0.3 }}
               className="group rounded-xl border border-border bg-card relative hover:border-gold/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
             >
@@ -314,11 +379,23 @@ const ProductsPage = () => {
                     {product.currency} {product.price?.toLocaleString() || "—"}
                   </span>
                 </div>
-                {((product as any).metadata?.sku) && (
-                  <div className="text-[10px] font-mono font-bold text-muted-foreground bg-muted/30 px-2 py-1 rounded-md inline-block">
-                    {(product as any).metadata.sku}
-                  </div>
-                )}
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  {((product as any).metadata?.sku) && (
+                    <div className="text-[10px] font-mono font-bold text-muted-foreground bg-muted/30 px-2 py-0.5 rounded-md">
+                      SKU: {(product as any).metadata.sku}
+                    </div>
+                  )}
+                  {((product as any).metadata?.vendor_sku) && (
+                    <div className="text-[10px] font-mono font-bold text-muted-foreground bg-muted/30 px-2 py-0.5 rounded-md">
+                      V-SKU: {(product as any).metadata.vendor_sku}
+                    </div>
+                  )}
+                  {hasDuplicate && (
+                    <Badge variant="destructive" className="text-[8px] font-bold py-0.5 px-1 bg-red-500 text-white rounded">
+                      ⚠️ Duplicate SKU
+                    </Badge>
+                  )}
+                </div>
 
                 {/* Bottom actions */}
                 <div className="flex items-center justify-between pt-2 border-t border-border/50">
@@ -342,7 +419,7 @@ const ProductsPage = () => {
                 </div>
               </div>
             </motion.div>
-          ))}
+          )})}
         </div>
       )}
 
@@ -391,6 +468,8 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
   
   const [form, setForm] = useState({
     name: "",
+    sku: "",
+    vendor_sku: "",
     category: "",
     price: "",
     description: "",
@@ -419,6 +498,8 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
     if (product) {
       setForm({
         name: product.name,
+        sku: (product as any).metadata?.sku || "",
+        vendor_sku: (product as any).metadata?.vendor_sku || "",
         category: product.category || "",
         price: product.price?.toString() || "",
         description: product.description || "",
@@ -439,6 +520,8 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
     } else {
       setForm({
         name: "",
+        sku: "",
+        vendor_sku: "",
         category: "",
         price: "",
         description: "",
@@ -498,6 +581,42 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
     
     setIsUploading(true);
     try {
+      // 1. Check admin SKU uniqueness
+      const cleanSku = form.sku.trim();
+      if (cleanSku) {
+        let query = supabase.from("products").select("id").eq("metadata->>sku", cleanSku);
+        if (product) query = query.ne("id", product.id);
+        const { data: duplicateSku, error: skuErr } = await query;
+        if (skuErr) throw skuErr;
+        if (duplicateSku && duplicateSku.length > 0) {
+          toast({
+            title: "Duplicate SKU Error ⚠️",
+            description: `A product with SKU "${cleanSku}" already exists in the catalog.`,
+            variant: "destructive",
+          });
+          setIsUploading(false);
+          return;
+        }
+      }
+
+      // 2. Check vendor SKU uniqueness
+      const cleanVendorSku = form.vendor_sku.trim();
+      if (cleanVendorSku) {
+        let query = supabase.from("products").select("id").eq("metadata->>vendor_sku", cleanVendorSku);
+        if (product) query = query.ne("id", product.id);
+        const { data: duplicateVendorSku, error: vendorSkuErr } = await query;
+        if (vendorSkuErr) throw vendorSkuErr;
+        if (duplicateVendorSku && duplicateVendorSku.length > 0) {
+          toast({
+            title: "Duplicate Vendor SKU Error ⚠️",
+            description: `A product with Vendor SKU "${cleanVendorSku}" already exists in the catalog.`,
+            variant: "destructive",
+          });
+          setIsUploading(false);
+          return;
+        }
+      }
+
       const uploadedUrls: string[] = [];
       
       for (const file of imageFiles) {
@@ -522,10 +641,20 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
       const finalImages = [...existingUrls, ...uploadedUrls].slice(0, 5);
 
       let metadata = product?.metadata as any || {};
-      if (!product) {
+      
+      // Update metadata with input SKUs if they exist
+      if (cleanSku) {
+        metadata.sku = cleanSku;
+      } else if (!product) {
         const isVendor = form.vendor_id !== "none";
         const prefix = isVendor ? "FSC-VEN-" : "FSC-";
-        metadata = { ...metadata, sku: `${prefix}${Math.random().toString(36).substring(2, 8).toUpperCase()}` };
+        metadata.sku = `${prefix}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      }
+
+      if (cleanVendorSku) {
+        metadata.vendor_sku = cleanVendorSku;
+      } else {
+        delete metadata.vendor_sku;
       }
 
       const data: any = {
@@ -627,9 +756,15 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
                 <div className="space-y-4">
                   <Input 
                     placeholder="SKU (Auto-generated on save)" 
-                    value={product ? ((product as any).metadata?.sku || "") : ""} 
-                    disabled 
-                    className="font-body h-12 rounded-xl bg-muted/50 border-border/50 text-muted-foreground font-mono disabled:opacity-70" 
+                    value={form.sku} 
+                    onChange={e => setForm(f => ({ ...f, sku: e.target.value }))}
+                    className="font-body h-12 rounded-xl bg-muted/20 border-border/50 text-foreground font-mono focus:bg-background transition-all" 
+                  />
+                  <Input 
+                    placeholder="Vendor SKU (Optional)" 
+                    value={form.vendor_sku} 
+                    onChange={e => setForm(f => ({ ...f, vendor_sku: e.target.value }))}
+                    className="font-body h-12 rounded-xl bg-muted/20 border-border/50 text-foreground font-mono focus:bg-background transition-all" 
                   />
                   <Input placeholder="Product name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />
                   <Input placeholder="Category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="font-body h-12 rounded-xl bg-muted/20 border-border/50 focus:bg-background transition-all" />

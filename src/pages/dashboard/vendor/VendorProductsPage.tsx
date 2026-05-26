@@ -83,9 +83,36 @@ export default function VendorProductsPage() {
     return ["all", ...Array.from(cats)];
   }, [products]);
 
+  const duplicateSKUs = useMemo(() => {
+    if (!products) return new Set<string>();
+    const skusCount = new Map<string, number>();
+    products.forEach((p: any) => {
+      const adminSku = p.metadata?.sku;
+      const vendorSku = p.metadata?.vendor_sku;
+      if (adminSku) {
+        const cleanAdmin = adminSku.toLowerCase().trim();
+        skusCount.set(cleanAdmin, (skusCount.get(cleanAdmin) || 0) + 1);
+      }
+      if (vendorSku) {
+        const cleanVendor = vendorSku.toLowerCase().trim();
+        skusCount.set(cleanVendor, (skusCount.get(cleanVendor) || 0) + 1);
+      }
+    });
+    const duplicates = new Set<string>();
+    skusCount.forEach((count, sku) => {
+      if (count > 1) duplicates.add(sku);
+    });
+    return duplicates;
+  }, [products]);
+
   const filtered = useMemo(() => {
+    const searchLower = search.toLowerCase().trim();
     return (products || []).filter((p: any) => {
-      const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.category?.toLowerCase().includes(search.toLowerCase());
+      const matchSearch = !search || 
+        p.name.toLowerCase().includes(searchLower) || 
+        p.category?.toLowerCase().includes(searchLower) ||
+        p.metadata?.sku?.toLowerCase().includes(searchLower) ||
+        p.metadata?.vendor_sku?.toLowerCase().includes(searchLower);
       const matchCat = categoryFilter === "all" || p.category === categoryFilter;
       return matchSearch && matchCat;
     });
@@ -243,6 +270,9 @@ export default function VendorProductsPage() {
             {filtered.map((product: any, i: number) => {
               const displayPrice = product.price; // Read-only FSC price
               const stockStatus = product.stock_status || "available";
+              const isDuplicateSku = product.metadata?.sku && duplicateSKUs.has(product.metadata.sku.toLowerCase().trim());
+              const isDuplicateVendorSku = product.metadata?.vendor_sku && duplicateSKUs.has(product.metadata.vendor_sku.toLowerCase().trim());
+              const hasDuplicate = isDuplicateSku || isDuplicateVendorSku;
 
               return (
                 <motion.div
@@ -303,6 +333,11 @@ export default function VendorProductsPage() {
                         {product.metadata?.vendor_sku && (
                           <Badge variant="outline" className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/5 border-primary/20 text-primary">
                             POS: {product.metadata.vendor_sku}
+                          </Badge>
+                        )}
+                        {hasDuplicate && (
+                          <Badge variant="destructive" className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-red-500 text-white">
+                            ⚠️ Duplicate SKU
                           </Badge>
                         )}
                       </div>
@@ -546,6 +581,24 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
     
     setIsUploading(true);
     try {
+      // Check vendor SKU uniqueness
+      const cleanVendorSku = form.vendor_sku.trim();
+      if (cleanVendorSku) {
+        let query = supabase.from("products").select("id").eq("metadata->>vendor_sku", cleanVendorSku);
+        if (product) query = query.ne("id", product.id);
+        const { data: duplicateVendorSku, error: vendorSkuErr } = await query;
+        if (vendorSkuErr) throw vendorSkuErr;
+        if (duplicateVendorSku && duplicateVendorSku.length > 0) {
+          toast({
+            title: "Duplicate Vendor SKU Error ⚠️",
+            description: `A product with Vendor SKU "${cleanVendorSku}" already exists in your catalog.`,
+            variant: "destructive",
+          });
+          setIsUploading(false);
+          return;
+        }
+      }
+
       const uploadedUrls: string[] = [];
       
       for (const file of imageFiles) {
@@ -572,11 +625,15 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
       const cost = parseFloat(form.vendor_cost.replace(/,/g, ''));
       const calculatedPrice = Math.ceil((cost + operationsCost) / 0.55);
       
-      let metadata = product?.metadata || {};
+      let metadata = (product?.metadata as any) || {};
       if (!product) {
-        metadata = { ...metadata, sku: `FSC-VEN-${Math.random().toString(36).substring(2, 8).toUpperCase()}` };
+        metadata.sku = `FSC-VEN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       }
-      metadata = { ...metadata, vendor_sku: form.vendor_sku?.trim() || null };
+      if (cleanVendorSku) {
+        metadata.vendor_sku = cleanVendorSku;
+      } else {
+        delete metadata.vendor_sku;
+      }
 
       const data: any = {
         name: form.name,

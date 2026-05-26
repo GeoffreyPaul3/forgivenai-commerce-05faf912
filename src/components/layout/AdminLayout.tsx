@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   ShoppingBag, LayoutDashboard, MessageSquare, CreditCard,
   Users, BarChart3, Video, Settings, Bot, ShieldCheck,
-  User, LogOut, ChevronDown, Store
+  User, LogOut, ChevronDown, Store, Bell
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -19,6 +19,7 @@ import { NavLink } from "@/components/NavLink";
 import { useState, useEffect } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { UserCheck } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 const adminMenuItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
@@ -98,6 +99,23 @@ export default function AdminLayout({ children, title }: { children: React.React
     navigate("/");
   };
 
+  const { data: pendingPayouts = [] } = useQuery({
+    queryKey: ["admin-pending-payouts-notifications"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("vendor_payouts")
+        .select("*, vendors(business_name)")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error("Error fetching payouts notifications:", error);
+        return [];
+      }
+      return data || [];
+    },
+    refetchInterval: 30000,
+  });
+
   const initials = user?.user_metadata?.full_name
     ? user.user_metadata.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
     : user?.email?.[0]?.toUpperCase() || "A";
@@ -110,6 +128,57 @@ export default function AdminLayout({ children, title }: { children: React.React
           <header className="h-14 flex items-center border-b border-border px-4 shrink-0 min-w-0 w-full">
             <SidebarTrigger className="mr-4 shrink-0" />
             <h1 className="font-heading text-xl font-semibold text-foreground flex-1 truncate pr-4">{title}</h1>
+
+            {/* Notification Bell */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="relative p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full transition-colors mr-2">
+                  <Bell className="w-5 h-5" />
+                  {pendingPayouts.length > 0 && (
+                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white animate-pulse">
+                      {pendingPayouts.length}
+                    </span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80 p-2">
+                <div className="px-3 py-2 border-b border-border/50">
+                  <p className="text-sm font-semibold text-foreground">Notifications</p>
+                  <p className="text-xs text-muted-foreground">
+                    {pendingPayouts.length > 0
+                      ? `You have ${pendingPayouts.length} pending withdrawal request(s)`
+                      : "No new notifications"}
+                  </p>
+                </div>
+                <div className="max-h-64 overflow-y-auto mt-1">
+                  {pendingPayouts.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                      All caught up! 🎉
+                    </div>
+                  ) : (
+                    pendingPayouts.map((payout: any) => (
+                      <DropdownMenuItem
+                        key={payout.id}
+                        onClick={() => navigate(`/dashboard/vendors?tab=payouts`)}
+                        className="flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-accent rounded-lg"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-xs font-bold text-primary">
+                            {payout.vendors?.business_name || "Vendor"}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(payout.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-xs text-foreground font-medium">
+                          Requested payout of <span className="font-bold text-emerald-600">MWK {payout.amount.toLocaleString()}</span>
+                        </p>
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
