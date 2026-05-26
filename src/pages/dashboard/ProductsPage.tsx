@@ -20,6 +20,15 @@ import { Search, Plus, Sparkles, Pencil, Trash2, ExternalLink, Loader2, Image as
 import type { Tables } from "@/integrations/supabase/types";
 import { motion } from "framer-motion";
 
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+};
+
 type Product = Tables<"products">;
 const PAGE_SIZE = 12;
 
@@ -562,6 +571,13 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
     }
     setIsGenerating(true);
     try {
+      let productImage: string | null = null;
+      if (imageFiles && imageFiles.length > 0) {
+        productImage = await fileToBase64(imageFiles[0]);
+      } else if (previewUrls && previewUrls.length > 0 && !previewUrls[0].startsWith("blob:")) {
+        productImage = previewUrls[0];
+      }
+
       const { data, error } = await supabase.functions.invoke("ai-generate", {
         body: {
           type: "product-description",
@@ -569,6 +585,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
           productCategory: form.category,
           productPrice: form.price,
           currency: "MWK",
+          productImage: productImage,
         },
       });
       if (error) throw error;
@@ -576,7 +593,8 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
         setForm(f => ({ ...f, description: data.content }));
         toast({ title: "AI description generated!" });
       }
-    } catch {
+    } catch (e: any) {
+      console.error(e);
       toast({ title: "Failed to generate description", variant: "destructive" });
     } finally {
       setIsGenerating(false);

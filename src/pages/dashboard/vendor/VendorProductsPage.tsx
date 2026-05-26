@@ -18,6 +18,15 @@ import {
 } from "lucide-react";
 import { useVendorProfile } from "./VendorDashboard";
 
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+};
+
 export default function VendorProductsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -468,6 +477,13 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
     }
     setIsGenerating(true);
     try {
+      let productImage: string | null = null;
+      if (imageFiles && imageFiles.length > 0) {
+        productImage = await fileToBase64(imageFiles[0]);
+      } else if (previewUrls && previewUrls.length > 0 && !previewUrls[0].startsWith("blob:")) {
+        productImage = previewUrls[0];
+      }
+
       const { data, error } = await supabase.functions.invoke("ai-generate", {
         body: {
           type: "product-description",
@@ -475,6 +491,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
           productCategory: form.category,
           productPrice: form.vendor_cost ? form.vendor_cost.replace(/,/g, '') : "0",
           currency: "MWK",
+          productImage: productImage,
         },
       });
       if (error) throw error;
@@ -482,7 +499,8 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
         setForm(f => ({ ...f, description: data.content }));
         toast({ title: "AI description generated!" });
       }
-    } catch {
+    } catch (e: any) {
+      console.error(e);
       toast({ title: "Failed to generate description", variant: "destructive" });
     } finally {
       setIsGenerating(false);

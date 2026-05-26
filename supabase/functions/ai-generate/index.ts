@@ -12,23 +12,34 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { type, productName, productCategory, productPrice, currency, context } = await req.json();
+    const { type, productName, productCategory, productPrice, currency, context, productImage } = await req.json();
     const QWEN_API_KEY = Deno.env.get("QWEN_API_KEY");
     if (!QWEN_API_KEY) throw new Error("QWEN_API_KEY is not configured");
 
     let systemPrompt = "";
     let userPrompt = "";
+    let modelToUse = QWEN_MODEL;
+    let messagesPayload: any[] = [];
 
     switch (type) {
       case "product-description":
-        systemPrompt = "You are a luxury fashion copywriter & social media manager for Forgiven Shopping Centre, a premium fashion & lifestyle brand in Malawi. Write a compelling product description containing two distinct sections: first, a professional and elegant E-commerce Product Description highlighting quality, style, and value (2-3 sentences); second, a highly engaging and trendy Social Media Post version featuring emojis and hashtags.";
-        userPrompt = `Write a compelling description for "${productName}" in category "${productCategory}", priced at ${currency} ${productPrice}. Format the output exactly like this:
-
-E-commerce Description:
-[Your elegant product description here]
-
-Social Media Post:
-[Your engaging social media post here with emojis and hashtags]`;
+        if (productImage) {
+          modelToUse = "qwen-vl-plus";
+          systemPrompt = "You are a luxury fashion copywriter for Forgiven Shopping Centre, a premium fashion & lifestyle brand in Malawi. Write a compelling, elegant product description based on the provided product name and image. Observe the product design, color, material, and style in the image, and write 2-3 sophisticated sentences describing the product. Do NOT include any social media pitch, tags, emojis, or hashtags.";
+          messagesPayload = [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: `Write an elegant product description for: "${productName}" in category "${productCategory}", priced at ${currency} ${productPrice}.` },
+                { type: "image_url", image_url: { url: productImage } }
+              ]
+            }
+          ];
+        } else {
+          systemPrompt = "You are a luxury fashion copywriter for Forgiven Shopping Centre, a premium fashion & lifestyle brand in Malawi. Write a compelling, elegant product description based on the product name and category. Highlight its quality, style, design, and value in 2-3 sophisticated sentences. Do NOT include any social media pitch, tags, emojis, or hashtags.";
+          userPrompt = `Write a compelling product description for: "${productName}" in category "${productCategory}", priced at ${currency} ${productPrice}. ${context || ""}`;
+        }
         break;
       case "social-post":
         systemPrompt = "You are a social media manager for Forgiven Shopping Centre. Create engaging, trendy social media posts with emojis and hashtags. Keep posts concise and attention-grabbing.";
@@ -54,6 +65,13 @@ Social Media Post:
         throw new Error(`Unknown content type: ${type}`);
     }
 
+    if (messagesPayload.length === 0) {
+      messagesPayload = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ];
+    }
+
     const response = await fetch(QWEN_API_URL, {
       method: "POST",
       headers: {
@@ -61,11 +79,8 @@ Social Media Post:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: QWEN_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
+        model: modelToUse,
+        messages: messagesPayload,
         temperature: 0.7,
         max_tokens: 1024,
       }),
