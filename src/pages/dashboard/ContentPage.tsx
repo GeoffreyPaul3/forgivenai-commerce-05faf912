@@ -429,7 +429,15 @@ function UGCStudio() {
         setting: avatarSetting,
         productName: selectedProd?.name,
         productCategory: selectedProd?.category,
+        // Send ONLY the primary product image URL as a direct string for quick access
         productImageUrl: selectedProd?.images?.[0] || null,
+        // Also send the full product object so the edge function has ALL images for fidelity anchoring
+        product: selectedProd ? {
+          id: selectedProd.id,
+          name: selectedProd.name,
+          category: selectedProd.category,
+          images: Array.isArray(selectedProd.images) ? selectedProd.images.filter(Boolean) : [],
+        } : undefined,
         isUGC: isUGC,
       };
 
@@ -508,7 +516,16 @@ function UGCStudio() {
     try {
       const body: any = {
         action: "generate-ugc-video",
+        // Primary image as direct string for quick access
         productImageUrl: selectedProd.images?.[0],
+        // Full product object with ALL images for multi-reference fidelity anchoring
+        product: {
+          id: selectedProd.id,
+          name: selectedProd.name,
+          category: selectedProd.category,
+          images: Array.isArray(selectedProd.images) ? selectedProd.images.filter(Boolean) : [],
+          description: selectedProd.description,
+        },
         influencerImageUrl: currentAvatar,
         avatarGender,
         avatarEthnicity,

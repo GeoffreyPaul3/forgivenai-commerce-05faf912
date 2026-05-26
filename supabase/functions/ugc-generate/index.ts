@@ -1362,14 +1362,18 @@ async function runUnifiedVTON(
 
           const wanPrompt = [
             `Professional high-resolution fashion catalog photograph.`,
-            `MODEL: ${targetGender} ${targetEthnicity} — the face, skin tone, and body must be IDENTICAL to the target person reference image.`,
-            `GARMENT (must be reproduced with 100% accuracy — do not alter any detail):`,
-            `  ${garmentDetails}`,
+            `MODEL: ${targetGender} ${targetEthnicity} — the face, skin tone, and body must be IDENTICAL to the target person reference image. Do NOT generate a different person.`,
+            `PRODUCT IDENTITY — ABSOLUTE SOURCE OF TRUTH: The product reference image is the ONLY valid source for the garment. Reproduce it with 100% pixel fidelity.`,
+            `  Detected product details: ${garmentDetails}`,
             `  Product name: ${description}`,
-            `RULES: Do NOT change the garment's neckline, sleeve length, color, cut, pattern, print or fabric texture.`,
-            `Do NOT change the model's face, skin tone or ethnicity.`,
+            `MANDATORY RULES — ZERO TOLERANCE:`,
+            `  - DO NOT redesign, approximate, or hallucinate any part of the garment.`,
+            `  - DO NOT substitute a generic or similar-looking product. Only the EXACT reference product is acceptable.`,
+            `  - DO NOT change the garment's neckline, sleeve length, color, cut, pattern, print, logo, or fabric texture.`,
+            `  - DO NOT change the model's face, skin tone or ethnicity.`,
+            `  - If you cannot reproduce the EXACT product, output a blank result rather than a wrong product.`,
             strictnessPromptModifier,
-            `Studio lighting, sharp focus, white background, realistic render.`
+            `Studio lighting, sharp focus, white background, photorealistic render. The generated image MUST be indistinguishable from a product catalog photo taken with the original garment.`
           ].join(" ");
 
           console.log(`[Unified VTON] Wan prompt (attempt ${attempt}): ${wanPrompt}`);
@@ -1442,12 +1446,13 @@ async function runUnifiedVTON(
     }
   }
 
-  // Best-effort fallback: if we have a result that scored ≥ 80%, serve it with a warning
-  // rather than completely failing the user — a 92% result is genuinely good
-  if (bestResultUrl && bestResultScore >= 80) {
+  // Best-effort fallback: only serve a result if it meets the SAME 88% threshold as the strict audit.
+  // The previous 80% cutoff was the primary reason wrong (non-inventory) products were being served.
+  // Raising to 88% means a result must pass the audit standard to reach the user.
+  if (bestResultUrl && bestResultScore >= 88) {
     console.warn(
-      `[Unified VTON] ⚠️ Best-effort fallback: serving highest-scoring result (${bestResultScore}%) ` +
-      `after all retries exhausted. Reason for non-pass: ${lastReasoning}`
+      `[Unified VTON] ⚠️ Best-effort fallback (≥88%): serving highest-scoring result (${bestResultScore}%) ` +
+      `after all retries exhausted. Reason for not achieving strict pass: ${lastReasoning}`
     );
     return bestResultUrl;
   }
@@ -1479,8 +1484,49 @@ Deno.serve(async (req) => {
 
     const referenceImage = body.avatarImageUrl || body.avatarImageBase64;
 
-    // Collect all potential product image references into a deduplicated list
-    const candidateUrls: string[] = [];
+    // ═══════════════════════════════════════════════════════
+    // INVENTORY VALIDATION GATE
+    // If a productId is provided, fetch the product's real images
+    // directly from the Supabase inventory database. This guarantees
+    // the pipeline ALWAYS uses actual inventory product images and
+    // cannot be contaminated by stale frontend data or external URLs.
+    // ═══════════════════════════════════════════════════════
+    let inventoryImages: string[] = [];
+    const incomingProductId = body.productId || body.product?.id;
+    if (incomingProductId && !String(incomingProductId).startsWith("live_")) {
+      try {
+        const { data: dbProduct, error: dbErr } = await supabase
+          .from("products")
+          .select("images, status")
+          .eq("id", incomingProductId)
+          .maybeSingle();
+        if (dbErr) {
+          console.warn("[Inventory Gate] DB lookup error:", dbErr.message);
+        } else if (dbProduct) {
+          if (dbProduct.status !== "active") {
+            throw { status: 400, message: `Product ${incomingProductId} is not active in inventory (status: ${dbProduct.status}). Generation blocked.` };
+          }
+          const dbImages: string[] = Array.isArray(dbProduct.images)
+            ? dbProduct.images.filter((u: any) => typeof u === "string" && u.trim())
+            : [];
+          if (dbImages.length > 0) {
+            inventoryImages = dbImages;
+            console.log(`[Inventory Gate] ✅ Locked ${dbImages.length} verified image(s) for product ${incomingProductId} from database.`);
+          } else {
+            console.warn(`[Inventory Gate] Product ${incomingProductId} found in DB but has no images. Falling back to request payload.`);
+          }
+        } else {
+          console.warn(`[Inventory Gate] Product ${incomingProductId} not found in DB. Falling back to request payload.`);
+        }
+      } catch (gateErr: any) {
+        if (gateErr.status) throw gateErr; // re-throw 400 errors (inactive product)
+        console.warn("[Inventory Gate] Unexpected error during DB lookup:", gateErr);
+      }
+    }
+
+    // Collect all potential product image references into a deduplicated list.
+    // Inventory DB images take PRIORITY — they are prepended before any payload URLs.
+    const candidateUrls: string[] = [...inventoryImages];
     const addCandidates = (val: any) => {
       if (!val) return;
       if (Array.isArray(val)) {
@@ -1494,18 +1540,27 @@ Deno.serve(async (req) => {
       }
     };
 
-    addCandidates(body.productImageUrl);
-    addCandidates(body.product?.images);
-    addCandidates(body.product?.side_images);
-    addCandidates(body.product?.closeups);
-    addCandidates(body.product?.textures);
-    addCandidates(body.side_images);
-    addCandidates(body.closeups);
-    addCandidates(body.textures);
+    // Only add payload URLs if we didn't already get authoritative DB images
+    if (inventoryImages.length === 0) {
+      addCandidates(body.productImageUrl);
+      addCandidates(body.product?.images);
+      addCandidates(body.product?.side_images);
+      addCandidates(body.product?.closeups);
+      addCandidates(body.product?.textures);
+      addCandidates(body.side_images);
+      addCandidates(body.closeups);
+      addCandidates(body.textures);
+    } else {
+      // Even if we have DB images, include extra payload references as supplemental views
+      addCandidates(body.product?.side_images);
+      addCandidates(body.product?.closeups);
+      addCandidates(body.product?.textures);
+    }
 
-    // Deduplicate while preserving order
+    // Deduplicate while preserving order (DB images first = highest priority)
     const productImages = [...new Set(candidateUrls)];
     const primaryProductUrl = productImages[0] || "";
+    console.log(`[Product Images] Total references for generation: ${productImages.length} (inventory DB: ${inventoryImages.length}, payload extras: ${productImages.length - inventoryImages.length})`);
 
     if (action === "generate-avatar") {
       const { productName, productCategory } = body;

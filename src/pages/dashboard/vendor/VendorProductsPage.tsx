@@ -585,7 +585,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
       const cleanVendorSku = form.vendor_sku.trim();
       if (cleanVendorSku) {
         let query = supabase.from("products").select("id").eq("metadata->>vendor_sku", cleanVendorSku);
-        if (product) query = query.ne("id", product.id);
+        if (product) query = query.neq("id", product.id);
         const { data: duplicateVendorSku, error: vendorSkuErr } = await query;
         if (vendorSkuErr) throw vendorSkuErr;
         if (duplicateVendorSku && duplicateVendorSku.length > 0) {

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import AuthLayout from "@/components/layout/AuthLayout";
 import PortalAuthLayout from "@/components/layout/PortalAuthLayout";
-import { Mail, Lock, User, ArrowRight, Loader2, KeyRound, CheckCircle2, Store, Phone } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Loader2, KeyRound, CheckCircle2, Store, Phone, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAppMode, getRedirectUrl, type AppMode } from "@/lib/app-mode";
 
@@ -44,6 +44,8 @@ export default function AuthPage() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const [pendingApproval, setPendingApproval] = useState(false);
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -53,15 +55,26 @@ export default function AuthPage() {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
 
-        // Fetch user role for redirection
+        // Fetch user profile to check approval status
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role")
+          .select("role, status")
           .eq("id", data.user.id)
           .single();
 
-        const userRole = profile?.role;
+        // Block pending users — sign them out and show waiting screen
+        if (profile?.status === "pending") {
+          await supabase.auth.signOut();
+          setPendingApproval(true);
+          return;
+        }
 
+        if (profile?.status === "rejected") {
+          await supabase.auth.signOut();
+          throw new Error("Your account application has been declined. Please contact support.");
+        }
+
+        const userRole = profile?.role;
         toast({ title: "Access Granted", description: "Authentication successful. Welcome back." });
 
         // Force redirect to correct portal if user is on the wrong one
@@ -94,16 +107,16 @@ export default function AuthPage() {
         if (error) throw error;
 
         const isAdmin = role === 'admin';
-        toast({
-          title: isAdmin ? "Admin account created!" : "Account created!",
-          description: isAdmin
-            ? "Your administrator account is active. Please sign in."
-            : "Please sign in.",
-        });
-
         if (isAdmin) {
+          toast({
+            title: "Admin account created!",
+            description: "Your administrator account is active. Please sign in.",
+          });
           setMode("login");
-          setEmail(email); // Keep email for convenience
+          setEmail(email);
+        } else {
+          // Non-admin accounts need approval — show the waiting screen immediately
+          setPendingApproval(true);
         }
 
       } else if (mode === "forgot") {
@@ -276,13 +289,45 @@ export default function AuthPage() {
     </>
   );
 
+  // Pending approval screen — shown after signup or blocked login
+  const pendingScreen = (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="text-center space-y-6 py-4"
+    >
+      <div className="w-20 h-20 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center mx-auto">
+        <Clock className="w-9 h-9 text-gold animate-pulse" />
+      </div>
+      <div className="space-y-2">
+        <h2 className="font-heading text-xl font-bold text-white">Awaiting Approval</h2>
+        <p className="text-cream/60 text-sm font-body leading-relaxed max-w-xs mx-auto">
+          Your account is under review. An administrator will approve your access shortly.
+          You'll be able to sign in once approved.
+        </p>
+      </div>
+      <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-left space-y-1">
+        <p className="text-xs text-gold/80 font-bold uppercase tracking-wider">What happens next?</p>
+        <p className="text-xs text-cream/50 font-body">Our admin team reviews new accounts and approves access within 24 hours.</p>
+      </div>
+      <button
+        onClick={() => { setPendingApproval(false); setMode("login"); }}
+        className="text-cream/40 text-sm hover:text-cream/60 transition-colors"
+      >
+        ← Back to Sign In
+      </button>
+    </motion.div>
+  );
+
+  const content = pendingApproval ? pendingScreen : formContent;
+
   if (appMode === "vendor" || appMode === "agent") {
-    return <PortalAuthLayout mode={appMode}>{formContent}</PortalAuthLayout>;
+    return <PortalAuthLayout mode={appMode}>{content}</PortalAuthLayout>;
   }
 
   return (
     <AuthLayout>
-      {formContent}
+      {content}
     </AuthLayout>
   );
 }

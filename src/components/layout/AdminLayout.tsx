@@ -116,6 +116,23 @@ export default function AdminLayout({ children, title }: { children: React.React
     refetchInterval: 30000,
   });
 
+  const { data: pendingApprovals = [] } = useQuery({
+    queryKey: ["admin-pending-approvals-notifications"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, role, created_at")
+        .eq("status", "pending")
+        .neq("role", "admin")
+        .order("created_at", { ascending: false });
+      if (error) return [];
+      return data || [];
+    },
+    refetchInterval: 30000,
+  });
+
+  const totalNotifications = pendingPayouts.length + pendingApprovals.length;
+
   const initials = user?.user_metadata?.full_name
     ? user.user_metadata.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
     : user?.email?.[0]?.toUpperCase() || "A";
@@ -134,9 +151,9 @@ export default function AdminLayout({ children, title }: { children: React.React
               <DropdownMenuTrigger asChild>
                 <button className="relative p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full transition-colors mr-2">
                   <Bell className="w-5 h-5" />
-                  {pendingPayouts.length > 0 && (
+                  {totalNotifications > 0 && (
                     <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white animate-pulse">
-                      {pendingPayouts.length}
+                      {totalNotifications}
                     </span>
                   )}
                 </button>
@@ -145,36 +162,56 @@ export default function AdminLayout({ children, title }: { children: React.React
                 <div className="px-3 py-2 border-b border-border/50">
                   <p className="text-sm font-semibold text-foreground">Notifications</p>
                   <p className="text-xs text-muted-foreground">
-                    {pendingPayouts.length > 0
-                      ? `You have ${pendingPayouts.length} pending withdrawal request(s)`
-                      : "No new notifications"}
+                    {totalNotifications > 0 ? `${totalNotifications} item(s) need your attention` : "No new notifications"}
                   </p>
                 </div>
-                <div className="max-h-64 overflow-y-auto mt-1">
-                  {pendingPayouts.length === 0 ? (
-                    <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-                      All caught up! 🎉
-                    </div>
+                <div className="max-h-72 overflow-y-auto mt-1 space-y-1">
+                  {totalNotifications === 0 ? (
+                    <div className="px-3 py-6 text-center text-xs text-muted-foreground">All caught up! 🎉</div>
                   ) : (
-                    pendingPayouts.map((payout: any) => (
-                      <DropdownMenuItem
-                        key={payout.id}
-                        onClick={() => navigate(`/dashboard/vendors?tab=payouts`)}
-                        className="flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-accent rounded-lg"
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-xs font-bold text-primary">
-                            {payout.vendors?.business_name || "Vendor"}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {new Date(payout.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p className="text-xs text-foreground font-medium">
-                          Requested payout of <span className="font-bold text-emerald-600">MWK {payout.amount.toLocaleString()}</span>
-                        </p>
-                      </DropdownMenuItem>
-                    ))
+                    <>
+                      {/* Pending user approvals */}
+                      {pendingApprovals.length > 0 && (
+                        <>
+                          <p className="px-3 pt-2 pb-1 text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Account Requests</p>
+                          {pendingApprovals.map((u: any) => (
+                            <DropdownMenuItem
+                              key={u.id}
+                              onClick={() => navigate("/dashboard/settings")}
+                              className="flex flex-col items-start gap-0.5 p-3 cursor-pointer hover:bg-accent rounded-lg"
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span className="text-xs font-bold text-amber-600">{u.full_name || u.email || "New User"}</span>
+                                <span className="text-[10px] text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground capitalize">Wants to join as {u.role} · awaiting approval</p>
+                            </DropdownMenuItem>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Pending payouts */}
+                      {pendingPayouts.length > 0 && (
+                        <>
+                          <p className="px-3 pt-2 pb-1 text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Withdrawal Requests</p>
+                          {pendingPayouts.map((payout: any) => (
+                            <DropdownMenuItem
+                              key={payout.id}
+                              onClick={() => navigate(`/dashboard/vendors?tab=payouts`)}
+                              className="flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-accent rounded-lg"
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span className="text-xs font-bold text-primary">{payout.vendors?.business_name || "Vendor"}</span>
+                                <span className="text-[10px] text-muted-foreground">{new Date(payout.created_at).toLocaleDateString()}</span>
+                              </div>
+                              <p className="text-xs text-foreground font-medium">
+                                Requested payout of <span className="font-bold text-emerald-600">MWK {payout.amount.toLocaleString()}</span>
+                              </p>
+                            </DropdownMenuItem>
+                          ))}
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
               </DropdownMenuContent>

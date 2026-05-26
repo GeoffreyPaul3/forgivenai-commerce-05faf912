@@ -342,46 +342,78 @@ const SettingsPage = () => {
                   </div>
                 ) : (
                   pendingUsers.map((user) => (
-                    <div key={user.id} className="flex flex-col md:flex-row items-center justify-between p-4 rounded-xl border border-border bg-muted/10 gap-4">
-                      <div className="flex items-center gap-3 w-full md:w-auto">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                          {user.full_name?.[0] || user.id[0]}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold font-heading">{user.full_name || "New User"}</p>
-                            <Badge variant="outline" className="text-[10px] uppercase font-bold bg-primary/5 text-primary border-primary/20 px-2 py-0">
-                              {user.role}
-                            </Badge>
+                    <div key={user.id} className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-3">
+                      {/* Header row */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm uppercase shrink-0">
+                            {user.full_name?.[0] || user.email?.[0] || "?"}
                           </div>
-                          <p className="text-xs text-muted-foreground">{new Date(user.created_at).toLocaleDateString()}</p>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-semibold font-heading">{user.full_name || "New User"}</p>
+                              <Badge variant="outline" className="text-[10px] uppercase font-bold bg-amber-500/10 text-amber-600 border-amber-500/30 px-2 py-0">
+                                {user.role || "unassigned"} · pending
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{user.email || "No email"}</p>
+                          </div>
                         </div>
+                        <p className="text-xs text-muted-foreground shrink-0">{new Date(user.created_at).toLocaleDateString()}</p>
                       </div>
-                      
-                      <div className="flex gap-2 w-full md:w-auto">
-                        <Button 
-                          onClick={() => handleApprove(user.id, "vendor")} 
-                          variant="outline" 
-                          size="sm" 
-                          className="flex-1 md:flex-none gap-1.5 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50"
+
+                      {/* Extra details */}
+                      {(user.phone || user.business_name) && (
+                        <div className="flex flex-wrap gap-4 px-1 text-xs text-muted-foreground">
+                          {user.phone && (
+                            <span>📞 {user.phone}</span>
+                          )}
+                          {user.business_name && (
+                            <span>🏪 {user.business_name}</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          onClick={() => handleApprove(user.id, user.role === "agent" ? "agent" : "vendor")}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 gap-1.5 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                         >
-                          <Check className="w-3 h-3" /> Approve as Vendor
+                          <Check className="w-3 h-3" />
+                          Approve as {user.role === "agent" ? "Agent" : "Vendor"}
                         </Button>
-                        <Button 
-                          onClick={() => handleApprove(user.id, "agent")} 
-                          variant="outline" 
-                          size="sm" 
-                          className="flex-1 md:flex-none gap-1.5 border-blue-500/30 text-blue-600 hover:bg-blue-50"
+                        {user.role !== "agent" && (
+                          <Button
+                            onClick={() => handleApprove(user.id, "agent")}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 gap-1.5 border-blue-500/30 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          >
+                            <Check className="w-3 h-3" />
+                            Approve as Agent
+                          </Button>
+                        )}
+                        {user.role !== "vendor" && (
+                          <Button
+                            onClick={() => handleApprove(user.id, "vendor")}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 gap-1.5 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                          >
+                            <Check className="w-3 h-3" />
+                            Approve as Vendor
+                          </Button>
+                        )}
+                        <Button
+                          onClick={() => handleReject(user.id)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:bg-destructive/10 gap-1.5"
                         >
-                          <Check className="w-3 h-3" /> Approve as Agent
-                        </Button>
-                        <Button 
-                          onClick={() => handleReject(user.id)} 
-                          variant="ghost" 
-                          size="sm" 
-                          className="flex-1 md:flex-none text-destructive hover:bg-destructive/10"
-                        >
-                          <X className="w-3 h-3" />
+                          <X className="w-3 h-3" /> Decline
                         </Button>
                       </div>
                     </div>

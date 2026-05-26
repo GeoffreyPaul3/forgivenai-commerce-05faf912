@@ -585,7 +585,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
       const cleanSku = form.sku.trim();
       if (cleanSku) {
         let query = supabase.from("products").select("id").eq("metadata->>sku", cleanSku);
-        if (product) query = query.ne("id", product.id);
+        if (product) query = query.neq("id", product.id);
         const { data: duplicateSku, error: skuErr } = await query;
         if (skuErr) throw skuErr;
         if (duplicateSku && duplicateSku.length > 0) {
@@ -603,7 +603,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
       const cleanVendorSku = form.vendor_sku.trim();
       if (cleanVendorSku) {
         let query = supabase.from("products").select("id").eq("metadata->>vendor_sku", cleanVendorSku);
-        if (product) query = query.ne("id", product.id);
+        if (product) query = query.neq("id", product.id);
         const { data: duplicateVendorSku, error: vendorSkuErr } = await query;
         if (vendorSkuErr) throw vendorSkuErr;
         if (duplicateVendorSku && duplicateVendorSku.length > 0) {
