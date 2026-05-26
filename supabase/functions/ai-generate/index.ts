@@ -21,8 +21,14 @@ serve(async (req) => {
 
     switch (type) {
       case "product-description":
-        systemPrompt = "You are a luxury fashion copywriter for Forgiven Shopping Centre, a premium fashion & lifestyle brand in Malawi. Write compelling, elegant product descriptions that highlight quality, style, and value. Keep descriptions 2-3 sentences.";
-        userPrompt = `Write a compelling product description for: "${productName}" in category "${productCategory}", priced at ${currency} ${productPrice}. ${context || ""}`;
+        systemPrompt = "You are a luxury fashion copywriter & social media manager for Forgiven Shopping Centre, a premium fashion & lifestyle brand in Malawi. Write a compelling product description containing two distinct sections: first, a professional and elegant E-commerce Product Description highlighting quality, style, and value (2-3 sentences); second, a highly engaging and trendy Social Media Post version featuring emojis and hashtags.";
+        userPrompt = `Write a compelling description for "${productName}" in category "${productCategory}", priced at ${currency} ${productPrice}. Format the output exactly like this:
+
+E-commerce Description:
+[Your elegant product description here]
+
+Social Media Post:
+[Your engaging social media post here with emojis and hashtags]`;
         break;
       case "social-post":
         systemPrompt = "You are a social media manager for Forgiven Shopping Centre. Create engaging, trendy social media posts with emojis and hashtags. Keep posts concise and attention-grabbing.";

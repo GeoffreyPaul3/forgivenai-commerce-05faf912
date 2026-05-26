@@ -16,7 +16,7 @@ import {
   PaginationNext, PaginationPrevious,
 } from "@/components/ui/pagination";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Sparkles, Pencil, Trash2, ExternalLink, Loader2, Image as ImageIcon, Package, TrendingUp } from "lucide-react";
+import { Search, Plus, Sparkles, Pencil, Trash2, ExternalLink, Loader2, Image as ImageIcon, Package, TrendingUp, X, ImageOff } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { motion } from "framer-motion";
 
@@ -230,10 +230,25 @@ const ProductsPage = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05, duration: 0.3 }}
-              className="group rounded-xl border border-border bg-card overflow-hidden hover:border-gold/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
+              className="group rounded-xl border border-border bg-card relative hover:border-gold/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
             >
+              {/* Floating Large Hover Preview */}
+              {product.images && product.images.length > 0 && (
+                <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 w-64 h-64 rounded-2xl border border-border bg-popover shadow-2xl p-1.5 pointer-events-none opacity-0 scale-95 translate-y-3 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-300 z-50 overflow-hidden flex flex-col items-center justify-center">
+                  <img
+                    src={product.images[0]}
+                    alt={`${product.name} Hover Preview`}
+                    className="w-full h-full object-cover rounded-xl bg-background shadow-inner"
+                  />
+                  <div className="absolute bottom-3 left-3 right-3 bg-background/95 backdrop-blur-md px-3 py-1.5 rounded-lg border border-border text-center shadow-md">
+                    <p className="text-[10px] font-black text-foreground truncate uppercase tracking-tighter">{product.name}</p>
+                    <p className="text-[9px] font-bold text-primary font-body mt-0.5">{product.currency} {product.price?.toLocaleString()}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Image */}
-              <div className="relative h-48 bg-muted overflow-hidden">
+              <div className="relative h-48 bg-muted overflow-hidden rounded-t-xl">
                 {product.images && product.images.length > 0 ? (
                   <img
                     src={product.images[0]}
@@ -361,6 +376,10 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
 }) {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -406,6 +425,8 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
         newSize: "",
         newColor: "",
       });
+      setPreviewUrls(product.images || []);
+      setImageFiles([]);
     } else {
       setForm({
         name: "",
@@ -424,37 +445,104 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
         newSize: "",
         newColor: "",
       });
+      setPreviewUrls([]);
+      setImageFiles([]);
     }
-  }, [product]);
+  }, [product, open]);
 
-  const handleSave = () => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      const totalFiles = previewUrls.length + files.length;
+      if (totalFiles > 5) {
+        toast({ title: "Maximum 5 images allowed", variant: "destructive" });
+        return;
+      }
+      const newFiles = [...imageFiles, ...files].slice(0, 5);
+      setImageFiles(newFiles);
+      
+      const newPreviews = [...previewUrls, ...files.map(f => URL.createObjectURL(f))].slice(0, 5);
+      setPreviewUrls(newPreviews);
+    }
+  };
+
+  const removeImage = (idx: number) => {
+    const urlToRemove = previewUrls[idx];
+    
+    if (urlToRemove.startsWith("blob:")) {
+      const existingCount = previewUrls.filter(u => !u.startsWith("blob:")).length;
+      const fileIndex = idx - existingCount;
+      if (fileIndex >= 0) {
+        const newFiles = [...imageFiles];
+        newFiles.splice(fileIndex, 1);
+        setImageFiles(newFiles);
+      }
+    }
+    
+    const newPreviews = [...previewUrls];
+    newPreviews.splice(idx, 1);
+    setPreviewUrls(newPreviews);
+  };
+
+  const handleSave = async () => {
     if (!form.name.trim()) return;
     
-    let metadata = product?.metadata as any || {};
-    if (!product) {
-      const isVendor = form.vendor_id !== "none";
-      const prefix = isVendor ? "FSC-VEN-" : "FSC-";
-      metadata = { ...metadata, sku: `${prefix}${Math.random().toString(36).substring(2, 8).toUpperCase()}` };
-    }
+    setIsUploading(true);
+    try {
+      const uploadedUrls: string[] = [];
+      
+      for (const file of imageFiles) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `product_images/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('vendor-products')
+          .upload(filePath, file);
+          
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('vendor-products')
+          .getPublicUrl(filePath);
+          
+        uploadedUrls.push(publicUrl);
+      }
 
-    const data: any = {
-      name: form.name,
-      category: form.category || null,
-      price: form.price ? parseFloat(form.price) : null,
-      description: form.description || null,
-      status: form.status,
-      vendor_id: form.vendor_id === "none" ? null : (form.vendor_id || null),
-      vendor_cost: form.vendor_cost ? parseFloat(form.vendor_cost) : null,
-      inventory_mode: form.inventory_mode,
-      stock_quantity: parseInt(form.stock_quantity) || 0,
-      stock_status: form.stock_status,
-      sizes: form.sizes,
-      colors: form.colors,
-      is_luxury: form.is_luxury,
-      metadata: Object.keys(metadata).length > 0 ? metadata : null,
-    };
-    if (product) data.id = product.id;
-    onSave(data);
+      const existingUrls = previewUrls.filter(url => !url.startsWith('blob:'));
+      const finalImages = [...existingUrls, ...uploadedUrls].slice(0, 5);
+
+      let metadata = product?.metadata as any || {};
+      if (!product) {
+        const isVendor = form.vendor_id !== "none";
+        const prefix = isVendor ? "FSC-VEN-" : "FSC-";
+        metadata = { ...metadata, sku: `${prefix}${Math.random().toString(36).substring(2, 8).toUpperCase()}` };
+      }
+
+      const data: any = {
+        name: form.name,
+        category: form.category || null,
+        price: form.price ? parseFloat(form.price) : null,
+        description: form.description || null,
+        status: form.status,
+        vendor_id: form.vendor_id === "none" ? null : (form.vendor_id || null),
+        vendor_cost: form.vendor_cost ? parseFloat(form.vendor_cost) : null,
+        inventory_mode: form.inventory_mode,
+        stock_quantity: parseInt(form.stock_quantity) || 0,
+        stock_status: form.stock_status,
+        sizes: form.sizes,
+        colors: form.colors,
+        is_luxury: form.is_luxury,
+        images: finalImages,
+        metadata: Object.keys(metadata).length > 0 ? metadata : null,
+      };
+      if (product) data.id = product.id;
+      onSave(data);
+    } catch (err: any) {
+      toast({ title: "Failed to upload images", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const addTag = (type: "sizes" | "colors") => {
@@ -571,6 +659,47 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
                   </SelectContent>
                 </Select>
                 <p className="text-[9px] text-muted-foreground px-1">Luxury products are hidden from the Agent Portal.</p>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-border/40">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Product Images (Max 5)</label>
+                <div className="flex flex-wrap gap-4">
+                  {previewUrls.map((url, idx) => (
+                    <div key={idx} className="relative w-20 h-20 group">
+                      <div className="w-full h-full rounded-xl border border-border/50 overflow-hidden bg-muted/20 shadow-inner relative">
+                        <img src={url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover group-hover:opacity-40 transition-opacity" />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute inset-0 m-auto w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-lg"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      
+                      {/* Floating full-size preview on hover */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 h-64 rounded-2xl border border-border bg-popover shadow-2xl p-1.5 pointer-events-none opacity-0 scale-95 translate-y-2 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-200 z-50 overflow-hidden">
+                        <img src={url} alt={`Full Preview ${idx + 1}`} className="w-full h-full object-contain rounded-xl bg-background" />
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {previewUrls.length < 5 && (
+                    <label className="w-20 h-20 flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border/50 bg-muted/10 cursor-pointer hover:bg-muted/20 hover:border-primary/50 transition-all group">
+                      <div className="w-6 h-6 rounded-full bg-background shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary" />
+                      </div>
+                      <span className="text-[8px] font-black uppercase text-muted-foreground group-hover:text-primary">Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleImageChange}
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -697,8 +826,17 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
             </div>
           </div>
           
-          <Button onClick={handleSave} className="w-full bg-primary text-white hover:bg-primary/90 font-heading font-black h-14 sm:h-20 text-lg sm:text-2xl rounded-2xl sm:rounded-[2rem] shadow-2xl shadow-primary/30 transition-all hover:scale-[1.005] active:scale-[0.995] flex items-center justify-center gap-3">
-            <Package className="w-6 h-6" /> Save Product & Update Catalog
+          <Button disabled={!form.name.trim() || isUploading} onClick={handleSave} className="w-full bg-primary text-white hover:bg-primary/90 font-heading font-black h-14 sm:h-20 text-lg sm:text-2xl rounded-2xl sm:rounded-[2rem] shadow-2xl shadow-primary/30 transition-all hover:scale-[1.005] active:scale-[0.995] flex items-center justify-center gap-3">
+            {isUploading ? (
+              <>
+                <Loader2 className="w-6 h-6 animate-spin" />
+                Saving & Uploading...
+              </>
+            ) : (
+              <>
+                <Package className="w-6 h-6" /> Save Product & Update Catalog
+              </>
+            )}
           </Button>
         </div>
       </DialogContent>

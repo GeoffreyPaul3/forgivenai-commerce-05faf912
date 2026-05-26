@@ -41,9 +41,22 @@ serve(async (req) => {
     const uniqueProducts = Array.from(new Map(products.map(p => [p.name, p])).values());
     console.log(`Syncing ${uniqueProducts.length} unique products from API...`);
 
-    // Upsert into products table
-    const { error } = await supabase.from('products').upsert(
-      uniqueProducts.map(p => ({
+    // Fetch existing products by name
+    const { data: existingProducts, error: fetchErr } = await supabase
+      .from('products')
+      .select('id, name')
+      .in('name', uniqueProducts.map(p => p.name));
+
+    if (fetchErr) throw fetchErr;
+
+    const existingMap = new Map(existingProducts?.map(p => [p.name, p.id]) || []);
+
+    const toInsert = [];
+    const toUpdate = [];
+
+    for (const p of uniqueProducts) {
+      const existingId = existingMap.get(p.name);
+      const productRow = {
         name: p.name,
         description: p.description,
         category: p.category,
@@ -53,11 +66,26 @@ serve(async (req) => {
         status: 'active',
         sizes: p.sizes,
         colors: p.colors
-      })),
-      { onConflict: 'name' }
-    );
+      };
 
-    if (error) throw error;
+      if (existingId) {
+        toUpdate.push({ id: existingId, ...productRow });
+      } else {
+        toInsert.push(productRow);
+      }
+    }
+
+    if (toInsert.length > 0) {
+      console.log(`Inserting ${toInsert.length} new products...`);
+      const { error: insErr } = await supabase.from('products').insert(toInsert);
+      if (insErr) throw insErr;
+    }
+
+    if (toUpdate.length > 0) {
+      console.log(`Updating ${toUpdate.length} existing products...`);
+      const { error: updErr } = await supabase.from('products').upsert(toUpdate);
+      if (updErr) throw updErr;
+    }
 
     return new Response(
       JSON.stringify({ success: true, imported: uniqueProducts.length }),

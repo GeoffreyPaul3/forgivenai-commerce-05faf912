@@ -399,13 +399,14 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
 }) {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [form, setForm] = useState({
     name: "",
     category: "",
     description: "",
-    status: "active",
+    status: "draft",
     vendor_cost: "",
     price: "",
     inventory_mode: "flexible",
@@ -424,7 +425,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
         name: product.name,
         category: product.category || "",
         description: product.description || "",
-        status: product.status || "active",
+        status: product.status || "draft",
         vendor_cost: product.vendor_cost ? Number(product.vendor_cost).toLocaleString("en-US") : "",
         price: product.price ? Number(product.price).toLocaleString("en-US") : "",
         inventory_mode: product.inventory_mode || "flexible",
@@ -443,7 +444,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
         name: "",
         category: "",
         description: "",
-        status: "active",
+        status: "draft",
         vendor_cost: "",
         price: "",
         inventory_mode: "flexible",
@@ -459,6 +460,34 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
       setImageFiles([]);
     }
   }, [product, open]);
+
+  const generateAiDescription = async () => {
+    if (!form.name.trim()) {
+      toast({ title: "Product name required", description: "Please enter a name first.", variant: "destructive" });
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-generate", {
+        body: {
+          type: "product-description",
+          productName: form.name,
+          productCategory: form.category,
+          productPrice: form.vendor_cost ? form.vendor_cost.replace(/,/g, '') : "0",
+          currency: "MWK",
+        },
+      });
+      if (error) throw error;
+      if (data?.content) {
+        setForm(f => ({ ...f, description: data.content }));
+        toast({ title: "AI description generated!" });
+      }
+    } catch {
+      toast({ title: "Failed to generate description", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -648,8 +677,19 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
                       placeholder="Full description..." 
                       value={form.description} 
                       onChange={e => setForm(f => ({ ...f, description: e.target.value }))} 
-                      className="font-body min-h-[140px] rounded-xl bg-muted/20 border-border/50 p-4 focus:bg-background transition-all" 
+                      className="font-body min-h-[140px] rounded-xl bg-muted/20 border-border/50 p-4 focus:bg-background transition-all pr-12" 
                     />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="absolute right-3 top-3 h-8 w-8 text-primary hover:bg-primary/10 transition-colors"
+                      onClick={generateAiDescription}
+                      disabled={isGenerating}
+                      title="Generate AI Description"
+                    >
+                      {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    </Button>
                   </div>
                 </div>
               </div>
