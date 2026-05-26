@@ -15,6 +15,7 @@ import {
   Pagination, PaginationContent, PaginationItem, PaginationLink,
   PaginationNext, PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Plus, Sparkles, Pencil, Trash2, ExternalLink, Loader2, Image as ImageIcon, Package, TrendingUp, X, ImageOff } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
@@ -38,6 +39,7 @@ const ProductsPage = () => {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [vendorFilter, setVendorFilter] = useState("all");
+  const [statusTab, setStatusTab] = useState<"all" | "active" | "draft" | "archived">("all");
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [page, setPage] = useState(1);
@@ -170,19 +172,33 @@ const ProductsPage = () => {
     return duplicates;
   }, [products]);
 
+  const statusCounts = useMemo(() => {
+    if (!products) return { all: 0, active: 0, draft: 0, archived: 0 };
+    const all = products.length;
+    const active = products.filter((p: any) => (p.status || "draft") === "active").length;
+    const draft = products.filter((p: any) => (p.status || "draft") === "draft").length;
+    const archived = products.filter((p: any) => (p.status || "draft") === "archived").length;
+    return { all, active, draft, archived };
+  }, [products]);
+
   const filteredProductsList = useMemo(() => {
     if (!products) return [];
-    if (!search.trim()) return products;
+    // Apply status tab filter first
+    const byStatus = statusTab === "all"
+      ? products
+      : products.filter((p: any) => (p.status || "draft") === statusTab);
+    // Then apply search
+    if (!search.trim()) return byStatus;
     const searchLower = search.toLowerCase().trim();
-    return products.filter((p: any) => {
+    return byStatus.filter((p: any) => {
       const nameMatch = p.name?.toLowerCase().includes(searchLower);
       const skuMatch = p.metadata?.sku?.toLowerCase().includes(searchLower);
       const vendorSkuMatch = p.metadata?.vendor_sku?.toLowerCase().includes(searchLower);
       return nameMatch || skuMatch || vendorSkuMatch;
     });
-  }, [products, search]);
+  }, [products, search, statusTab]);
 
-  useEffect(() => { setPage(1); }, [search, categoryFilter, vendorFilter]);
+  useEffect(() => { setPage(1); }, [search, categoryFilter, vendorFilter, statusTab]);
 
   const totalPages = Math.ceil((filteredProductsList?.length || 0) / PAGE_SIZE);
   const paginatedProducts = filteredProductsList?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) || [];
@@ -239,6 +255,51 @@ const ProductsPage = () => {
           <Plus className="w-4 h-4" /> Add Product
         </Button>
       </div>
+
+      {/* Status Tabs */}
+      <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as typeof statusTab)}>
+        <TabsList className="h-auto bg-card border border-border rounded-xl p-1 gap-1 flex-wrap">
+          <TabsTrigger
+            value="all"
+            className="rounded-lg text-xs font-bold px-4 py-2 gap-2 data-[state=active]:bg-foreground data-[state=active]:text-background transition-all"
+          >
+            All
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-muted text-muted-foreground data-[state=active]:bg-background/20 data-[state=active]:text-inherit">
+              {statusCounts.all}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="active"
+            className="rounded-lg text-xs font-bold px-4 py-2 gap-2 data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-current inline-block" />
+            Active
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/10 text-emerald-700 data-[state=active]:bg-white/20 data-[state=active]:text-white">
+              {statusCounts.active}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="draft"
+            className="rounded-lg text-xs font-bold px-4 py-2 gap-2 data-[state=active]:bg-amber-500 data-[state=active]:text-white transition-all"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-current inline-block" />
+            Draft
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/10 text-amber-700 data-[state=active]:bg-white/20 data-[state=active]:text-white">
+              {statusCounts.draft}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="archived"
+            className="rounded-lg text-xs font-bold px-4 py-2 gap-2 data-[state=active]:bg-muted-foreground data-[state=active]:text-background transition-all"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-current inline-block" />
+            Archived
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-muted text-muted-foreground data-[state=active]:bg-white/20 data-[state=active]:text-inherit">
+              {statusCounts.archived}
+            </span>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
