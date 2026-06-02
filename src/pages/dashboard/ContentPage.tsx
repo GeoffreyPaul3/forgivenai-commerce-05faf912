@@ -1136,6 +1136,12 @@ function InfluencerManager() {
   const [generating, setGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
+  // Influencer management state
+  const [viewInfluencer, setViewInfluencer] = useState<any>(null);
+  const [editInfluencer, setEditInfluencer] = useState<any>(null);
+  const [deleteInfluencer, setDeleteInfluencer] = useState<any>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const [savingEdit, setSavingEdit] = useState(false);
   
   // Influencer creation state
   const [newInfluencer, setNewInfluencer] = useState({ 
@@ -1177,6 +1183,39 @@ function InfluencerManager() {
       return data || [];
     },
   });
+
+  const deleteInfluencerMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("influencers").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencers"] });
+      if (selectedInfluencer?.id === deleteInfluencer?.id) setSelectedInfluencer(null);
+      setDeleteInfluencer(null);
+      toast({ title: "Model deleted", description: "The identity has been permanently removed." });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Delete failed", description: error.message });
+    },
+  });
+
+  const saveEditInfluencer = async () => {
+    if (!editInfluencer) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase.from("influencers").update(editForm).eq("id", editInfluencer.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["influencers"] });
+      if (selectedInfluencer?.id === editInfluencer.id) setSelectedInfluencer({ ...editInfluencer, ...editForm });
+      setEditInfluencer(null);
+      toast({ title: "Model updated", description: "Identity details have been saved." });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Update failed", description: err.message });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const setCoverImage = useMutation({
     mutationFn: async (visual: any) => {
@@ -1343,25 +1382,161 @@ function InfluencerManager() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
             {influencers?.map(inf => (
-              <button
+              <div
                 key={inf.id}
-                onClick={() => setSelectedInfluencer(inf)}
                 className={`group relative rounded-xl border-2 p-2 transition-all hover:shadow-md ${
                   selectedInfluencer?.id === inf.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
                 }`}
               >
-                <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-muted">
-                  <img src={inf.avatar_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                {/* Three-dot menu */}
+                <div className="absolute top-1.5 right-1.5 z-10">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        onClick={e => e.stopPropagation()}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded-md bg-background/80 backdrop-blur-sm border border-border hover:bg-muted shadow-sm"
+                      >
+                        <MoreHorizontal className="w-3.5 h-3.5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-32">
+                      <DropdownMenuItem onClick={e => { e.stopPropagation(); setViewInfluencer(inf); }}>
+                        <Eye className="w-3.5 h-3.5 mr-2" /> View
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={e => { e.stopPropagation(); setEditForm({ name: inf.name, gender: inf.gender, ethnicity: inf.ethnicity, body_type: inf.body_type, style_profile: inf.style_profile, pose_style: inf.pose_style }); setEditInfluencer(inf); }}>
+                        <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={e => { e.stopPropagation(); setDeleteInfluencer(inf); }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-                <p className="text-xs font-bold font-heading truncate text-center">{inf.name}</p>
+
+                {/* Card body — clicking selects influencer */}
+                <button className="w-full text-left" onClick={() => setSelectedInfluencer(inf)}>
+                  <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-muted">
+                    <img src={inf.avatar_url} alt={inf.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  </div>
+                  <p className="text-xs font-bold font-heading truncate text-center">{inf.name}</p>
+                </button>
+
                 {selectedInfluencer?.id === inf.id && (
-                  <div className="absolute -top-1.5 -right-1.5 bg-primary text-white p-0.5 rounded-full shadow-sm">
+                  <div className="absolute -top-1.5 -left-1.5 bg-primary text-white p-0.5 rounded-full shadow-sm pointer-events-none">
                     <CheckCircle2 className="w-3 h-3" />
                   </div>
                 )}
-              </button>
+              </div>
             ))}
           </div>
+
+          {/* ── VIEW DIALOG ── */}
+          {viewInfluencer && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setViewInfluencer(null)}>
+              <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
+                <div className="flex items-start justify-between">
+                  <h3 className="font-heading text-lg font-bold">{viewInfluencer.name}</h3>
+                  <button onClick={() => setViewInfluencer(null)} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="aspect-square rounded-xl overflow-hidden bg-muted">
+                  <img src={viewInfluencer.avatar_url} alt={viewInfluencer.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {[
+                    { label: "Gender", value: viewInfluencer.gender },
+                    { label: "Ethnicity", value: viewInfluencer.ethnicity },
+                    { label: "Body Type", value: viewInfluencer.body_type },
+                    { label: "Style", value: viewInfluencer.style_profile },
+                    { label: "Pose", value: viewInfluencer.pose_style },
+                  ].map(row => (
+                    <div key={row.label} className="bg-muted/40 rounded-lg p-2">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">{row.label}</p>
+                      <p className="font-medium truncate capitalize">{row.value || "—"}</p>
+                    </div>
+                  ))}
+                </div>
+                <Button className="w-full" onClick={() => { setSelectedInfluencer(viewInfluencer); setViewInfluencer(null); }}>
+                  <CheckCircle2 className="w-4 h-4 mr-2" /> Select this Model
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── EDIT DIALOG ── */}
+          {editInfluencer && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEditInfluencer(null)}>
+              <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
+                <div className="flex items-start justify-between">
+                  <h3 className="font-heading text-lg font-bold">Edit Model</h3>
+                  <button onClick={() => setEditInfluencer(null)} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <img src={editInfluencer.avatar_url} alt="" className="w-14 h-14 rounded-xl object-cover border border-border" />
+                  <div className="flex-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Display Name</label>
+                    <input
+                      value={editForm.name || ""}
+                      onChange={e => setEditForm((f: any) => ({ ...f, name: e.target.value }))}
+                      className="w-full mt-1 text-sm bg-muted/40 border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { key: "gender", label: "Gender", options: ["female", "male", "non-binary"] },
+                    { key: "ethnicity", label: "Ethnicity", options: ["african", "asian", "caucasian", "latina", "mixed"] },
+                    { key: "body_type", label: "Body Type", options: ["tall_editorial", "petite", "curvy", "athletic"] },
+                    { key: "style_profile", label: "Style", options: ["High-End Editorial", "Streetwear", "Casual Chic", "Minimalist"] },
+                  ] as { key: string; label: string; options: string[] }[]).map(field => (
+                    <div key={field.key}>
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{field.label}</label>
+                      <select
+                        value={editForm[field.key] || ""}
+                        onChange={e => setEditForm((f: any) => ({ ...f, [field.key]: e.target.value }))}
+                        className="w-full mt-1 text-sm bg-muted/40 border border-border rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      >
+                        {field.options.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setEditInfluencer(null)}>Cancel</Button>
+                  <Button className="flex-1" onClick={saveEditInfluencer} disabled={savingEdit}>
+                    {savingEdit ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── DELETE ALERT DIALOG ── */}
+          <AlertDialog open={!!deleteInfluencer} onOpenChange={open => !open && setDeleteInfluencer(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-heading">Delete "{deleteInfluencer?.name}"?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently remove this AI model identity and all its associated data. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => deleteInfluencer && deleteInfluencerMutation.mutate(deleteInfluencer.id)}
+                >
+                  Delete Model
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <div className="pt-4 border-t border-border/50">
             <h3 className="font-heading text-lg font-bold flex items-center gap-2 mb-4">

@@ -756,9 +756,11 @@ async function runSpecializedObjectVTON(
     ``,
     `PERSON FIDELITY — NON-NEGOTIABLE:`,
     `- Preserve the EXACT face, facial features, skin tone, ethnicity, hair, and body proportions from Image 1.`,
-    `- Do NOT generate a different person or change the model's appearance.`,
+    `- Do NOT generate a different person or change the model's appearance. MUST BE A REAL HUMAN, NOT A MANNEQUIN.`,
     ``,
     `PRODUCT FIDELITY — ABSOLUTE SOURCE OF TRUTH:`,
+    `- NO MANNEQUINS: If the source product image shows a mannequin, DO NOT copy the mannequin. You MUST map the product onto the REAL HUMAN model.`,
+    `- PRESERVE SLEEVE LENGTH: You MUST match the exact sleeve length (e.g., long sleeve, short sleeve, sleeveless) shown in the product image.`,
     `- The product in Image 2 is the ONLY valid source for the garment. Reproduce it with 100% pixel fidelity.`,
     categoryRules,
     poseGuide,
@@ -886,7 +888,7 @@ async function detectGarmentColor(apiKey: string, imageUrl: string): Promise<str
             role: "user",
             content: [
               { image: imageUrl },
-              { text: "You are a fashion product analyst. Analyze the clothing/shoes in this image with extreme precision. Identify:\n1. PRIMARY COLOR (be very specific, e.g. 'Coffee Brown', 'Jet-Black', 'Navy Blue', 'Burgundy Red')\n2. SECONDARY COLOR if any\n3. MATERIAL (e.g. 'Leather', 'Suede', 'Canvas', 'Cotton', 'Denim')\n4. TYPE (e.g. 'Sneakers', 'Dress Shoes', 'T-Shirt', 'Jacket')\n5. KEY DETAILS (e.g. 'white sole', 'gold buckle', 'zip closure')\n\nReturn ONLY in this format:\nColor: [Primary Color], Material: [Material], Type: [Type], Details: [Key Details]" }
+              { text: "You are a fashion product analyst. Analyze the clothing/shoes in this image with extreme precision. Identify:\n1. PRIMARY COLOR (be very specific, e.g. 'Coffee Brown', 'Jet-Black', 'Navy Blue', 'Burgundy Red')\n2. SECONDARY COLOR if any\n3. MATERIAL (e.g. 'Leather', 'Suede', 'Canvas', 'Cotton', 'Denim')\n4. TYPE (e.g. 'Sneakers', 'Dress Shoes', 'T-Shirt', 'Jacket')\n5. SLEEVE LENGTH/CUT (e.g. 'Long sleeve', 'Short sleeve', 'Sleeveless')\n6. KEY DETAILS (e.g. 'white sole', 'gold buckle', 'zip closure')\n\nReturn ONLY in this format:\nColor: [Primary Color], Material: [Material], Type: [Type], Sleeves: [Sleeve Length], Details: [Key Details]" }
             ]
           }]
         }
@@ -1502,7 +1504,7 @@ async function runUnifiedVTON(
             keys.falKey,
             personImageUrl,
             segmentedGarmentUrl,
-            `${garmentDetails} — worn by a ${targetGender} ${targetEthnicity} model. seed: ${seed}`
+            `${garmentDetails} — worn by a REAL HUMAN ${targetGender} ${targetEthnicity} model. DO NOT generate a mannequin. Preserve exact sleeve length. seed: ${seed}`
           );
         }
       },
@@ -1519,11 +1521,13 @@ async function runUnifiedVTON(
 
           const wanPrompt = [
             `Professional high-resolution fashion catalog photograph.`,
-            `MODEL: ${targetGender} ${targetEthnicity} — the face, skin tone, and body must be IDENTICAL to the target person reference image. Do NOT generate a different person.`,
+            `MODEL: ${targetGender} ${targetEthnicity} — the face, skin tone, and body must be IDENTICAL to the target person reference image. Do NOT generate a different person. MUST BE A REAL HUMAN, NOT A MANNEQUIN.`,
             `PRODUCT IDENTITY — ABSOLUTE SOURCE OF TRUTH: The product reference image is the ONLY valid source for the garment. Reproduce it with 100% pixel fidelity.`,
             `  Detected product details: ${garmentDetails}`,
             `  Product name: ${description}`,
             `MANDATORY RULES — ZERO TOLERANCE:`,
+            `  - NO MANNEQUINS: If the source product image shows a mannequin, DO NOT copy the mannequin. You MUST map the clothing onto the REAL HUMAN model.`,
+            `  - PRESERVE SLEEVE LENGTH: You MUST match the exact sleeve length (e.g., long sleeve, short sleeve, sleeveless) shown in the product image. DO NOT alter the sleeve length.`,
             `  - DO NOT redesign, approximate, or hallucinate any part of the garment.`,
             `  - DO NOT substitute a generic or similar-looking product. Only the EXACT reference product is acceptable.`,
             `  - DO NOT change the garment's neckline, sleeve length, color, cut, pattern, print, logo, or fabric texture.`,
