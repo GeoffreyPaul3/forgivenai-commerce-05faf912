@@ -4,7 +4,7 @@ import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import {
   ShoppingBag, LayoutDashboard, MessageSquare, CreditCard,
   Users, BarChart3, Video, Settings, Bot, Package, ShieldCheck,
-  User, LogOut, ChevronDown, TrendingUp, Store
+  User, LogOut, ChevronDown, TrendingUp, Store, Truck
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -46,6 +46,7 @@ import VendorProductsPage from "./dashboard/vendor/VendorProductsPage";
 import VendorOrdersPage from "./dashboard/vendor/VendorOrdersPage";
 import VendorPerformancePage from "./dashboard/vendor/VendorPerformancePage";
 import VendorPayoutsPage from "./dashboard/vendor/VendorPayoutsPage";
+import CourierOperationsDashboard from "./dashboard/CourierOperationsDashboard";
 
 const menuItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
@@ -54,6 +55,7 @@ const menuItems = [
   { title: "Customers", url: "/dashboard/customers", icon: Users },
   { title: "Conversations", url: "/dashboard/conversations", icon: MessageSquare },
   { title: "Content & UGC", url: "/dashboard/content", icon: Video },
+  { title: "Courier", url: "/dashboard/courier", icon: Truck },
   { title: "Agents", url: "/dashboard/agents", icon: ShieldCheck },
   { title: "Vendors", url: "/dashboard/vendors", icon: Store },
   { title: "Vendor Portal", url: "/dashboard/vendor-portal", icon: ShoppingBag },
@@ -87,7 +89,7 @@ function DashboardSidebar() {
     if (role === "admin") return true;
 
     // Restrictions for non-admins
-    if (item.title === "Agents" || item.title === "Vendors" || item.title === "Analytics") return false;
+    if (item.title === "Agents" || item.title === "Vendors" || item.title === "Analytics" || item.title === "Courier") return false;
     
     if (role === "vendor") {
       if (item.title === "Agent Portal" || item.title === "Agents") return false;
@@ -551,6 +553,7 @@ const pageTitles: Record<string, string> = {
   "/dashboard/customers": "Customers",
   "/dashboard/conversations": "Conversations",
   "/dashboard/content": "Content & UGC",
+  "/dashboard/courier": "Courier Operations",
   "/dashboard/agents": "Agents",
   "/dashboard/vendors": "Vendors",
   "/dashboard/vendor-portal": "Vendor Portal",
@@ -593,6 +596,7 @@ const DashboardPage = () => {
       <Route path="customers" element={<CustomersPage />} />
       <Route path="conversations" element={<ConversationsPage />} />
       <Route path="content" element={<ContentPage />} />
+      <Route path="courier" element={<CourierOperationsDashboard />} />
       <Route path="agents" element={<AgentsPage />} />
       <Route path="vendors" element={<VendorsPage />} />
       <Route path="vendors/:id/analytics" element={<VendorPerformancePage />} />

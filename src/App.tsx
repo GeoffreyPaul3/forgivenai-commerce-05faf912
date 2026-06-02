@@ -9,7 +9,9 @@ import NotFound from "./pages/NotFound.tsx";
 import AuthPage from "./pages/Auth.tsx";
 import PaymentSuccess from "./pages/PaymentSuccess.tsx";
 import Shop from "./pages/Shop.tsx";
+import CustomerTracking from "./pages/CustomerTracking.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
+
 import { useEffect } from "react";
 import { getAppMode } from "@/lib/app-mode";
 import { Navigate } from "react-router-dom";
@@ -93,6 +95,8 @@ const App = () => (
           <Route path="/shop" element={<Shop />} />
           {/* Payment callback landing page – must be public */}
           <Route path="/create-payment" element={<PaymentSuccess />} />
+          {/* Tracking page */}
+          <Route path="/tracking/:orderId" element={<CustomerTracking />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

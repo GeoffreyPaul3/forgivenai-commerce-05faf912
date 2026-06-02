@@ -191,7 +191,9 @@ const OrdersPage = () => {
   });
 
   const createOrder = useMutation({
-    mutationFn: async (order: any) => {
+    mutationFn: async (orderPayload: any) => {
+      const { delivery_provider, delivery_city, delivery_type, delivery_address, ...order } = orderPayload;
+      
       // For agent-created orders, inject order-level attribution fields
       // so commission is correctly attributed under the per-order model.
       const enrichedOrder = profile?.role === "agent" && agentId
@@ -204,14 +206,49 @@ const OrdersPage = () => {
             order_source_type:     "agent",
           }
         : order;
-      const { error } = await supabase.from("orders").insert(enrichedOrder);
-      if (error) throw error;
+
+      // Ensure status is correctly set for delivery
+      if (delivery_provider === 'smart_deliveries') {
+        enrichedOrder.status = 'awaiting_delivery_payment';
+      }
+
+      const { data: newOrder, error: orderError } = await supabase.from("orders").insert(enrichedOrder).select().single();
+      if (orderError) throw orderError;
+
+      if (delivery_provider === 'smart_deliveries') {
+        // Fetch provider ID
+        const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', 'SMART_DELIVERIES').single();
+        if (provider) {
+          // Get quote
+          const { getDeliveryQuote } = await import('@/integrations/smart-deliveries/deliveryFeeEngine');
+          const quote = await getDeliveryQuote({
+            city: delivery_city,
+            deliveryType: delivery_type,
+            itemsCount: 1
+          });
+
+          await supabase.from('delivery_orders').insert({
+            order_id: newOrder.id,
+            courier_provider_id: provider.id,
+            delivery_type: delivery_type,
+            receiver_name: enrichedOrder.customer_name || 'Customer',
+            receiver_phone: enrichedOrder.customer_phone || '',
+            receiver_city: delivery_city,
+            receiver_address: delivery_address || '',
+            delivery_fee: quote.fee,
+            parcel_status: 'pending'
+          });
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       setShowAdd(false);
-      toast({ title: "Order created" });
+      toast({ title: "Order created successfully" });
     },
+    onError: (error) => {
+      toast({ title: "Failed to create order", description: error.message, variant: "destructive" });
+    }
   });
 
   const totalRevenue = orders?.filter(o => o.status === "paid" || o.status === "delivered").reduce((sum, o) => sum + (o.total || 0), 0) || 0;
@@ -532,22 +569,89 @@ const OrdersPage = () => {
 };
 
 function AddOrderForm({ onSave }: { onSave: (o: any) => void }) {
-  const [form, setForm] = useState({ customer_name: "", customer_phone: "", total: "", channel: "web", notes: "" });
+  const [form, setForm] = useState({ 
+    customer_name: "", 
+    customer_phone: "", 
+    total: "", 
+    channel: "whatsapp", 
+    notes: "",
+    delivery_provider: "none",
+    delivery_city: "",
+    delivery_type: "office_collection",
+    delivery_address: ""
+  });
+
   return (
-    <div className="space-y-3">
-      <Input placeholder="Customer Name" value={form.customer_name} onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} />
-      <Input placeholder="Phone" value={form.customer_phone} onChange={e => setForm(f => ({ ...f, customer_phone: e.target.value }))} />
-      <Input placeholder="Total Amount" type="number" value={form.total} onChange={e => setForm(f => ({ ...f, total: e.target.value }))} />
-      <Select value={form.channel} onValueChange={v => setForm(f => ({ ...f, channel: v }))}>
-        <SelectTrigger><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="web">Web</SelectItem>
-          <SelectItem value="whatsapp">WhatsApp</SelectItem>
-          <SelectItem value="agent">Agent</SelectItem>
-        </SelectContent>
-      </Select>
-      <Input placeholder="Notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
-      <Button className="w-full" onClick={() => onSave({ ...form, total: parseFloat(form.total) || 0 })}>Create Order</Button>
+    <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+      <div className="space-y-3">
+        <h3 className="font-heading font-medium text-sm">Customer Details</h3>
+        <Input placeholder="Customer Name" value={form.customer_name} onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} />
+        <Input placeholder="Phone (+265...)" value={form.customer_phone} onChange={e => setForm(f => ({ ...f, customer_phone: e.target.value }))} />
+        <Input placeholder="Total Amount (Items)" type="number" value={form.total} onChange={e => setForm(f => ({ ...f, total: e.target.value }))} />
+        <Select value={form.channel} onValueChange={v => setForm(f => ({ ...f, channel: v }))}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="web">Web</SelectItem>
+            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+            <SelectItem value="agent">Agent</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input placeholder="Notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+      </div>
+
+      <div className="space-y-3 border-t border-border pt-4">
+        <h3 className="font-heading font-medium text-sm">Delivery Options</h3>
+        <Select value={form.delivery_provider} onValueChange={v => setForm(f => ({ ...f, delivery_provider: v }))}>
+          <SelectTrigger><SelectValue placeholder="Delivery Provider" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No Delivery / Customer Pickup</SelectItem>
+            <SelectItem value="smart_deliveries">Smart Deliveries (Lilongwe, Blantyre, Mzuzu, Zomba)</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {form.delivery_provider === 'smart_deliveries' && (
+          <div className="space-y-3 bg-muted/50 p-3 rounded-lg border border-border">
+            <Select value={form.delivery_city} onValueChange={v => setForm(f => ({ ...f, delivery_city: v }))}>
+              <SelectTrigger><SelectValue placeholder="Select City" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Lilongwe">Lilongwe</SelectItem>
+                <SelectItem value="Blantyre">Blantyre</SelectItem>
+                <SelectItem value="Mzuzu">Mzuzu</SelectItem>
+                <SelectItem value="Zomba">Zomba</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={form.delivery_type} onValueChange={v => setForm(f => ({ ...f, delivery_type: v }))}>
+              <SelectTrigger><SelectValue placeholder="Delivery Type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="office_collection">Office Collection</SelectItem>
+                <SelectItem value="door_to_door">Door to Door (+MWK 1,500)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {form.delivery_type === 'door_to_door' && (
+              <Input 
+                placeholder="Full Delivery Address & Description" 
+                value={form.delivery_address} 
+                onChange={e => setForm(f => ({ ...f, delivery_address: e.target.value }))} 
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      <Button 
+        className="w-full" 
+        onClick={() => {
+          if (form.delivery_provider === 'smart_deliveries' && !form.delivery_city) {
+            alert("Please select a city for Smart Deliveries.");
+            return;
+          }
+          onSave({ ...form, total: parseFloat(form.total) || 0 });
+        }}
+      >
+        Create Order
+      </Button>
     </div>
   );
 }

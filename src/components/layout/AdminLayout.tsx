@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   ShoppingBag, LayoutDashboard, MessageSquare, CreditCard,
   Users, BarChart3, Video, Settings, Bot, ShieldCheck,
-  User, LogOut, ChevronDown, Store, Bell
+  User, LogOut, ChevronDown, Store, Bell, Truck
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -28,6 +28,7 @@ const adminMenuItems = [
   { title: "Customers", url: "/dashboard/customers", icon: Users },
   { title: "Conversations", url: "/dashboard/conversations", icon: MessageSquare },
   { title: "Content & UGC", url: "/dashboard/content", icon: Video },
+  { title: "Courier", url: "/dashboard/courier", icon: Truck },
   { title: "Agents", url: "/dashboard/agents", icon: ShieldCheck },
   { title: "Vendors", url: "/dashboard/vendors", icon: Store },
   { title: "Profit Intel", url: "/dashboard/profit-intel", icon: BarChart3 },

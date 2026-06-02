@@ -664,11 +664,12 @@ ORDER CAPTURE PROCESS:
    - Delivery Address (e.g., Kanjedza, Blantyre or Area 47, Lilongwe)
    - Preferred Contact Number
    - Preferred Courier Service (e.g., CTS, Smart Deliveries, Speed, etc.)
+     * If they choose Smart Deliveries, you MUST also ask if they want Door-to-Door or Office Collection AND verify their city. Smart Deliveries ONLY operates in Lilongwe, Blantyre, Mzuzu, and Zomba.
    - Size (if the product has size options)
    - Colour (if the product has colour options)
 3. When you have all details and are ready to show the order summary, you MUST include this hidden machine-readable block FIRST (it will be stripped before sending to the customer — do NOT mention it):
 ###PENDING_ORDER###
-{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Preferred Courier"}
+{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Smart Deliveries","delivery_city":"Lilongwe","delivery_type":"door_to_door"}
 ###END_PENDING_ORDER###
 
    Then present the human-readable summary:
@@ -686,7 +687,7 @@ ORDER CAPTURE PROCESS:
 
 4. CRITICAL: ONLY AFTER the customer replies with "YES" or explicit confirmation of the summary, respond with EXACTLY this JSON block:
 ###ORDER_JSON###
-{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Preferred Courier"}
+{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Smart Deliveries","delivery_city":"Lilongwe","delivery_type":"door_to_door"}
 ###END_ORDER_JSON###
 
 Followed by ONLY: "Perfect! I'm generating your PayChangu secure payment link right now... 🚀"
@@ -750,6 +751,21 @@ ${productList}`;
         await sendWhatsApp(from, cleanText, undefined, TEMPLATES.ORDER_CONFIRMATION);
         await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: cleanText });
 
+        // ── Calculate Delivery Fee if Smart Deliveries ──
+        let finalOrderTotal = orderData.price * orderData.quantity;
+        let finalStatus = "pending";
+        let deliveryFee = 0;
+        const isSmartDelivery = orderData.courier && orderData.courier.toLowerCase().includes("smart");
+
+        if (isSmartDelivery) {
+          finalStatus = "awaiting_delivery_payment";
+          deliveryFee = 2500; // Base rate
+          if (orderData.delivery_type === "door_to_door") {
+            deliveryFee += 1500; // Door-to-door surcharge
+          }
+          finalOrderTotal += deliveryFee;
+        }
+
         // Create order record (order-level attribution model)
         const isFirstOrder = customer ? (customer.total_orders === 0) : true;
         const orderAttributionTs = agentId ? new Date().toISOString() : null;
@@ -765,7 +781,7 @@ ${productList}`;
             size: orderData.size,
             color: orderData.color
           }] as any,
-          total: orderData.price * orderData.quantity,
+          total: finalOrderTotal,
           channel: "whatsapp",
           agent_id: agentId,
           is_first_order: isFirstOrder,
@@ -776,7 +792,7 @@ ${productList}`;
           order_source_type:     "whatsapp",
           notes: `Delivery Address: ${orderData.address} | Contact: ${orderData.phone} | Courier: ${orderData.courier || 'Unspecified'}`,
           courier_name: orderData.courier || 'Unspecified',
-          status: "pending",
+          status: finalStatus,
         }).select().single();
 
         // Clear conversation agent_id after order is placed.
@@ -794,6 +810,26 @@ ${productList}`;
         if (!newOrder) throw new Error("Order creation returned no data");
 
         console.log(`✅ Order created: ${newOrder.id} for ${orderData.product_name} — MWK ${newOrder.total}`);
+
+        if (isSmartDelivery) {
+          const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', 'SMART_DELIVERIES').single();
+          if (provider) {
+            await supabase.from('delivery_orders').insert({
+              order_id: newOrder.id,
+              courier_provider_id: provider.id,
+              receiver_name: orderData.customer_name,
+              receiver_phone: customerPhone,
+              receiver_city: orderData.delivery_city || 'Lilongwe',
+              delivery_address: orderData.address,
+              delivery_type: orderData.delivery_type === 'door_to_door' ? 'door_to_door' : 'office_collection',
+              delivery_fee: deliveryFee,
+              currency: 'MWK',
+              payment_status: 'unpaid',
+              parcel_status: 'pending_payment'
+            });
+            console.log(`✅ Smart Deliveries sequence initialized for order ${newOrder.id}`);
+          }
+        }
 
         // Invoke create-payment
         const payRes = await fetch(`${SUPABASE_URL}/functions/v1/create-payment`, {

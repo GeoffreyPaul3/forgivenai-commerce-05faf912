@@ -148,6 +148,223 @@ export type Database = {
           },
         ]
       }
+      courier_providers: {
+        Row: {
+          id: string
+          name: string
+          code: string
+          active: boolean | null
+          environment: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          code: string
+          active?: boolean | null
+          environment?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          code?: string
+          active?: boolean | null
+          environment?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      delivery_audit_logs: {
+        Row: {
+          id: string
+          event_type: string
+          reference_id: string | null
+          payload: Json | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          event_type: string
+          reference_id?: string | null
+          payload?: Json | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          event_type?: string
+          reference_id?: string | null
+          payload?: Json | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
+      delivery_orders: {
+        Row: {
+          id: string
+          order_id: string
+          courier_provider_id: string | null
+          smart_delivery_uuid: string | null
+          waybill_number: string | null
+          delivery_type: string
+          receiver_name: string
+          receiver_phone: string
+          receiver_city: string
+          receiver_address: string | null
+          payment_method: string | null
+          parcel_status: string | null
+          delivery_fee: number | null
+          courier_fee: number | null
+          courier_response: Json | null
+          courier_request: Json | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          courier_provider_id?: string | null
+          smart_delivery_uuid?: string | null
+          waybill_number?: string | null
+          delivery_type: string
+          receiver_name: string
+          receiver_phone: string
+          receiver_city: string
+          receiver_address?: string | null
+          payment_method?: string | null
+          parcel_status?: string | null
+          delivery_fee?: number | null
+          courier_fee?: number | null
+          courier_response?: Json | null
+          courier_request?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          courier_provider_id?: string | null
+          smart_delivery_uuid?: string | null
+          waybill_number?: string | null
+          delivery_type?: string
+          receiver_name?: string
+          receiver_phone?: string
+          receiver_city?: string
+          receiver_address?: string | null
+          payment_method?: string | null
+          parcel_status?: string | null
+          delivery_fee?: number | null
+          courier_fee?: number | null
+          courier_response?: Json | null
+          courier_request?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_orders_courier_provider_id_fkey"
+            columns: ["courier_provider_id"]
+            isOneToOne: false
+            referencedRelation: "courier_providers"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      delivery_service_payments: {
+        Row: {
+          id: string
+          delivery_order_id: string
+          amount: number
+          currency: string | null
+          status: string | null
+          transaction_reference: string | null
+          provider_response: Json | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          delivery_order_id: string
+          amount: number
+          currency?: string | null
+          status?: string | null
+          transaction_reference?: string | null
+          provider_response?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          delivery_order_id?: string
+          amount?: number
+          currency?: string | null
+          status?: string | null
+          transaction_reference?: string | null
+          provider_response?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_service_payments_delivery_order_id_fkey"
+            columns: ["delivery_order_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_orders"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      delivery_tracking_events: {
+        Row: {
+          id: string
+          delivery_order_id: string
+          status_code: string
+          status_name: string
+          description: string | null
+          event_time: string | null
+          raw_payload: Json | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          delivery_order_id: string
+          status_code: string
+          status_name: string
+          description?: string | null
+          event_time?: string | null
+          raw_payload?: Json | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          delivery_order_id?: string
+          status_code?: string
+          status_name?: string
+          description?: string | null
+          event_time?: string | null
+          raw_payload?: Json | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_tracking_events_delivery_order_id_fkey"
+            columns: ["delivery_order_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_orders"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       conversations: {
         Row: {
           channel: string | null
