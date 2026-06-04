@@ -1534,13 +1534,7 @@ function InfluencerManager() {
     },
   });
 
-  const { data: products } = useQuery({
-    queryKey: ["products-active-influencer"],
-    queryFn: async () => {
-      const { data } = await supabase.from("products").select("*").eq("status", "active");
-      return data || [];
-    },
-  });
+  const { data: allProducts } = useAllProducts();
 
   const { data: generatedVisuals, refetch: refetchVisuals } = useQuery({
     queryKey: ["generated-visuals", selectedInfluencer?.id],
@@ -1614,8 +1608,7 @@ function InfluencerManager() {
     }
   });
 
-  const selectedProd = products?.find(p => p.id === selectedProduct);
-
+  const selectedProd = allProducts?.find((p: any) => p.id === selectedProduct);
   const generateCampaignVisual = async () => {
     if (!selectedInfluencer || !selectedProduct) {
       toast({ title: "Select an influencer and product first" });
@@ -1914,21 +1907,12 @@ function InfluencerManager() {
             <h3 className="font-heading text-lg font-bold flex items-center gap-2 mb-4">
               <ShoppingBag className="w-5 h-5 text-gold" /> 2. Product Lock
             </h3>
-            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-              <SelectTrigger className="rounded-xl h-12 bg-muted/20">
-                <SelectValue placeholder="Select product to wear..." />
-              </SelectTrigger>
-              <SelectContent>
-                {products?.map(p => (
-                  <SelectItem key={p.id} value={p.id} className="py-3">
-                    <div className="flex items-center gap-3">
-                      <img src={p.images?.[0]} alt="" className="w-8 h-8 rounded-md object-cover" />
-                      <span className="font-medium">{p.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <VendorProductPicker
+              selectedId={selectedProduct}
+              onSelect={(id) => setSelectedProduct(id === "none" ? "" : id)}
+              label="Select Product to Wear"
+              placeholder="Select product to wear..."
+            />
           </div>
 
           <div className="pt-4 border-t border-border/50 space-y-4">
