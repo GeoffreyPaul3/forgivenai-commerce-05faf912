@@ -30,9 +30,13 @@ serve(async (req) => {
       .from('delivery_orders')
       .select('id, waybill_number, parcel_status, order_id')
       .not('waybill_number', 'is', null)
-      .not('parcel_status', 'in', '("delivered","returned")');
+      .neq('parcel_status', 'delivered')
+      .neq('parcel_status', 'returned');
 
-    if (fetchError) throw fetchError;
+    if (fetchError) {
+      console.error("fetchError:", fetchError);
+      throw fetchError;
+    }
     if (!activeDeliveries || activeDeliveries.length === 0) {
       return new Response(JSON.stringify({ success: true, message: "No active deliveries to sync" }), { headers: corsHeaders });
     }

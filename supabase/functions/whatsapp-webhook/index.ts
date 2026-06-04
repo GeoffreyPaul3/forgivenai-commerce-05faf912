@@ -391,14 +391,12 @@ serve(async (req) => {
         
         // Fallback: If no pending_order, try parsing the MOST RECENT summary message
         if (!orderData) {
-          const reversedHistory = [...(historyData ?? [])].reverse();
-          const summaryMsg = reversedHistory.find(m =>
-            m.role === "ai" &&
-            (m.content.includes("Reply **YES**") || m.content.includes("Reply YES") || m.content.toLowerCase().includes("reply yes"))
-          );
-
-          if (summaryMsg) {
-            const c = summaryMsg.content;
+          // ONLY look at the most recent AI message to prevent grabbing old orders
+          const { data: messages } = await supabase.from("messages").select("*").eq("conversation_id", convo.id).order("created_at", { ascending: false }).limit(3);
+          const lastAiMsg = messages?.find(m => m.role === "ai");
+          
+          if (lastAiMsg && (lastAiMsg.content.includes("*Total:*") || lastAiMsg.content.includes("*Product:*"))) {
+            const c = lastAiMsg.content;
             // Flexible regex to handle different AI formatting
             const productMatch  = c.match(/\*Product:\*\s*(.+)/) || c.match(/\*\*([^*]+)\*\*/);
             const quantityMatch = c.match(/\*Quantity:\*\s*(\d+)/);
@@ -494,6 +492,34 @@ serve(async (req) => {
 
               if (orderError || !newOrder) throw new Error(`Order creation failed: ${orderError?.message}`);
               console.log(`✅ Order created (YES intercept): ${newOrder.id}`);
+
+              // Smart Deliveries Integration
+              const isSmartDelivery = custCourier && custCourier.toLowerCase().includes("smart");
+              if (isSmartDelivery) {
+                const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', 'SMART_DELIVERIES').single();
+                if (provider) {
+                  let deliveryFee = 2500;
+                  if (orderData.delivery_type === "door_to_door") deliveryFee += 1500;
+
+                  const { error: insertError } = await supabase.from('delivery_orders').insert({
+                    order_id: newOrder.id,
+                    courier_provider_id: provider.id,
+                    receiver_name: custName || 'Customer',
+                    receiver_phone: custPhone,
+                    receiver_city: orderData.delivery_city || 'Lilongwe',
+                    receiver_address: custAddress || 'Not specified',
+                    delivery_type: orderData.delivery_type === 'door_to_door' ? 'door_to_door' : 'office_collection',
+                    delivery_fee: deliveryFee,
+                    parcel_status: 'pending'
+                  });
+                  
+                  if (insertError) {
+                    console.error("Failed to insert delivery_order (YES intercept):", insertError);
+                  } else {
+                    console.log(`✅ Smart Deliveries sequence initialized (YES intercept) for order ${newOrder.id}`);
+                  }
+                }
+              }
 
               // Invoke create-payment
               const SUPABASE_URL_INT = Deno.env.get("SUPABASE_URL")!;
@@ -814,20 +840,23 @@ ${productList}`;
         if (isSmartDelivery) {
           const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', 'SMART_DELIVERIES').single();
           if (provider) {
-            await supabase.from('delivery_orders').insert({
+            const { error: insertError } = await supabase.from('delivery_orders').insert({
               order_id: newOrder.id,
               courier_provider_id: provider.id,
-              receiver_name: orderData.customer_name,
+              receiver_name: orderData.customer_name || 'Customer',
               receiver_phone: customerPhone,
               receiver_city: orderData.delivery_city || 'Lilongwe',
-              delivery_address: orderData.address,
+              receiver_address: orderData.address || 'Not specified',
               delivery_type: orderData.delivery_type === 'door_to_door' ? 'door_to_door' : 'office_collection',
               delivery_fee: deliveryFee,
-              currency: 'MWK',
-              payment_status: 'unpaid',
-              parcel_status: 'pending_payment'
+              parcel_status: 'pending'
             });
-            console.log(`✅ Smart Deliveries sequence initialized for order ${newOrder.id}`);
+            
+            if (insertError) {
+              console.error("Failed to insert delivery_order:", insertError);
+            } else {
+              console.log(`✅ Smart Deliveries sequence initialized for order ${newOrder.id}`);
+            }
           }
         }
 

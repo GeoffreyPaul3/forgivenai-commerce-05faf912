@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ import {
   Sparkles, Loader2, Video, FileText, Share2, Pencil, Trash2, Eye, Download,
   User, Wand2, Play, Upload, X, MoreHorizontal, Image, RefreshCw, ChevronRight,
   Clapperboard, Film, Layers, Volume2, CheckCircle2, ShoppingBag, Star, Zap, Plus,
+  Search, Filter, Store, Package, SlidersHorizontal,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import type { Tables } from "@/integrations/supabase/types";
@@ -39,7 +40,414 @@ import { motion, AnimatePresence } from "framer-motion";
 // Removed legacy videoAssembler import as per True Motion Engine upgrade
 
 type Content = Tables<"content">;
+type Product = Tables<"product"> & { vendorName?: string; isLive?: boolean };
 const PAGE_SIZE = 8;
+
+/* ═══════════════════════════════════════════════════════════
+   SHARED HOOK: Fetch ALL Products including vendor drafts
+   ═══════════════════════════════════════════════════════════ */
+function useAllProducts() {
+  return useQuery({
+    queryKey: ["all-products-with-vendors"],
+    queryFn: async () => {
+      // Fetch all local products (all statuses) joined with vendors
+      const { data: local } = await supabase
+        .from("products")
+        .select("*, vendors(business_name)")
+        .order("created_at", { ascending: false });
+
+      const mapped = (local || []).map((p: any) => ({
+        ...p,
+        vendorName: p.vendors?.business_name || null,
+        vendors: undefined,
+      }));
+
+      // Fetch live website products
+      try {
+        const res = await fetch("https://www.forgivenshoppingcentre.com/api/products/all");
+        const live = await res.json();
+        if (live.success && Array.isArray(live.data)) {
+          const mappedLive = live.data.map((p: any) => ({
+            id: `live_${p.id}`,
+            name: p.name,
+            category: p.category?.name || p.productType || "General",
+            price: p.salePrice || p.price,
+            currency: "MWK",
+            images: p.images || [],
+            description: p.description,
+            status: "active",
+            vendor_id: null,
+            vendorName: null,
+            subcategory: null,
+            tags: null,
+            stock_quantity: null,
+            isLive: true,
+          }));
+          return [...mapped, ...mappedLive];
+        }
+      } catch (e) {
+        console.warn("Could not fetch live products:", e);
+      }
+      return mapped;
+    },
+    staleTime: 30000,
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VENDOR PRODUCT PICKER COMPONENT
+   A world-class product picker with search, filters, and vendor support
+   ═══════════════════════════════════════════════════════════ */
+interface VendorProductPickerProps {
+  selectedId: string;
+  onSelect: (id: string, product?: any) => void;
+  label?: string;
+  placeholder?: string;
+  /** If true, shows a compact trigger button instead of inline grid */
+  compact?: boolean;
+}
+
+function VendorProductPicker({ selectedId, onSelect, label, placeholder = "Select a product...", compact = false }: VendorProductPickerProps) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterVendor, setFilterVendor] = useState("all");
+  const { data: products = [], isLoading } = useAllProducts();
+
+  const { data: vendors } = useQuery({
+    queryKey: ["vendors-list-picker"],
+    queryFn: async () => {
+      const { data } = await supabase.from("vendors").select("id, business_name").order("business_name");
+      return data || [];
+    },
+  });
+
+  // Derive unique categories from products
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    products.forEach((p: any) => { if (p.category) cats.add(p.category); });
+    return Array.from(cats).sort();
+  }, [products]);
+
+  // Filter products
+  const filtered = useMemo(() => {
+    let list = products as any[];
+    if (filterStatus !== "all") list = list.filter(p => p.status === filterStatus);
+    if (filterCategory !== "all") list = list.filter(p => p.category === filterCategory);
+    if (filterVendor === "own") list = list.filter(p => !p.vendor_id && !p.isLive);
+    else if (filterVendor === "live") list = list.filter(p => p.isLive);
+    else if (filterVendor !== "all") list = list.filter(p => p.vendor_id === filterVendor);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(p =>
+        p.name?.toLowerCase().includes(q) ||
+        p.category?.toLowerCase().includes(q) ||
+        p.vendorName?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [products, filterStatus, filterCategory, filterVendor, search]);
+
+  const selectedProduct = products.find((p: any) => p.id === selectedId);
+
+  const handleSelect = (product: any) => {
+    onSelect(product.id, product);
+    setOpen(false);
+  };
+
+  const clearFilters = () => {
+    setSearch("");
+    setFilterStatus("all");
+    setFilterCategory("all");
+    setFilterVendor("all");
+  };
+
+  const hasActiveFilters = filterStatus !== "all" || filterCategory !== "all" || filterVendor !== "all" || search.trim();
+
+  const getStatusColor = (status: string | null) => {
+    if (status === "active") return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
+    if (status === "draft") return "bg-amber-500/10 text-amber-700 border-amber-500/20";
+    return "bg-muted/50 text-muted-foreground";
+  };
+
+  return (
+    <>
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={`w-full flex items-center gap-3 rounded-xl border-2 transition-all hover:border-primary/40 ${
+          selectedId && selectedProduct
+            ? "border-primary/30 bg-primary/5 p-3"
+            : "border-dashed border-border bg-muted/20 p-3 hover:bg-muted/40"
+        }`}
+      >
+        {selectedProduct ? (
+          <>
+            {selectedProduct.images?.[0] ? (
+              <img src={selectedProduct.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-border" />
+            ) : (
+              <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                <Package className="w-5 h-5 text-muted-foreground" />
+              </div>
+            )}
+            <div className="flex-1 text-left min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-heading text-sm font-bold text-foreground truncate">{selectedProduct.name}</p>
+                {(selectedProduct as any).isLive && (
+                  <Badge variant="outline" className="bg-primary/10 text-primary text-[10px] py-0 h-4 border-primary/20 shrink-0">LIVE</Badge>
+                )}
+                {(selectedProduct as any).vendorName && (
+                  <Badge variant="outline" className="bg-violet-500/10 text-violet-700 text-[10px] py-0 h-4 border-violet-500/20 shrink-0 flex items-center gap-1">
+                    <Store className="w-2.5 h-2.5" />{(selectedProduct as any).vendorName}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <Badge variant="outline" className={`text-[10px] py-0 h-4 border ${getStatusColor(selectedProduct.status)}`}>
+                  {selectedProduct.status || "unknown"}
+                </Badge>
+                <p className="text-xs text-muted-foreground">{selectedProduct.category}</p>
+                {selectedProduct.price && (
+                  <p className="text-xs text-muted-foreground font-mono">{selectedProduct.currency || "MWK"} {selectedProduct.price.toLocaleString()}</p>
+                )}
+              </div>
+            </div>
+            <div className="shrink-0 flex items-center gap-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); onSelect("none"); }}
+                className="p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+              <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center flex-shrink-0">
+              <ShoppingBag className="w-5 h-5 text-muted-foreground/60" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-medium text-muted-foreground">{placeholder}</p>
+              <p className="text-xs text-muted-foreground/60">Includes vendor draft products</p>
+            </div>
+            <Search className="w-4 h-4 text-muted-foreground/60 shrink-0" />
+          </>
+        )}
+      </button>
+
+      {/* Full-screen picker dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+          {/* Header */}
+          <div className="p-5 border-b border-border bg-gradient-to-r from-primary/5 via-background to-background shrink-0">
+            <DialogHeader>
+              <DialogTitle className="font-heading text-xl font-bold flex items-center gap-2">
+                <ShoppingBag className="w-5 h-5 text-primary" />
+                {label || "Select Product"}
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground font-body">Browse all products including vendor drafts. Search, filter, and select.</p>
+            </DialogHeader>
+          </div>
+
+          {/* Search + Filters Bar */}
+          <div className="p-4 border-b border-border bg-muted/20 shrink-0 space-y-3">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, category, vendor..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 bg-background"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-2 flex-wrap items-center">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+                <SlidersHorizontal className="w-3.5 h-3.5" /> Filters:
+              </div>
+
+              {/* Status filter */}
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="h-7 w-28 text-xs bg-background border-border/60 rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Category filter */}
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="h-7 w-36 text-xs bg-background border-border/60 rounded-lg">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Vendor filter */}
+              <Select value={filterVendor} onValueChange={setFilterVendor}>
+                <SelectTrigger className="h-7 w-40 text-xs bg-background border-border/60 rounded-lg">
+                  <SelectValue placeholder="All Sources" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="own">Own Products</SelectItem>
+                  <SelectItem value="live">Live Website</SelectItem>
+                  {vendors?.map(v => (
+                    <SelectItem key={v.id} value={v.id}>
+                      <span className="flex items-center gap-1.5">
+                        <Store className="w-3 h-3" /> {v.business_name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground">
+                  <X className="w-3 h-3" /> Clear
+                </Button>
+              )}
+
+              <span className="ml-auto text-xs text-muted-foreground font-medium">
+                {isLoading ? "Loading..." : `${filtered.length} product${filtered.length !== 1 ? "s" : ""}`}
+              </span>
+            </div>
+          </div>
+
+          {/* Product Grid */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {isLoading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="rounded-xl border border-border bg-muted/30 aspect-[3/4] animate-pulse" />
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Package className="w-12 h-12 text-muted-foreground/30 mb-3" />
+                <p className="font-heading font-bold text-lg text-foreground/70">No products found</p>
+                <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or filters.</p>
+                {hasActiveFilters && (
+                  <Button variant="outline" size="sm" onClick={clearFilters} className="mt-4 gap-1">
+                    <X className="w-3.5 h-3.5" /> Clear all filters
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {/* No product option */}
+                <button
+                  onClick={() => { onSelect("none"); setOpen(false); }}
+                  className={`rounded-xl border-2 p-3 text-left transition-all hover:border-border hover:shadow-sm flex flex-col items-center justify-center aspect-[3/4] ${
+                    selectedId === "none" || !selectedId ? "border-primary bg-primary/5" : "border-dashed border-border/50 bg-muted/10"
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center mb-2">
+                    <X className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <p className="text-xs font-semibold text-muted-foreground text-center">No Product</p>
+                  <p className="text-[10px] text-muted-foreground/60 text-center mt-0.5">General content</p>
+                </button>
+
+                {filtered.map((product: any) => (
+                  <motion.button
+                    key={product.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    onClick={() => handleSelect(product)}
+                    className={`rounded-xl border-2 p-2.5 text-left transition-all hover:border-primary/40 hover:shadow-md relative ${
+                      selectedId === product.id
+                        ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                        : "border-border bg-card"
+                    }`}
+                  >
+                    {/* Status + selection badges */}
+                    <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
+                      {selectedId === product.id && (
+                        <div className="bg-primary text-primary-foreground rounded-full p-0.5 shadow-lg">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Product image */}
+                    <div className="relative mb-2">
+                      {product.images?.[0] ? (
+                        <img
+                          src={product.images[0]}
+                          alt={product.name}
+                          className="w-full h-28 object-cover rounded-lg"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-28 rounded-lg bg-muted/50 flex items-center justify-center">
+                          <Package className="w-8 h-8 text-muted-foreground/30" />
+                        </div>
+                      )}
+                      {/* Status pill on image */}
+                      <div className="absolute bottom-1.5 left-1.5">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold border backdrop-blur-sm ${
+                          product.status === "active" ? "bg-emerald-500/80 text-white border-emerald-500/40" :
+                          product.status === "draft" ? "bg-amber-500/80 text-white border-amber-500/40" :
+                          "bg-muted/80 text-muted-foreground border-border"
+                        }`}>
+                          {product.status?.toUpperCase() || "UNKNOWN"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Product info */}
+                    <p className="font-heading text-xs font-bold text-foreground truncate leading-tight">{product.name}</p>
+
+                    <div className="flex items-center gap-1 flex-wrap mt-1">
+                      {product.isLive && (
+                        <Badge variant="outline" className="bg-primary/10 text-primary text-[9px] py-0 h-3.5 px-1 border-primary/20">LIVE</Badge>
+                      )}
+                      {product.vendorName && (
+                        <Badge variant="outline" className="bg-violet-500/10 text-violet-700 text-[9px] py-0 h-3.5 px-1 border-violet-500/20 flex items-center gap-0.5">
+                          <Store className="w-2 h-2" />
+                          <span className="truncate max-w-[60px]">{product.vendorName}</span>
+                        </Badge>
+                      )}
+                    </div>
+
+                    {product.category && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{product.category}</p>
+                    )}
+                    {product.price && (
+                      <p className="text-[10px] font-mono font-bold text-foreground/80 mt-0.5">
+                        {product.currency || "MWK"} {product.price.toLocaleString()}
+                      </p>
+                    )}
+                  </motion.button>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 const ContentPage = () => {
   const [activeTab, setActiveTab] = useState("content");
@@ -93,44 +501,16 @@ function ContentManager() {
     },
   });
 
-  const { data: products } = useQuery({
-    queryKey: ["products-list"],
-    queryFn: async () => {
-      // 1. Fetch local products
-      const { data: local } = await supabase.from("products").select("id, name, category, price, currency, images").eq("status", "active");
-      
-      // 2. Fetch live website products
-      try {
-        const res = await fetch("https://www.forgivenshoppingcentre.com/api/products/all");
-        const live = await res.json();
-        if (live.success && Array.isArray(live.data)) {
-          const mappedLive = live.data.map((p: any) => ({
-            id: `live_${p.id}`,
-            name: `[LIVE] ${p.name}`,
-            category: p.category?.name || p.productType || "General",
-            price: p.salePrice || p.price,
-            currency: "MWK",
-            images: p.images || [],
-            description: p.description,
-            isLive: true
-          }));
-          return [...(local || []), ...mappedLive];
-        }
-      } catch (e) {
-        console.warn("Could not fetch live products:", e);
-      }
-      return local || [];
-    },
-  });
-
   useEffect(() => { setPage(1); }, [filter]);
   const totalPages = Math.ceil((content?.length || 0) / PAGE_SIZE);
   const paginatedContent = content?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) || [];
 
+  const { data: allProducts } = useAllProducts();
+
   const generateContent = async () => {
     setGenerating(true);
     try {
-      const product = products?.find(p => p.id === selectedProduct);
+      const product = allProducts?.find((p: any) => p.id === selectedProduct);
       const typeMap: Record<string, string> = { description: "product-description", social_post: "social-post", campaign: "campaign" };
       const { data, error } = await supabase.functions.invoke("ai-generate", {
         body: { type: typeMap[genType] || "social-post", productName: product?.name || "General", productCategory: product?.category || "", productPrice: product?.price || 0, currency: product?.currency || "MWK", context: genContext },
@@ -174,29 +554,36 @@ function ContentManager() {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-        <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
-           AI Content Generator
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Select value={genType} onValueChange={setGenType}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="description">Product Description</SelectItem>
-              <SelectItem value="social_post">Social Media Post</SelectItem>
-              <SelectItem value="campaign">Campaign Idea</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-            <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No product</SelectItem>
-              {products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center justify-between">
+          <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" /> AI Content Generator
+          </h3>
           <Button onClick={generateContent} disabled={generating} className="gap-2">
             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             Generate
           </Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Content Type</label>
+            <Select value={genType} onValueChange={setGenType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="description">Product Description</SelectItem>
+                <SelectItem value="social_post">Social Media Post</SelectItem>
+                <SelectItem value="campaign">Campaign Idea</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Product (optional — includes vendor drafts)</label>
+            <VendorProductPicker
+              selectedId={selectedProduct}
+              onSelect={(id) => setSelectedProduct(id)}
+              label="Select Product for Content"
+              placeholder="No product selected"
+            />
+          </div>
         </div>
         <Textarea placeholder="Additional context or instructions..." value={genContext} onChange={e => setGenContext(e.target.value)} className="min-h-[60px]" />
       </div>
@@ -370,37 +757,8 @@ function UGCStudio() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: products } = useQuery({
-    queryKey: ["products-active-sync"],
-    queryFn: async () => {
-      // 1. Fetch local products
-      const { data: local } = await supabase.from("products").select("*").eq("status", "active");
-      
-      // 2. Fetch live website products
-      try {
-        const res = await fetch("https://www.forgivenshoppingcentre.com/api/products/all");
-        const live = await res.json();
-        if (live.success && Array.isArray(live.data)) {
-          const mappedLive = live.data.map((p: any) => ({
-            id: `live_${p.id}`,
-            name: `[LIVE] ${p.name}`,
-            category: p.category?.name || p.productType || "General",
-            price: p.salePrice || p.price,
-            currency: "MWK",
-            images: p.images || [],
-            description: p.description,
-            isLive: true
-          }));
-          return [...(local || []), ...mappedLive];
-        }
-      } catch (e) {
-        console.warn("Could not fetch live products:", e);
-      }
-      return local || [];
-    },
-  });
-
-  const selectedProd = products?.find(p => p.id === selectedProduct);
+  const { data: allProducts } = useAllProducts();
+  const selectedProd = allProducts?.find((p: any) => p.id === selectedProduct);
   const currentAvatar = uploadedPreview || avatarUrl;
   const avatarDescription = `${avatarEthnicity} ${avatarGender} fashion influencer, stylish and authentic`;
 
@@ -724,13 +1082,13 @@ function UGCStudio() {
         {/* ── Step 1: Product Selection ── */}
         {step === 1 && (
           <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-            <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <div className="rounded-xl border border-border bg-card p-6 space-y-5">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
                     <Layers className="w-5 h-5 text-primary" /> 🔒 Step 1: Product Lock
                   </h3>
-                  <p className="text-sm text-muted-foreground font-body">Select the real product you want to feature. Its images are the single source of truth.</p>
+                  <p className="text-sm text-muted-foreground font-body">Select the real product you want to feature — includes active, draft, and vendor products.</p>
                 </div>
                 {selectedProd && (
                   <Badge className="bg-emerald-500/10 text-emerald-700 gap-1">
@@ -739,50 +1097,64 @@ function UGCStudio() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {products?.map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => { setSelectedProduct(p.id); }}
-                    className={`rounded-xl border p-3 text-left transition-all hover:border-primary/30 hover:shadow-md ${
-                      selectedProduct === p.id ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border bg-card"
-                    }`}
-                  >
-                    <div className="relative">
-                      {p.images && p.images.length > 0 && (
-                        <img src={p.images[0]} alt={p.name} className="w-full h-28 object-cover rounded-lg mb-2" loading="lazy" />
-                      )}
-                      {selectedProduct === p.id && (
-                        <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1 shadow-lg">
-                          <CheckCircle2 className="w-4 h-4" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="font-heading text-sm font-semibold truncate">{p.name}</p>
-                      {p.isLive && (
-                        <Badge variant="outline" className="bg-primary/10 text-primary text-[10px] py-0 h-4 border-primary/20">
-                          LIVE
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{p.currency} {p.price?.toLocaleString()}</p>
-                  </button>
-                ))}
-              </div>
+              <VendorProductPicker
+                selectedId={selectedProduct}
+                onSelect={(id, product) => {
+                  setSelectedProduct(id === "none" ? "" : id);
+                }}
+                label="Lock Product for UGC Video"
+                placeholder="Click to browse & select a product..."
+              />
 
-              {selectedProduct && (
+              {/* Preview of locked product */}
+              {selectedProd && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-xl border border-primary/20 bg-primary/5 p-4"
+                >
+                  <div className="flex items-center gap-4">
+                    {selectedProd.images?.[0] && (
+                      <img src={selectedProd.images[0]} alt={selectedProd.name} className="w-20 h-20 object-cover rounded-xl border-2 border-primary shadow-md" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <h4 className="font-heading text-base font-bold text-foreground">{selectedProd.name}</h4>
+                        {(selectedProd as any).vendorName && (
+                          <Badge variant="outline" className="bg-violet-500/10 text-violet-700 text-[10px] border-violet-500/20 flex items-center gap-1">
+                            <Store className="w-2.5 h-2.5" /> {(selectedProd as any).vendorName}
+                          </Badge>
+                        )}
+                        {(selectedProd as any).isLive && (
+                          <Badge variant="outline" className="bg-primary/10 text-primary text-[10px] border-primary/20">LIVE</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        {selectedProd.category && <span>{selectedProd.category}</span>}
+                        {selectedProd.price && <span className="font-mono font-bold">{selectedProd.currency || "MWK"} {selectedProd.price.toLocaleString()}</span>}
+                        <Badge variant="outline" className={`text-[10px] py-0 h-4 border ${
+                          selectedProd.status === "active" ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" : "bg-amber-500/10 text-amber-700 border-amber-500/20"
+                        }`}>{selectedProd.status}</Badge>
+                      </div>
+                      {selectedProd.description && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{selectedProd.description}</p>
+                      )}
+                    </div>
+                    <div className="shrink-0 flex flex-col gap-2">
+                      <Badge className="bg-emerald-500/10 text-emerald-700 gap-1 text-[10px]">
+                        <CheckCircle2 className="w-3 h-3" /> Locked
+                      </Badge>
+                      <span className="text-[9px] text-muted-foreground text-center">Visual Integrity<br/>Enforced</span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {selectedProduct && selectedProduct !== "" && (
                 <div className="flex justify-end">
                   <Button onClick={() => setStep(2)} className="gap-2">
                     Lock & Continue <ChevronRight className="w-4 h-4" />
                   </Button>
-                </div>
-              )}
-
-              {!products?.length && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Layers className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">No active products. Add products first.</p>
                 </div>
               )}
             </div>

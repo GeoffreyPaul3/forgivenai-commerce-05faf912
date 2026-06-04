@@ -112,11 +112,40 @@ serve(async (req) => {
       }
     }
 
-    // ── CUSTOMER NOTIFICATIONS (on UPDATE) ──
+    // ── CUSTOMER NOTIFICATIONS & SMART DELIVERIES (on UPDATE) ──
     if (type === 'UPDATE' && record.status !== old_record.status) {
       const status = record.status;
       const config = statusConfig[status];
       
+      // Smart Deliveries Automation
+      if (status === 'paid') {
+        try {
+          const { data: deliveryOrder } = await supabase
+            .from('delivery_orders')
+            .select('id, courier_providers(code)')
+            .eq('order_id', record.id)
+            .maybeSingle();
+
+          if (deliveryOrder && deliveryOrder.courier_providers?.code === 'SMART_DELIVERIES') {
+            console.log(`Order ${record.id} paid. Invoking smart-deliveries-create-parcel...`);
+            
+            // Invoke edge function instead of direct HTTP, bypassing local anon keys
+            const { data, error } = await supabase.functions.invoke('smart-deliveries-create-parcel', {
+              body: { deliveryOrderId: deliveryOrder.id }
+            });
+            
+            if (error) {
+              console.error("Smart Delivery parcel creation failed via Edge Function:", error);
+            } else {
+              console.log("Smart Delivery parcel created:", data);
+            }
+          }
+        } catch (deliverySyncError) {
+          console.error("Error triggering Smart Deliveries sync:", deliverySyncError);
+        }
+      }
+
+      // Send WhatsApp Notification
       if (config) {
         const phone = record.customer_phone;
         const name = record.customer_name || 'Customer';
