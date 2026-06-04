@@ -689,7 +689,7 @@ ORDER CAPTURE PROCESS:
    - Email Address
    - Delivery Address (e.g., Kanjedza, Blantyre or Area 47, Lilongwe)
    - Preferred Contact Number
-   - Preferred Courier Service (e.g., CTS, Smart Deliveries, Speed, etc.)
+   - Preferred Courier Service. You MUST present "Smart Deliveries" as our preferred and highly recommended courier partner (e.g., "We highly recommend Smart Deliveries for fast and reliable shipping! We also support CTS, Speed, etc. Which do you prefer?").
      * If they choose Smart Deliveries, you MUST also ask if they want Door-to-Door or Office Collection AND verify their city. Smart Deliveries ONLY operates in Lilongwe, Blantyre, Mzuzu, and Zomba.
    - Size (if the product has size options)
    - Colour (if the product has colour options)
@@ -784,12 +784,12 @@ ${productList}`;
         const isSmartDelivery = orderData.courier && orderData.courier.toLowerCase().includes("smart");
 
         if (isSmartDelivery) {
-          finalStatus = "awaiting_delivery_payment";
+          finalStatus = "pending"; // Customer pays product only; we cover delivery
           deliveryFee = 2500; // Base rate
           if (orderData.delivery_type === "door_to_door") {
             deliveryFee += 1500; // Door-to-door surcharge
           }
-          finalOrderTotal += deliveryFee;
+          // We DO NOT add deliveryFee to finalOrderTotal since Forgiven SC covers it!
         }
 
         // Create order record (order-level attribution model)

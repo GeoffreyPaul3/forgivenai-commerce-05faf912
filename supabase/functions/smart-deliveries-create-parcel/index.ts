@@ -6,19 +6,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/**
+ * Fetch a remote image URL and return a base64 data URL string.
+ * Smart Deliveries requires exactly 3 base64 or data URL strings.
+ */
+async function toBase64DataUrl(url: string): Promise<string> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+    const contentType = res.headers.get('content-type') || 'image/jpeg';
+    const buffer = await res.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
+    return `data:${contentType};base64,${base64}`;
+  } catch (e) {
+    console.error(`Image conversion failed for ${url}:`, e);
+    // Return a 1x1 white pixel as a safe fallback
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI6QAAAABJRU5ErkJggg==';
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
-    
-    // Also init service role client for privileged operations (audit logs, etc.)
+    // Use service role for all DB operations
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -27,57 +45,106 @@ serve(async (req) => {
     const { deliveryOrderId } = await req.json();
     if (!deliveryOrderId) throw new Error("Missing deliveryOrderId");
 
-    // Get delivery order details
+    // Get delivery order + order items + product images
     const { data: deliveryOrder, error: deliveryError } = await supabaseAdmin
       .from('delivery_orders')
-      .select('*, orders(items)')
+      .select('*, orders(items, id)')
       .eq('id', deliveryOrderId)
       .single();
 
-    if (deliveryError || !deliveryOrder) throw new Error("Delivery order not found");
+    if (deliveryError || !deliveryOrder) throw new Error(`Delivery order not found: ${deliveryError?.message}`);
     if (deliveryOrder.smart_delivery_uuid) throw new Error("Parcel already created");
 
-    // Build Payload
-    const items = typeof deliveryOrder.orders.items === 'string' ? JSON.parse(deliveryOrder.orders.items) : deliveryOrder.orders.items;
-    
-    // Convert items to Smart Deliveries packages
-    const packages = items.map((item: any) => {
-      let images = item.images || [];
-      const defaultImg = "https://via.placeholder.com/300";
-      if (images.length === 0) images = [defaultImg, defaultImg, defaultImg];
-      else if (images.length === 1) images = [images[0], images[0], images[0]];
-      else if (images.length === 2) images = [images[0], images[1], images[1]];
-      else if (images.length > 3) images = images.slice(0, 3);
-      
+    const items = typeof deliveryOrder.orders.items === 'string'
+      ? JSON.parse(deliveryOrder.orders.items)
+      : deliveryOrder.orders.items;
+
+    // Fetch product images from the products table so we have real images
+    const productIds = items.map((i: any) => i.product_id).filter(Boolean);
+    let productImagesMap: Record<string, string[]> = {};
+
+    if (productIds.length > 0) {
+      const { data: products } = await supabaseAdmin
+        .from('products')
+        .select('id, images')
+        .in('id', productIds);
+
+      products?.forEach((p: any) => {
+        productImagesMap[p.id] = p.images || [];
+      });
+    }
+
+    // Build packages — convert all images to base64 data URLs as required by Smart Deliveries
+    const packages = await Promise.all(items.map(async (item: any) => {
+      let imageUrls: string[] = productImagesMap[item.product_id] || item.images || [];
+
+      // Pad/trim to exactly 3 images
+      while (imageUrls.length < 3) imageUrls.push(imageUrls[0] || '');
+      imageUrls = imageUrls.slice(0, 3);
+
+      // Convert all to base64 data URLs (required by Smart Deliveries API)
+      const pictures = await Promise.all(imageUrls.map((url: string) => toBase64DataUrl(url)));
+
       return {
         name: item.name,
         qty: item.quantity || 1,
         valuedAt: Number(item.price) || 0,
-        pictures: images
+        pictures
       };
-    });
+    }));
+
+    // Format phone: must be +265 followed by exactly 9 digits
+    let formattedPhone = deliveryOrder.receiver_phone.replace(/\D/g, '');
+    if (formattedPhone.startsWith('265')) formattedPhone = '+' + formattedPhone;
+    else if (formattedPhone.startsWith('0')) formattedPhone = '+265' + formattedPhone.substring(1);
+    else formattedPhone = '+265' + formattedPhone;
+
+    // Format location: must be one of: Blantyre, Lilongwe, Limbe, Mzuzu, Zomba
+    const validLocations = ['Blantyre', 'Lilongwe', 'Limbe', 'Mzuzu', 'Zomba'];
+    let formattedLocation = deliveryOrder.receiver_city || 'Lilongwe';
+    formattedLocation = formattedLocation.charAt(0).toUpperCase() + formattedLocation.slice(1).toLowerCase();
+    if (!validLocations.includes(formattedLocation)) {
+      console.warn(`Location "${formattedLocation}" not in Smart Deliveries list, defaulting to Lilongwe`);
+      formattedLocation = 'Lilongwe';
+    }
+
+    // deliveryType must be camelCase: doorToDoor or officeCollection
+    const deliveryType = deliveryOrder.delivery_type === 'door_to_door' || deliveryOrder.delivery_type === 'doorToDoor'
+      ? 'doorToDoor'
+      : 'officeCollection';
 
     const payload = {
       receiverName: deliveryOrder.receiver_name,
-      receiverPhone: deliveryOrder.receiver_phone,
-      receiverLocation: deliveryOrder.receiver_city,
-      receiverLocationDescription: deliveryOrder.receiver_address || "None",
-      deliveryType: deliveryOrder.delivery_type,
+      receiverPhone: formattedPhone,
+      receiverLocation: formattedLocation,
+      receiverLocationDescription: deliveryType === 'doorToDoor' ? (deliveryOrder.receiver_address || 'Please call on arrival') : undefined,
+      deliveryType,
+      paymentMethod: 'airtelMoney',
       packages
     };
 
-    // Log request
+    // Remove undefined fields (receiverLocationDescription only for doorToDoor)
+    if (payload.receiverLocationDescription === undefined) {
+      delete payload.receiverLocationDescription;
+    }
+
+    console.log("📦 Smart Deliveries Payload:", JSON.stringify({
+      ...payload,
+      packages: payload.packages.map(p => ({ ...p, pictures: [`[base64 - ${p.pictures[0]?.length || 0} chars]`, '...'] }))
+    }));
+
+    // Log request (without base64 blobs to keep logs clean)
     await supabaseAdmin.from('delivery_audit_logs').insert({
       event_type: 'API_REQUEST',
       reference_id: deliveryOrderId,
-      payload
+      payload: { ...payload, packages: payload.packages.map(p => ({ ...p, pictures: ['[base64]', '[base64]', '[base64]'] })) }
     });
 
-    const SMART_DELIVERIES_BASE_URL = Deno.env.get('SMART_DELIVERIES_BASE_URL') || "https://test.smartdeliveriesmw.com/mzadigito/api/integration/v1/connector";
+    const SMART_DELIVERIES_BASE_URL = Deno.env.get('SMART_DELIVERIES_BASE_URL') || 'https://test.smartdeliveriesmw.com/mzadigito/api/integration/v1/connector';
     const SMART_DELIVERIES_API_KEY = Deno.env.get('SMART_DELIVERIES_API_KEY');
 
     if (!SMART_DELIVERIES_API_KEY) {
-      throw new Error("Missing SMART_DELIVERIES_API_KEY");
+      throw new Error("Missing SMART_DELIVERIES_API_KEY in Supabase secrets");
     }
 
     // Call Smart Deliveries API
@@ -91,12 +158,14 @@ serve(async (req) => {
     });
 
     const rawResponseText = await response.text();
-    let responseData;
+    let responseData: any;
     try {
       responseData = JSON.parse(rawResponseText);
     } catch {
       responseData = { raw: rawResponseText };
     }
+
+    console.log(`📬 Smart Deliveries Response [${response.status}]:`, JSON.stringify(responseData));
 
     // Log response
     await supabaseAdmin.from('delivery_audit_logs').insert({
@@ -106,32 +175,34 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status} - ${JSON.stringify(responseData)}`);
+      const errMsg = responseData?.message || responseData?.error || responseData?.raw || JSON.stringify(responseData);
+      throw new Error(`Smart Deliveries API Error [${response.status}]: ${errMsg}`);
     }
 
-    // Expecting response to contain parcel UUID and waybill
-    const waybill = responseData.waybill || responseData.data?.waybill || responseData.waybillNumber || "WB-UNKNOWN";
-    const uuid = responseData.uuid || responseData.data?.uuid || responseData.id || "UUID-UNKNOWN";
+    // Extract waybill and UUID from response
+    const waybill = responseData.waybill || responseData.data?.waybill || responseData.waybillNumber || 'WB-UNKNOWN';
+    const uuid = responseData.uuid || responseData.data?.uuid || responseData.id || 'UUID-UNKNOWN';
 
     await supabaseAdmin.from('delivery_orders').update({
       smart_delivery_uuid: uuid,
       waybill_number: waybill,
       parcel_status: 'parcel_created',
-      courier_request: payload,
+      courier_request: { ...payload, packages: payload.packages.map(p => ({ ...p, pictures: ['[base64]', '[base64]', '[base64]'] })) },
       courier_response: responseData
     }).eq('id', deliveryOrderId);
 
-    // Update main order
+    // Update main order status
     await supabaseAdmin.from('orders').update({
       status: 'parcel_created'
-    }).eq('id', deliveryOrder.order_id);
+    }).eq('id', deliveryOrder.orders.id || deliveryOrder.order_id);
 
     return new Response(JSON.stringify({ success: true, uuid, waybill }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    console.error("smart-deliveries-create-parcel ERROR:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,

@@ -1,12 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Truck, RefreshCw } from "lucide-react";
+import { Package, Truck, RefreshCw, MoreHorizontal, CreditCard, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { syncParcelStatus } from "@/integrations/smart-deliveries/smartDeliveriesService";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const CourierOperationsDashboard = () => {
   const { data: deliveries, isLoading, refetch } = useQuery({
@@ -17,7 +25,8 @@ const CourierOperationsDashboard = () => {
         .select(`
           *,
           courier_providers(name),
-          orders(status, total)
+          orders(status, total),
+          delivery_service_payments(status, transaction_reference)
         `)
         .order('created_at', { ascending: false });
       
@@ -38,6 +47,44 @@ const CourierOperationsDashboard = () => {
       }
     } catch (e: any) {
       toast.error("Failed to sync: " + e.message);
+    }
+  };
+
+  const handleRetryDispatch = async (deliveryOrderId: string) => {
+    try {
+      toast.loading("Retrying dispatch to Smart Deliveries...", { id: `dispatch-${deliveryOrderId}` });
+      
+      const { data, error } = await supabase.functions.invoke('smart-deliveries-create-parcel', {
+        body: { deliveryOrderId }
+      });
+      
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      toast.success("Dispatch successful! Waybill generated.", { id: `dispatch-${deliveryOrderId}` });
+      refetch();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(`Dispatch failed: ${e.message}`, { id: `dispatch-${deliveryOrderId}` });
+    }
+  };
+
+  const handlePayout = async (deliveryOrderId: string) => {
+    try {
+      toast.loading("Initiating PayChangu payout...", { id: `payout-${deliveryOrderId}` });
+      
+      const { data, error } = await supabase.functions.invoke('paychangu-payout', {
+        body: { deliveryOrderId }
+      });
+      
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || "Unknown error");
+
+      toast.success("Payout successful!", { id: `payout-${deliveryOrderId}` });
+      refetch();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(`Payout failed: ${e.message}`, { id: `payout-${deliveryOrderId}` });
     }
   };
 
@@ -112,9 +159,40 @@ const CourierOperationsDashboard = () => {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => window.open(`/tracking/${d.order_id}`, '_blank')}>
-                    View Tracking
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => window.open(`/tracking/${d.order_id}`, '_blank')}>
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        View Tracking
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {d.parcel_status === 'pending' && d.orders?.status === 'paid' && (
+                        <DropdownMenuItem onClick={() => handleRetryDispatch(d.id)} className="text-blue-600 focus:text-blue-600 font-medium">
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Retry Dispatch
+                        </DropdownMenuItem>
+                      )}
+                      {d.delivery_service_payments && d.delivery_service_payments.length > 0 && d.delivery_service_payments.some((p: any) => p.status === 'paid') ? (
+                        <DropdownMenuItem disabled>
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 ml-auto">
+                            Paid
+                          </Badge>
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onClick={() => handlePayout(d.id)} className="text-purple-600 focus:text-purple-600 font-medium">
+                          <CreditCard className="mr-2 h-4 w-4" />
+                          Pay via PayChangu
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
