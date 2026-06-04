@@ -742,6 +742,9 @@ function UGCStudio() {
   const [avatarGender, setAvatarGender] = useState("female");
   const [avatarEthnicity, setAvatarEthnicity] = useState("african");
   const [avatarSetting, setAvatarSetting] = useState("studio");
+  const [avatarHairstyle, setAvatarHairstyle] = useState("");
+  const [avatarMakeup, setAvatarMakeup] = useState("");
+  const [avatarSkinTone, setAvatarSkinTone] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadedPreview, setUploadedPreview] = useState("");
@@ -786,6 +789,9 @@ function UGCStudio() {
         gender: avatarGender,
         ethnicity: avatarEthnicity,
         setting: avatarSetting,
+        hairstyle: avatarHairstyle,
+        makeup: avatarMakeup,
+        skinTone: avatarSkinTone,
         productName: selectedProd?.name,
         productCategory: selectedProd?.category,
         // Send ONLY the primary product image URL as a direct string for quick access
@@ -1239,18 +1245,70 @@ function UGCStudio() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-body text-muted-foreground mb-1 block">Setting</label>
-                  <Select value={avatarSetting} onValueChange={setAvatarSetting} disabled={!!avatarUrl}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="studio">Studio</SelectItem>
-                      <SelectItem value="bedroom">Bedroom</SelectItem>
-                      <SelectItem value="outdoor">Outdoor</SelectItem>
-                      <SelectItem value="office">Office</SelectItem>
-                      <SelectItem value="fashion_store">Fashion Store</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className="text-xs font-body text-muted-foreground mb-1 block">Setting</label>
+                    <Select value={avatarSetting} onValueChange={setAvatarSetting} disabled={!!avatarUrl}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="studio">Studio (White/Neutral)</SelectItem>
+                        <SelectItem value="bedroom">Bedroom</SelectItem>
+                        <SelectItem value="outdoor">Outdoor / Nature</SelectItem>
+                        <SelectItem value="city_street">City Street</SelectItem>
+                        <SelectItem value="office">Office</SelectItem>
+                        <SelectItem value="fashion_store">Fashion Store</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-body text-muted-foreground mb-1 block">Skin Tone</label>
+                    <Select value={avatarSkinTone} onValueChange={setAvatarSkinTone} disabled={!!avatarUrl}>
+                      <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Default</SelectItem>
+                        <SelectItem value="fair">Fair</SelectItem>
+                        <SelectItem value="light">Light</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="olive">Olive</SelectItem>
+                        <SelectItem value="tan">Tan</SelectItem>
+                        <SelectItem value="deep">Deep</SelectItem>
+                        <SelectItem value="rich dark">Rich Dark</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className="text-xs font-body text-muted-foreground mb-1 block">Hairstyle</label>
+                    <Select value={avatarHairstyle} onValueChange={setAvatarHairstyle} disabled={!!avatarUrl}>
+                      <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Default</SelectItem>
+                        <SelectItem value="long wavy">Long Wavy</SelectItem>
+                        <SelectItem value="short bob">Short Bob</SelectItem>
+                        <SelectItem value="braids">Braids</SelectItem>
+                        <SelectItem value="buzzcut">Buzzcut</SelectItem>
+                        <SelectItem value="curly volume">Curly Volume</SelectItem>
+                        <SelectItem value="sleek straight">Sleek Straight</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-body text-muted-foreground mb-1 block">Makeup</label>
+                    <Select value={avatarMakeup} onValueChange={setAvatarMakeup} disabled={!!avatarUrl}>
+                      <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Default</SelectItem>
+                        <SelectItem value="natural minimal">Natural Minimal</SelectItem>
+                        <SelectItem value="glamorous evening">Glamorous Evening</SelectItem>
+                        <SelectItem value="soft editorial">Soft Editorial</SelectItem>
+                        <SelectItem value="dewy skin">Dewy Skin</SelectItem>
+                        <SelectItem value="bold lips">Bold Lips</SelectItem>
+                        <SelectItem value="avant-garde">Avant-Garde</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {!avatarUrl && !uploadedPreview && (

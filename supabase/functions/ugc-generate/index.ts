@@ -1398,7 +1398,11 @@ async function runUnifiedVTON(
   description: string,
   supabaseClient: any,
   ethnicity?: string,
-  gender?: string
+  gender?: string,
+  scene?: string,
+  style?: string,
+  hairstyle?: string,
+  makeup?: string
 ): Promise<string> {
   const targetEthnicity = ethnicity || "person";
   const targetGender = gender || "female";
@@ -1534,7 +1538,10 @@ async function runUnifiedVTON(
             `  - DO NOT change the model's face, skin tone or ethnicity.`,
             `  - If you cannot reproduce the EXACT product, output a blank result rather than a wrong product.`,
             strictnessPromptModifier,
-            `Studio lighting, sharp focus, white background, photorealistic render. The generated image MUST be indistinguishable from a product catalog photo taken with the original garment.`
+            scene ? `SETTING: ${scene.replace(/_/g, " ")}.` : `Studio lighting, sharp focus, white background.`,
+            hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ``,
+            makeup ? `MAKEUP: ${makeup}.` : ``,
+            `Photorealistic render. The generated image MUST be indistinguishable from a high-end catalog photo.`
           ].join(" ");
 
           console.log(`[Unified VTON] Wan prompt (attempt ${attempt}): ${wanPrompt}`);
@@ -1664,9 +1671,6 @@ Deno.serve(async (req) => {
         if (dbErr) {
           console.warn("[Inventory Gate] DB lookup error:", dbErr.message);
         } else if (dbProduct) {
-          if (dbProduct.status !== "active") {
-            throw { status: 400, message: `Product ${incomingProductId} is not active in inventory (status: ${dbProduct.status}). Generation blocked.` };
-          }
           const dbImages: string[] = Array.isArray(dbProduct.images)
             ? dbProduct.images.filter((u: any) => typeof u === "string" && u.trim())
             : [];
@@ -1727,9 +1731,12 @@ Deno.serve(async (req) => {
       const { productName, productCategory } = body;
       const ethnicity = body.ethnicity || "African";
       const gender = body.gender || "female";
-      const setting = body.setting || "studio";
+      const setting = body.setting || body.scene || "studio";
+      const hairstyle = body.hairstyle || "";
+      const makeup = body.makeup || "";
+      const skinTone = body.skinTone || "";
       
-      console.log(`Generating avatar for ${productName} (${gender}, ${ethnicity})...`);
+      console.log(`Generating avatar for ${productName} (${gender}, ${ethnicity}, ${skinTone}, ${hairstyle}, ${makeup}, ${setting})...`);
 
       let url;
       try {
@@ -1739,11 +1746,15 @@ Deno.serve(async (req) => {
           if (!vtonPersonImage) {
             console.log(`[generate-avatar] No reference image provided. Generating high-quality baseline portrait for ${gender} ${ethnicity}...`);
             let baselinePrompt = "";
+            const modelDesc = `Stunningly beautiful high-fashion supermodel. Striking editorial facial features. Top-tier modeling agency quality.`;
+            const identityDesc = `MODEL GENDER: ${gender}. ETHNICITY/SKIN TONE: ${ethnicity} ${skinTone}.`;
+            const styleDesc = `${hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ""} ${makeup ? `MAKEUP: ${makeup}.` : ""}`;
+            
             if (body.isUGC) {
-              baselinePrompt = `Authentic smartphone selfie. Lifestyle photography. MODEL: ${ethnicity} ${gender}. SETTING: ${setting || "natural city street"}. 
+              baselinePrompt = `Authentic smartphone selfie. Lifestyle photography. ${modelDesc} ${identityDesc} ${styleDesc} SETTING: ${setting || "natural city street"}. 
               CRITICAL: Natural skin texture, realistic casual lighting, unedited look, raw lifestyle feel, wearing casual undergarment or plain white t-shirt.`;
             } else {
-              baselinePrompt = `High-end fashion portrait. MODEL: ${ethnicity} ${gender}. SETTING: ${setting || "studio"}. Wearing simple plain undergarment or white t-shirt.`;
+              baselinePrompt = `High-end fashion portrait. ${modelDesc} ${identityDesc} ${styleDesc} SETTING: ${setting || "studio"}. Wearing simple plain undergarment or white t-shirt.`;
             }
             // Generate a premium baseline model portrait
             const baselineUrl = await callImageAI(QWEN_API_KEY, baselinePrompt, []);
@@ -1760,11 +1771,18 @@ Deno.serve(async (req) => {
             productName || "garment",
             supabase,
             ethnicity,
-            gender
+            gender,
+            setting,
+            body.style || "",
+            hairstyle,
+            makeup
           );
         } else {
           // Creating a baseline influencer identity portrait (no product selected)
-          const prompt = `High-end fashion portrait. MODEL: ${ethnicity} ${gender}. SETTING: ${setting || "studio"}.`;
+          const modelDesc = `Stunningly beautiful high-fashion supermodel. Striking editorial facial features.`;
+          const identityDesc = `GENDER: ${gender}. ETHNICITY/SKIN TONE: ${ethnicity} ${skinTone}.`;
+          const styleDesc = `${hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ""} ${makeup ? `MAKEUP: ${makeup}.` : ""}`;
+          const prompt = `High-end fashion portrait. ${modelDesc} ${identityDesc} ${styleDesc} SETTING: ${setting || "studio"}.`;
           url = await callImageAI(QWEN_API_KEY, prompt, referenceImage ? [{ type: 'influencer' as const, url: referenceImage }] : []);
         }
       } catch (e) {
@@ -1778,7 +1796,7 @@ Deno.serve(async (req) => {
 
 
     if (action === "generate-ugc-video") {
-      const { productName, productCategory, productDescription, avatarGender, avatarEthnicity, isUGC, avatarImageBase64, influencerId, voiceId, musicPrompt, scriptText } = body;
+      const { productName, productCategory, productDescription, avatarGender, avatarEthnicity, isUGC, avatarImageBase64, influencerId, voiceId, musicPrompt, scriptText, setting, style, hairstyle, makeup } = body;
       console.log(`🎬 STARTING HIGH-MOTION UGC PIPELINE: ${productName} (${avatarGender}, ${avatarEthnicity})...`);
       
       // --- STAGE 1: PRODUCT LOCK ENGINE ---
@@ -1801,7 +1819,11 @@ Deno.serve(async (req) => {
         productName || "garment",
         supabase,
         avatarEthnicity,
-        avatarGender
+        avatarGender,
+        setting || body.scene || "",
+        style || "",
+        hairstyle || "",
+        makeup || ""
       );
       const persistedMasterUrl = await persistMedia(supabase, masterFrameUrl, "master_frames");
       console.log(`✅ Master Frame created: ${persistedMasterUrl}`);
@@ -1920,7 +1942,9 @@ Deno.serve(async (req) => {
           product.name || "garment",
           supabase,
           influencerEthnicity,
-          influencerGender
+          influencerGender,
+          scene,
+          body.style || ""
         );
 
         const persistedUrl = await persistMedia(supabase, url, "campaigns", HF_TOKEN);
