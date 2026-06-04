@@ -173,10 +173,10 @@ const CourierOperationsDashboard = () => {
                         View Tracking
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      {d.parcel_status === 'pending' && d.orders?.status === 'paid' && (
+                      {(!d.smart_delivery_uuid || d.smart_delivery_uuid === 'UUID-UNKNOWN') && (
                         <DropdownMenuItem onClick={() => handleRetryDispatch(d.id)} className="text-blue-600 focus:text-blue-600 font-medium">
                           <RefreshCw className="mr-2 h-4 w-4" />
-                          Retry Dispatch
+                          Dispatch to Smart Deliveries
                         </DropdownMenuItem>
                       )}
                       {d.delivery_service_payments && d.delivery_service_payments.length > 0 && d.delivery_service_payments.some((p: any) => p.status === 'paid') ? (

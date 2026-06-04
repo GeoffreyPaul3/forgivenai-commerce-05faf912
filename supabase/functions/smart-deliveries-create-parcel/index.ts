@@ -179,9 +179,20 @@ serve(async (req) => {
       throw new Error(`Smart Deliveries API Error [${response.status}]: ${errMsg}`);
     }
 
-    // Extract waybill and UUID from response
-    const waybill = responseData.waybill || responseData.data?.waybill || responseData.waybillNumber || 'WB-UNKNOWN';
-    const uuid = responseData.uuid || responseData.data?.uuid || responseData.id || 'UUID-UNKNOWN';
+    // Log the FULL raw response so we can see every field in Supabase function logs
+    console.log("📬 FULL Smart Deliveries Response:", rawResponseText);
+    console.log("📬 Parsed keys:", Object.keys(responseData));
+    if (responseData.data) console.log("📬 data keys:", Object.keys(responseData.data));
+
+    // Per Smart Deliveries PDF spec:
+    // POST /parcel 201 response: {"success":true,"data":{...},"message":"Created successfully"}
+    // UUID field: responseData.data.id
+    // Waybill field: responseData.data.waybillNumberShort
+    const parcelData = responseData.data || {};
+    const waybill = parcelData.waybillNumberShort || parcelData.waybill || parcelData.waybillNumber || null;
+    const uuid = parcelData.id || parcelData.uuid || null;
+
+    console.log(`📬 Extracted → waybill: ${waybill}, uuid: ${uuid}`);
 
     await supabaseAdmin.from('delivery_orders').update({
       smart_delivery_uuid: uuid,
