@@ -209,7 +209,7 @@ const ProductsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["products-all-synced"] });
       toast({ title: "Product deleted" });
     },
   });
@@ -220,7 +220,7 @@ const ProductsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["products-all-synced"] });
       setEditProduct(null);
       toast({ title: "Product updated" });
     },
@@ -232,7 +232,7 @@ const ProductsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["products-all-synced"] });
       setShowAdd(false);
       toast({ title: "Product added" });
     },

@@ -32,9 +32,14 @@ serve(async (req) => {
       price: p.salePrice || p.price,
       images: p.images || [],
       source_url: "https://www.forgivenshoppingcentre.com/",
-      status: 'active',
+      status: (p.inStock === false || p.quantity <= 0 || p.inventory_quantity <= 0 || p.status === 'out_of_stock' || p.status === 'inactive' || p.status === 'draft') ? 'inactive' : 'active',
       sizes: p.sizes || (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.size || v.value || v.name).filter(Boolean))] : []) || (p.options?.find((o: any) => o.name?.toLowerCase().includes("size"))?.values || []),
-      colors: p.colors || (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.color || v.colour || v.name).filter(Boolean))] : []) || (p.options?.find((o: any) => o.name?.toLowerCase().includes("color") || o.name?.toLowerCase().includes("colour"))?.values || [])
+      colors: p.colors || (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.color || v.colour || v.name).filter(Boolean))] : []) || (p.options?.find((o: any) => o.name?.toLowerCase().includes("color") || o.name?.toLowerCase().includes("colour"))?.values || []),
+      variants: p.variants,
+      options: p.options,
+      quantity: p.quantity,
+      inventory_quantity: p.inventory_quantity,
+      inStock: p.inStock
     }));
 
     // Deduplicate by name
@@ -63,9 +68,15 @@ serve(async (req) => {
         price: p.price,
         images: p.images,
         source_url: p.source_url,
-        status: 'active',
+        status: p.status, // use the properly mapped status
         sizes: p.sizes,
-        colors: p.colors
+        colors: p.colors,
+        metadata: {
+          variants: p.variants || [],
+          options: p.options || [],
+          inventory: p.inventory_quantity || p.quantity || 0,
+          inStock: p.inStock !== false
+        }
       };
 
       if (existingId) {
@@ -85,6 +96,31 @@ serve(async (req) => {
       console.log(`Updating ${toUpdate.length} existing products...`);
       const { error: updErr } = await supabase.from('products').upsert(toUpdate);
       if (updErr) throw updErr;
+    }
+
+    // Trigger Decomposition Engine (Fire & Forget)
+    const allProcessed = [...toInsert, ...toUpdate];
+    for (const p of allProcessed) {
+      if (p.images && p.images.length > 0) {
+        const prodName = p.name;
+        // Fetch the generated ID if not present
+        let prodId = p.id;
+        if (!prodId) {
+          const { data } = await supabase.from('products').select('id').eq('name', prodName).single();
+          if (data) prodId = data.id;
+        }
+        
+        if (prodId) {
+          fetch(`${supabaseUrl}/functions/v1/decompose-image`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseKey}`
+            },
+            body: JSON.stringify({ product_id: prodId, image_url: p.images[0] })
+          }).catch(err => console.error("Failed to trigger decomposition:", err));
+        }
+      }
     }
 
     return new Response(

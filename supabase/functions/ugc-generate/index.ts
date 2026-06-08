@@ -516,7 +516,7 @@ async function generateTrueMotionVideo(apiKey: string, imageUrl: string, prompt:
       
       The video must feel like:
       real iPhone creator footage. (${prompt})`,
-      negative_prompt: "slideshow, static, still image, blurry, distorted face, unnatural movement, warping, low resolution, jumping frames, generic background, robotic, zoom, pan",
+      negative_prompt: "deformed anatomy, broken arms, extra limbs, artificial, mannequin, bad anatomy, distorted faces, weird hands, merged bodies, slideshow, static, still image, blurry, unnatural movement, warping, low resolution, jumping frames, generic background, robotic, zoom, pan",
       aspect_ratio: "9:16",
       duration: 15,
       motion_score: 10,
@@ -557,7 +557,7 @@ async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string) {
       model: "wan2.1-i2v-turbo",
       input: { 
         img_url: imageUrl,
-        prompt: `DYNAMIC UGC PERFORMANCE: ${prompt}. The model walks toward the camera with a joyful expression, performing a natural twirl, sways their hips, and adjusts their hair. Highly realistic 4k lifestyle video, handheld phone footage feel, fluid human motion.`
+        prompt: `DYNAMIC UGC PERFORMANCE: ${prompt}. The model walks toward the camera with a joyful expression, performing a natural twirl, sways their hips, and adjusts their hair. Highly realistic 4k lifestyle video, handheld phone footage feel, fluid human motion. ABSOLUTELY NO deformed anatomy, broken arms, extra limbs, artificial mannequin features, or bad anatomy.`
       },
       parameters: { 
         duration: 5,
@@ -600,7 +600,7 @@ async function callVeoVideo(apiKey: string, imageUrl: string, prompt: string) {
     method: "POST",
     headers: { "Authorization": `Key ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      prompt: `Cinematic UGC performance: ${prompt}. Natural human motion, walking, smiling, 4k high fidelity.`,
+      prompt: `Cinematic UGC performance: ${prompt}. Natural human motion, walking, smiling, 4k high fidelity. ABSOLUTELY NO deformed anatomy, broken arms, extra limbs, artificial mannequin features, or bad anatomy.`,
       image_url: imageUrl,
       aspect_ratio: "9:16",
       duration: "10s"
@@ -761,6 +761,7 @@ async function runSpecializedObjectVTON(
     `PRODUCT FIDELITY — ABSOLUTE SOURCE OF TRUTH:`,
     `- NO MANNEQUINS: If the source product image shows a mannequin, DO NOT copy the mannequin. You MUST map the product onto the REAL HUMAN model.`,
     `- PRESERVE SLEEVE LENGTH: You MUST match the exact sleeve length (e.g., long sleeve, short sleeve, sleeveless) shown in the product image.`,
+    `- MULTI-ITEM IMAGES: If the source image contains multiple clothes in different colors or a grid collage, select ONLY ONE single clothing item to apply. Do NOT create a collage, and do NOT layer multiple items on top of each other.`,
     `- The product in Image 2 is the ONLY valid source for the garment. Reproduce it with 100% pixel fidelity.`,
     categoryRules,
     poseGuide,
@@ -908,12 +909,94 @@ async function detectGarmentColor(apiKey: string, imageUrl: string): Promise<str
   }
 }
 
+async function extractProductDNA(apiKey: string, imageUrl: string) {
+  console.log("Extracting structured Product DNA Profile via Qwen VL...");
+  try {
+    const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "qwen-vl-plus",
+        input: {
+          messages: [{
+            role: "user",
+            content: [
+              { image: imageUrl },
+              { text: `You are a fashion AI. Extract the Product DNA Profile of this garment. Identify the garment category (e.g., 2pc skirt suit, trousers, jacket, t-shirt), bottom type (skirt, trousers, none), sleeve length (long, short, sleeveless), collar style, button count, pocket count, fabric texture, and primary color.
+Return ONLY valid JSON matching this schema:
+{
+  "category": "string",
+  "bottom": "string",
+  "sleeve": "string",
+  "collar": "string",
+  "buttons": "number",
+  "pockets": "number",
+  "texture": "string",
+  "color": "string"
+}` }
+            ]
+          }]
+        }
+      })
+    });
+    const data = await res.json();
+    const rawContent = data.output?.choices?.[0]?.message?.content?.[0]?.text || "{}";
+    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) return JSON.parse(jsonMatch[0]);
+    return {};
+  } catch (e) {
+    console.warn("Product DNA extraction failed:", e);
+    return {};
+  }
+}
+
+async function verifyHumanRealism(apiKey: string, generatedImageUrl: string): Promise<{ pass: boolean; score: number; reasoning: string }> {
+  console.log("🔍 Running Human Realism Validation via Qwen VL...");
+  try {
+    const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "qwen-vl-plus",
+        input: {
+          messages: [{
+            role: "user",
+            content: [
+              { image: generatedImageUrl },
+              { text: `You are a strict anatomy QC auditor. Analyze this AI-generated human model. Grade the realism on a scale of 0-100. Check for: face symmetry, eye alignment, hand anatomy, correct number of fingers, elbows, shoulders, knees, body proportions, and skin consistency. Reject generations containing extra fingers, missing fingers, broken limbs, floating body parts, or distorted faces.
+Return ONLY valid JSON in this format:
+{
+  "score": 95,
+  "reasoning": "The anatomy is perfectly intact with clear symmetrical hands and face."
+}` }
+            ]
+          }]
+        }
+      })
+    });
+    const data = await res.json();
+    const rawContent = data.output?.choices?.[0]?.message?.content?.[0]?.text || "{}";
+    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+      const pass = (result.score || 0) >= 95;
+      console.log(`[Realism Audit] Score: ${result.score}%. Pass: ${pass}. Reason: ${result.reasoning}`);
+      return { pass, score: result.score || 0, reasoning: result.reasoning || "" };
+    }
+    return { pass: true, score: 95, reasoning: "Could not parse realism JSON" };
+  } catch (e) {
+    console.warn("Realism validation failed:", e);
+    return { pass: true, score: 95, reasoning: "Error executing realism validation" };
+  }
+}
+
 async function verifyProductFidelity(
   apiKey: string,
   productImages: string[],
-  generatedImageUrl: string
+  generatedImageUrl: string,
+  productDNA?: any
 ): Promise<{ pass: boolean; score: number; reasoning: string }> {
-  console.log("🔍 Running Rigorous 10-Point Visual Identity Audit via Qwen VL...");
+  console.log("🔍 Running Strict Product Lock 2.0 Audit via Qwen VL...");
   
   const contentItems: any[] = [];
   for (const url of productImages.slice(0, 3)) {
@@ -921,11 +1004,14 @@ async function verifyProductFidelity(
   }
   contentItems.push({ image: generatedImageUrl });
   
+  const dnaStr = productDNA ? JSON.stringify(productDNA, null, 2) : "Unknown";
+  
   const prompt = [
     `You are a strict, world-class QA auditor for a fashion e-commerce company.`,
-    `The first images are the ORIGINAL PRODUCT references (front, side, textures). The last image is the AI-generated model wearing the product.`,
-    `Your task is to perform a rigorous 10-Point Visual Identity Audit to verify if the generated model is wearing the EXACT inventory product.`,
-    `Perform direct pixel-level and aesthetic comparisons and grade the following 10 criteria on a scale of 0 to 10:`,
+    `The first images are the ORIGINAL PRODUCT references. The last image is the AI-generated model wearing the product.`,
+    `Your task is to perform a rigorous Product Lock 2.0 Audit to verify if the generated model is wearing the EXACT inventory product.`,
+    `PRODUCT DNA PROFILE: \n${dnaStr}\n`,
+    `Perform direct pixel-level comparisons and grade the following 10 criteria on a scale of 0 to 10:`,
     `1. Color: Does the hue, shade, gradients, and secondary colors match 100%?`,
     `2. Shape: Are the proportions, width, and structural cuts identical?`,
     `3. Silhouette: Does the fit, drape, and posture matching look natural without mutating the design?`,
@@ -934,26 +1020,15 @@ async function verifyProductFidelity(
     `6. Textures: Does the fabric texture (leather shine, knit pattern, denim weave) match the reference?`,
     `7. Stitching: Are the seams, borders, thread colors, and collar stitching accurately kept?`,
     `8. Accessories: Are buttons, zippers, buckles, pockets, and straps identical in count, color, and size?`,
-    `9. Neckline: Is the collar shape, depth, and wings 100% correct? (For non-apparel like shoes/bags, score 10/10 if not applicable)`,
-    `10. Sleeves: Are sleeve lengths, cuff structures, and shoulder seams matching? (For non-apparel like shoes/bags, score 10/10 if not applicable)`,
+    `9. Neckline: Is the collar shape, depth, and wings 100% correct?`,
+    `10. Sleeves: Are sleeve lengths, cuff structures, and shoulder seams matching?`,
     ``,
-    `Return ONLY a valid JSON object. Do NOT include markdown blocks or any other characters outside the JSON.`,
-    `The JSON must follow this exact format:`,
+    `CRITICAL RULE: If the garment category changed (e.g. skirt became trousers), sleeve length changed, or colors drastically changed, set the overall_score to 0.`,
+    `Return ONLY a valid JSON object. Do NOT include markdown blocks.`,
     `{`,
-    `  "scores": {`,
-    `    "color": 10,`,
-    `    "shape": 10,`,
-    `    "silhouette": 10,`,
-    `    "patterns": 10,`,
-    `    "logos": 10,`,
-    `    "textures": 9,`,
-    `    "stitching": 10,`,
-    `    "accessories": 10,`,
-    `    "neckline": 10,`,
-    `    "sleeves": 10`,
-    `  },`,
-    `  "overall_score": 99,`,
-    `  "reasoning": "Color matches perfectly, but the leather texture is slightly smoother in the generated image than the raw product image."`,
+    `  "scores": { "color": 10, "shape": 10, "silhouette": 10, "patterns": 10, "logos": 10, "textures": 9, "stitching": 10, "accessories": 10, "neckline": 10, "sleeves": 10 },`,
+    `  "overall_score": 98,`,
+    `  "reasoning": "Color matches perfectly, but the leather texture is slightly smoother."`,
     `}`
   ].join("\n");
   
@@ -965,24 +1040,17 @@ async function verifyProductFidelity(
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "qwen-vl-plus",
-        input: {
-          messages: [{
-            role: "user",
-            content: contentItems
-          }]
-        }
+        input: { messages: [{ role: "user", content: contentItems }] }
       })
     });
     
     if (!res.ok) {
-      console.warn(`Qwen VL Audit API returned ${res.status}. Falling back to standard pass.`);
-      return { pass: true, score: 95, reasoning: "API error - skipped verification to prevent lockup" };
+      console.warn(`Qwen VL Audit API returned ${res.status}. Falling back.`);
+      return { pass: true, score: 96, reasoning: "API error - skipped verification" };
     }
     
     const data = await res.json();
     const rawContent = data.output?.choices?.[0]?.message?.content?.[0]?.text || "";
-    console.log(`🔍 Qwen VL Audit raw response:`, rawContent);
-    
     const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const auditResult = JSON.parse(jsonMatch[0]);
@@ -992,18 +1060,12 @@ async function verifyProductFidelity(
       let categoryMismatch = false;
       if (auditResult.scores) {
         for (const [cat, val] of Object.entries(auditResult.scores)) {
-          // Threshold: 7/10 minimum per category — allows minor color warmth or lighting differences
-          if (typeof val === "number" && val < 7) {
-            categoryMismatch = true;
-            console.warn(`[Audit] Critical mismatch in category: ${cat} (Score: ${val}/10) — below minimum 7`);
-          } else if (typeof val === "number" && val < 8) {
-            console.log(`[Audit] Minor deviation in category: ${cat} (Score: ${val}/10) — acceptable`);
-          }
+          if (typeof val === "number" && val < 8) categoryMismatch = true;
         }
       }
       
-      // Overall threshold: 88% — accommodates minor lighting/color warmth differences from reference synthesis
-      const pass = !categoryMismatch && overallScore >= 88;
+      // Objective 2 Strict Lock: 96% threshold
+      const pass = !categoryMismatch && overallScore >= 96;
       console.log(`[Audit Result] Score: ${overallScore}%. Pass: ${pass}. Reason: ${reasoning}`);
       return { pass, score: overallScore, reasoning };
     } else {
@@ -1011,7 +1073,7 @@ async function verifyProductFidelity(
     }
   } catch (err: any) {
     console.warn("Fidelity verification failed, default permitting:", err);
-    return { pass: true, score: 95, reasoning: `Fidelity verification error: ${err.message}` };
+    return { pass: true, score: 96, reasoning: `Fidelity error: ${err.message}` };
   }
 }
 
@@ -1415,10 +1477,10 @@ async function runUnifiedVTON(
   const primaryProductUrl = productImages[0];
 
   // 1. Detect garment details using AI vision — this is the single source of truth for the garment
-  const garmentDetails = await detectGarmentColor(keys.qwenKey, primaryProductUrl);
-  const colorMatch = garmentDetails.match(/Color: ([^,]+)/);
-  const garmentColor = colorMatch ? colorMatch[1].trim() : "original";
-  console.log(`[Unified VTON] AI-detected details: ${garmentDetails}`);
+  const productDNA = await extractProductDNA(keys.qwenKey, primaryProductUrl);
+  const garmentDetails = JSON.stringify(productDNA);
+  const garmentColor = productDNA.color || "original";
+  console.log(`[Unified VTON] AI-detected DNA: ${garmentDetails}`);
 
   // 2. Identify if non-apparel (specialized routing required)
   const lowerCat = category.toLowerCase();
@@ -1457,11 +1519,17 @@ async function runUnifiedVTON(
           poseData
         );
 
-        // Verify visual fidelity via 10-Point Audit
-        const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl);
+        // Verify visual fidelity via 10-Point Audit and Human Realism
+        const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl, productDNA);
         if (audit.pass) {
-          console.log(`[Unified VTON] ✅ Specialized fidelity audit PASSED on attempt ${attempt} (Score: ${audit.score}%)`);
-          return resultUrl;
+          const realism = await verifyHumanRealism(keys.qwenKey, resultUrl);
+          if (realism.pass) {
+            console.log(`[Unified VTON] ✅ Specialized fidelity & realism PASSED on attempt ${attempt}`);
+            return resultUrl;
+          } else {
+            console.warn(`[Unified VTON] ❌ Realism FAILED (Score: ${realism.score}%). Reason: ${realism.reasoning}`);
+            lastReasoning = realism.reasoning;
+          }
         } else {
           console.warn(`[Unified VTON] ❌ Specialized fidelity audit FAILED (Score: ${audit.score}%). Reason: ${audit.reasoning}`);
           lastReasoning = audit.reasoning;
@@ -1532,6 +1600,7 @@ async function runUnifiedVTON(
             `MANDATORY RULES — ZERO TOLERANCE:`,
             `  - NO MANNEQUINS: If the source product image shows a mannequin, DO NOT copy the mannequin. You MUST map the clothing onto the REAL HUMAN model.`,
             `  - PRESERVE SLEEVE LENGTH: You MUST match the exact sleeve length (e.g., long sleeve, short sleeve, sleeveless) shown in the product image. DO NOT alter the sleeve length.`,
+            `  - MULTI-ITEM IMAGES: If the source image contains multiple clothes in different colors or a grid collage, select ONLY ONE single clothing item to apply. Do NOT create a collage, and do NOT layer multiple items on top of each other.`,
             `  - DO NOT redesign, approximate, or hallucinate any part of the garment.`,
             `  - DO NOT substitute a generic or similar-looking product. Only the EXACT reference product is acceptable.`,
             `  - DO NOT change the garment's neckline, sleeve length, color, cut, pattern, print, logo, or fabric texture.`,
@@ -1584,10 +1653,16 @@ async function runUnifiedVTON(
         if (resultUrl) {
           console.log(`[Unified VTON] Engine ${engine.name} succeeded. Verifying fidelity...`);
 
-          const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl);
+          const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl, productDNA);
           if (audit.pass) {
-            console.log(`[Unified VTON] ✅ Apparel fidelity check PASSED for: ${engine.name} (Score: ${audit.score}%)`);
-            return resultUrl;
+            const realism = await verifyHumanRealism(keys.qwenKey, resultUrl);
+            if (realism.pass) {
+              console.log(`[Unified VTON] ✅ Apparel fidelity & realism PASSED for: ${engine.name}`);
+              return resultUrl;
+            } else {
+              console.warn(`[Unified VTON] ❌ Realism check FAILED for: ${engine.name} (Score: ${realism.score}%). Reason: ${realism.reasoning}`);
+              lastReasoning = realism.reasoning;
+            }
           } else {
             console.warn(`[Unified VTON] ❌ Apparel fidelity check FAILED for: ${engine.name} (Score: ${audit.score}%). Reason: ${audit.reasoning}`);
             lastReasoning = audit.reasoning;
