@@ -403,8 +403,15 @@ function VendorProductPicker({ selectedId, onSelect, label, placeholder = "Selec
                           <Package className="w-8 h-8 text-muted-foreground/30" />
                         </div>
                       )}
+                      {/* Out of Stock overlay */}
+                      {!product.vendor_id && (product.stock_status === 'out_of_stock' || (product.stock_quantity !== null && product.stock_quantity <= 0)) && !product.id.toString().startsWith("live_") && (
+                        <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center backdrop-blur-[1px] z-10">
+                          <Badge variant="destructive" className="text-[10px] uppercase font-black tracking-wider">Out of Stock</Badge>
+                        </div>
+                      )}
+
                       {/* Status pill on image */}
-                      <div className="absolute bottom-1.5 left-1.5">
+                      <div className="absolute bottom-1.5 left-1.5 z-20">
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold border backdrop-blur-sm ${
                           product.status === "active" ? "bg-emerald-500/80 text-white border-emerald-500/40" :
                           product.status === "draft" ? "bg-amber-500/80 text-white border-amber-500/40" :

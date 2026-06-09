@@ -11,6 +11,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -25,22 +27,23 @@ serve(async (req) => {
       throw new Error("Failed to fetch products from live API");
     }
 
-    const products = apiData.data.map((p: any) => ({
-      name: p.name,
-      description: p.description,
-      category: p.category?.name || p.productType || "General",
-      price: p.salePrice || p.price,
-      images: p.images || [],
-      source_url: "https://www.forgivenshoppingcentre.com/",
-      status: (p.inStock === false || p.quantity <= 0 || p.inventory_quantity <= 0 || p.status === 'out_of_stock' || p.status === 'inactive' || p.status === 'draft') ? 'inactive' : 'active',
-      sizes: p.sizes || (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.size || v.value || v.name).filter(Boolean))] : []) || (p.options?.find((o: any) => o.name?.toLowerCase().includes("size"))?.values || []),
-      colors: p.colors || (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.color || v.colour || v.name).filter(Boolean))] : []) || (p.options?.find((o: any) => o.name?.toLowerCase().includes("color") || o.name?.toLowerCase().includes("colour"))?.values || []),
-      variants: p.variants,
-      options: p.options,
-      quantity: p.quantity,
-      inventory_quantity: p.inventory_quantity,
-      inStock: p.inStock
-    }));
+    const products = apiData.data.map((p: any) => {
+      const stockQuantity = p.stockQuantity ?? p.stock ?? p.quantity ?? 0;
+      const stockStatus = stockQuantity > 0 ? 'available' : 'out_of_stock';
+      return {
+        name: p.name,
+        description: p.description,
+        category: p.category?.name || p.productType || "General",
+        price: p.salePrice || p.price,
+        images: p.images || [],
+        source_url: "https://www.forgivenshoppingcentre.com/",
+        status: 'active',
+        sizes: p.sizes || (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.size || v.value || v.name).filter(Boolean))] : []) || (p.options?.find((o: any) => o.name?.toLowerCase().includes("size"))?.values || []),
+        colors: p.colors || (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.color || v.colour || v.name).filter(Boolean))] : []) || (p.options?.find((o: any) => o.name?.toLowerCase().includes("color") || o.name?.toLowerCase().includes("colour"))?.values || []),
+        stock_quantity: stockQuantity,
+        stock_status: stockStatus
+      };
+    });
 
     // Deduplicate by name
     const uniqueProducts = Array.from(new Map(products.map(p => [p.name, p])).values());
@@ -68,15 +71,11 @@ serve(async (req) => {
         price: p.price,
         images: p.images,
         source_url: p.source_url,
-        status: p.status, // use the properly mapped status
+        status: 'active',
         sizes: p.sizes,
         colors: p.colors,
-        metadata: {
-          variants: p.variants || [],
-          options: p.options || [],
-          inventory: p.inventory_quantity || p.quantity || 0,
-          inStock: p.inStock !== false
-        }
+        stock_quantity: p.stock_quantity,
+        stock_status: p.stock_status
       };
 
       if (existingId) {
@@ -98,39 +97,37 @@ serve(async (req) => {
       if (updErr) throw updErr;
     }
 
-    // Trigger Decomposition Engine (Fire & Forget)
-    const allProcessed = [...toInsert, ...toUpdate];
-    for (const p of allProcessed) {
-      if (p.images && p.images.length > 0) {
-        const prodName = p.name;
-        // Fetch the generated ID if not present
-        let prodId = p.id;
-        if (!prodId) {
-          const { data } = await supabase.from('products').select('id').eq('name', prodName).single();
-          if (data) prodId = data.id;
-        }
-        
-        if (prodId) {
-          fetch(`${supabaseUrl}/functions/v1/decompose-image`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseKey}`
-            },
-            body: JSON.stringify({ product_id: prodId, image_url: p.images[0] })
-          }).catch(err => console.error("Failed to trigger decomposition:", err));
-        }
-      }
-    }
+    const duration = Date.now() - startTime;
+    
+    // Log sync
+    await supabase.from('sync_logs').insert({
+      status: 'success',
+      products_synced: uniqueProducts.length,
+      new_products_count: toInsert.length,
+      updated_products_count: toUpdate.length,
+      duration_ms: duration,
+    });
 
     return new Response(
-      JSON.stringify({ success: true, imported: uniqueProducts.length }),
+      JSON.stringify({ success: true, imported: uniqueProducts.length, newCount: toInsert.length, updatedCount: toUpdate.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Sync Error:', error);
+    
+    const duration = Date.now() - startTime;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    await supabase.from('sync_logs').insert({
+      status: 'failed',
+      error_message: error.message || 'Unknown error',
+      duration_ms: duration,
+    });
+
     return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ success: false, error: error.message || 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

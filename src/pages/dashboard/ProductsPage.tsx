@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/pagination";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Sparkles, Pencil, Trash2, ExternalLink, Loader2, Image as ImageIcon, Package, TrendingUp, X, ImageOff } from "lucide-react";
+import { Search, Plus, Sparkles, Pencil, Trash2, ExternalLink, Loader2, Image as ImageIcon, Package, TrendingUp, X, ImageOff, Layers, Zap } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { motion } from "framer-motion";
 
@@ -41,6 +41,8 @@ const ProductsPage = () => {
   const [vendorFilter, setVendorFilter] = useState("all");
   const [statusTab, setStatusTab] = useState<"all" | "active" | "draft" | "archived">("all");
   const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [decomposeProduct, setDecomposeProduct] = useState<Product | null>(null);
+  const [isDecomposing, setIsDecomposing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [page, setPage] = useState(1);
 
@@ -203,13 +205,45 @@ const ProductsPage = () => {
   const totalPages = Math.ceil((filteredProductsList?.length || 0) / PAGE_SIZE);
   const paginatedProducts = filteredProductsList?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) || [];
 
+  
+  const handleDecompose = async (product: Product) => {
+    if (!product.images || product.images.length === 0) {
+      toast({ title: "No images", description: "Product needs an image to decompose", variant: "destructive" });
+      return;
+    }
+    setDecomposeProduct(product);
+    setIsDecomposing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${supabase['supabaseUrl']}/functions/v1/decompose-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          imageUrl: product.images[0],
+          productId: product.id
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Decomposition failed");
+      toast({ title: "Intelligence Extracted", description: `Found ${data.analysis?.garment_count || 1} item(s) in this image.` });
+      queryClient.invalidateQueries({ queryKey: ["products-all-synced"] });
+    } catch (e: any) {
+      toast({ title: "Decomposition failed", description: e.message, variant: "destructive" });
+    } finally {
+      setIsDecomposing(false);
+    }
+  };
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products-all-synced"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       toast({ title: "Product deleted" });
     },
   });
@@ -220,7 +254,7 @@ const ProductsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products-all-synced"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       setEditProduct(null);
       toast({ title: "Product updated" });
     },
@@ -232,7 +266,7 @@ const ProductsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products-all-synced"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       setShowAdd(false);
       toast({ title: "Product added" });
     },

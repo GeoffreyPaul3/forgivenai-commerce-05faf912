@@ -33,6 +33,7 @@ const SettingsPage = () => {
   const { toast } = useToast();
   const [crawlUrl, setCrawlUrl] = useState("https://www.forgivenshoppingcentre.com/");
   const [crawling, setCrawling] = useState(false);
+  const [syncLogs, setSyncLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -97,12 +98,19 @@ const SettingsPage = () => {
         const isUserAdmin = profile?.role === "admin";
         setIsAdmin(isUserAdmin);
         if (isUserAdmin) fetchTeamUsers();
+        fetchSyncLogs();
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  
+  const fetchSyncLogs = async () => {
+    const { data } = await supabase.from("sync_logs").select("*").order("created_at", { ascending: false }).limit(5);
+    if (data) setSyncLogs(data);
   };
 
   const fetchTeamUsers = async () => {
@@ -225,6 +233,7 @@ const SettingsPage = () => {
         title: "Crawl complete", 
         description: `Successfully imported/updated ${data.imported} products from your website.` 
       });
+      fetchSyncLogs();
     } catch (err: any) {
       console.error("Sync error:", err);
       toast({ 
@@ -270,17 +279,61 @@ const SettingsPage = () => {
         <TabsContent value="general" className="space-y-6">
           {/* Website Sync */}
           <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-            <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
-              <RefreshCw className="w-5 h-5 text-gold" /> High-Speed Catalog Sync
-            </h3>
-            <p className="text-sm text-muted-foreground font-body">Instantly pull all products from forgivenshoppingcentre.com via the direct API.</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5 text-gold" /> Real-Time Inventory Sync
+                </h3>
+                <p className="text-sm text-muted-foreground font-body">Pulls live stock quantities, variants, and product updates via API.</p>
+              </div>
+              <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/10 gap-1.5 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Auto-sync active: every 5 min
+              </Badge>
+            </div>
+            
             <div className="flex gap-2">
               <Input value={crawlUrl} onChange={e => setCrawlUrl(e.target.value)} className="flex-1" />
-              <Button onClick={handleCrawl} disabled={crawling} className="gap-2">
+              <Button onClick={handleCrawl} disabled={crawling} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
                 {crawling ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Sync Now
+                Force Sync Now
               </Button>
             </div>
+
+            {syncLogs.length > 0 && (
+              <div className="mt-4 border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Products</TableHead>
+                      <TableHead>Duration</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {syncLogs.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell className="text-sm">
+                          {new Date(log.created_at).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={log.status === 'success' ? 'default' : 'destructive'} className={log.status === 'success' ? 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20' : ''}>
+                            {log.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {log.products_synced || 0} synced ({log.new_products_count || 0} new, {log.updated_products_count || 0} updated)
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {log.duration_ms ? `${(log.duration_ms / 1000).toFixed(1)}s` : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </div>
 
           {/* Brand Settings */}
