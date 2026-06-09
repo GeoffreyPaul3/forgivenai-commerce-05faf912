@@ -72,10 +72,10 @@ serve(async (req) => {
     console.log(`Starting image decomposition for: ${imageUrl}`);
 
     // Call Qwen VL to analyze the image
-    const prompt = `You are a fashion catalog analyzer. 
-Analyze the image and detect every individual garment/product (e.g., in a grid, collage, or multi-item photo).
-For each detected garment, we will extract it.
+    const prompt = `You are a strict fashion catalog segmenter. 
+Analyze the image and detect EVERY INDIVIDUAL garment/product (e.g., in a grid, collage, or multi-item photo).
 Return ONLY a valid JSON object. Do not include markdown blocks.
+For each garment, you MUST provide its precise 2D bounding box as [ymin, xmin, ymax, xmax] where coordinates are normalized from 0 to 1000 (e.g., [0, 0, 500, 500] is the top-left quarter).
 Format:
 {
   "garment_count": 2,
@@ -84,7 +84,8 @@ Format:
     {
       "color": "Red",
       "type": "Dress",
-      "description": "Red floral summer dress"
+      "description": "Red floral summer dress",
+      "box_2d": [100, 100, 900, 450]
     }
   ]
 }`;
@@ -115,26 +116,68 @@ Format:
       analysisResult = { garment_count: 1, garments: [{ type: "unknown", color: "unknown" }] };
     }
 
-    // Process extraction (in a real scenario we would crop via coordinates, 
-    // but without native cropping we use Fal to extract the main objects or just save the analysis)
-    // To satisfy the requirement while keeping it robust, we'll try to extract variants.
-    // If we only have 1 image and background removal, we apply it.
-    
     let variants = [];
-    if (FAL_KEY) {
-       try {
-         const extractedUrl = await removeBackground(FAL_KEY, imageUrl);
-         const persistedUrl = await persistMedia(supabase, extractedUrl, "decomposed");
-         variants.push({
-           url: persistedUrl || extractedUrl,
-           details: analysisResult.garments?.[0] || {}
-         });
-       } catch (e) {
-         console.warn("Background removal failed:", e);
-         variants.push({ url: imageUrl, details: analysisResult.garments?.[0] || {} });
-       }
-    } else {
-       variants.push({ url: imageUrl, details: analysisResult.garments?.[0] || {} });
+    
+    try {
+      // Dynamic import ImageScript
+      const { Image } = await import("https://deno.land/x/imagescript@1.2.15/mod.ts");
+      
+      const imgRes = await fetch(imageUrl);
+      if (!imgRes.ok) throw new Error("Failed to fetch source image for cropping");
+      const imgBuffer = new Uint8Array(await imgRes.arrayBuffer());
+      const baseImage = await Image.decode(imgBuffer);
+      const width = baseImage.width;
+      const height = baseImage.height;
+
+      const garments = analysisResult.garments || [];
+      console.log(`Extracting ${garments.length} garments via ImageScript crops...`);
+
+      for (let i = 0; i < garments.length; i++) {
+        const g = garments[i];
+        let croppedUrl = imageUrl;
+        
+        if (g.box_2d && Array.isArray(g.box_2d) && g.box_2d.length === 4) {
+          const [ymin, xmin, ymax, xmax] = g.box_2d;
+          
+          const yPx = Math.max(0, Math.round((ymin / 1000) * height));
+          const xPx = Math.max(0, Math.round((xmin / 1000) * width));
+          const hPx = Math.min(height - yPx, Math.round(((ymax - ymin) / 1000) * height));
+          const wPx = Math.min(width - xPx, Math.round(((xmax - xmin) / 1000) * width));
+
+          if (wPx > 10 && hPx > 10) {
+            // Clone base image and crop
+            const clone = baseImage.clone();
+            const cropped = clone.crop(xPx, yPx, wPx, hPx);
+            const croppedBuffer = await cropped.encode(1); // PNG
+            
+            const fileName = `decomposed/${crypto.randomUUID()}.png`;
+            const { error: uploadError } = await supabase.storage.from("ugc-assets").upload(fileName, croppedBuffer, { contentType: "image/png" });
+            
+            if (!uploadError) {
+              croppedUrl = supabase.storage.from("ugc-assets").getPublicUrl(fileName).data.publicUrl;
+            }
+          }
+        }
+
+        // Apply background removal to isolate the garment perfectly if Fal is available
+        if (FAL_KEY) {
+          try {
+            const bgRemoved = await removeBackground(FAL_KEY, croppedUrl);
+            croppedUrl = await persistMedia(supabase, bgRemoved, "decomposed") || croppedUrl;
+          } catch (e) {
+            console.warn("Background removal failed for crop:", e);
+          }
+        }
+
+        variants.push({
+          url: croppedUrl,
+          details: g
+        });
+      }
+    } catch (e) {
+      console.error("ImageScript cropping failed:", e);
+      // Fallback: just use original image if cropping entirely crashes
+      variants.push({ url: imageUrl, details: analysisResult.garments?.[0] || {} });
     }
 
     // Update DB if productId provided

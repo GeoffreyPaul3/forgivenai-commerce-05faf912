@@ -1700,6 +1700,9 @@ function InfluencerManager() {
         ? selectedProd.variant_images 
         : [selectedProd.images?.[0] || ""];
 
+      // Track last successful response outside the loop to avoid scoping issues
+      let lastData: any = null;
+
       for (let i = 0; i < variantsToGenerate.length; i++) {
         const variantUrl = variantsToGenerate[i];
         
@@ -1713,12 +1716,14 @@ function InfluencerManager() {
             product: modifiedProd,
             style: styleMode,
             scene: sceneType,
-            brandLogoUrl: sceneType === "forgiven_storefront" ? window.location.origin + "/forgiven.png" : undefined
+            brandLogoUrl: window.location.origin + "/forgiven.png"
           }
         });
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
+
+        lastData = data;
 
         // Save to content gallery
         const variantTitleSuffix = variantsToGenerate.length > 1 ? ` (Variant ${i + 1})` : "";
@@ -1740,10 +1745,11 @@ function InfluencerManager() {
         if (insertError) throw insertError;
       }
 
-      if (data.fidelityScore !== undefined) setCampaignFidelityScore(data.fidelityScore);
+      if (lastData?.fidelityScore !== undefined) setCampaignFidelityScore(lastData.fidelityScore);
       await refetchVisuals();
-      const scoreLabel = data.fidelityScore != null ? ` · Fidelity ${Math.round(data.fidelityScore * 100)}%` : "";
-      toast({ title: "Campaign visual generated! 📸", description: `Garment & identity preserved${scoreLabel}.` });
+      const scoreLabel = lastData?.fidelityScore != null ? ` · Fidelity ${Math.round(lastData.fidelityScore * 100)}%` : "";
+      const variantLabel = variantsToGenerate.length > 1 ? ` ${variantsToGenerate.length} variants generated.` : "";
+      toast({ title: "Campaign visual generated! 📸", description: `Garment & identity preserved${scoreLabel}.${variantLabel}` });
     } catch (err: any) {
       console.error("Generation error:", err);
       toast({ 

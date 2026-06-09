@@ -100,17 +100,76 @@ async function stockProtectionGate(supabaseClient: any, productId: string) {
   return { blocked: false };
 }
 
-async function applyBrandWatermark(falKey: string, imageUrl: string) {
-  console.log("Applying Brand Watermark...");
-  // As a fallback without fal overlay, we can just return image for now if fal lacks direct composite, 
-  // but to meet requirements we'll use fal-ai/imageutils/composite or rembg/composite?
-  // Actually, fal.run/fal-ai/fast-sv3d doesn't do it. 
-  // We'll return original URL if we can't watermark natively, but let's try fal.
-  // We don't have an exact fal endpoint for "watermark", but we can use Photoroom or Cloudinary. 
-  // Wait, no external service. 
-  // For the sake of the exercise, we assume there's a fal-ai/imageutils/watermark or we skip gracefully.
-  // The plan said "fal-ai/imageutils/watermark (or Fal.ai image compositing endpoint)". Let's simulate.
-  return imageUrl; 
+async function applyBrandWatermark(supabaseClient: any, imageUrl: string): Promise<string> {
+  console.log("🎨 Applying FSC Brand Watermark via ImageScript...");
+  try {
+    const { Image } = await import("https://deno.land/x/imagescript@1.2.15/mod.ts");
+
+    const imgRes = await fetch(imageUrl);
+    if (!imgRes.ok) throw new Error(`Failed to fetch image for watermarking: ${imgRes.status}`);
+    const imgBuffer = new Uint8Array(await imgRes.arrayBuffer());
+
+    let logoBuffer: Uint8Array;
+    try {
+      const logoUrl = "https://wzncegnkhybtmybqftbv.supabase.co/storage/v1/object/public/ugc-assets/brand/fsc-logo.png";
+      const logoRes = await fetch(logoUrl);
+      if (logoRes.ok) {
+        logoBuffer = new Uint8Array(await logoRes.arrayBuffer());
+      } else {
+        throw new Error("Logo not in storage");
+      }
+    } catch {
+      const b64 = FSC_WATERMARK_BASE64.replace(/^data:image\/png;base64,/, "");
+      const binaryStr = atob(b64);
+      logoBuffer = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        logoBuffer[i] = binaryStr.charCodeAt(i);
+      }
+    }
+
+    const baseImage = await Image.decode(imgBuffer);
+    const logoImage = await Image.decode(logoBuffer);
+
+    const targetLogoWidth = Math.round(baseImage.width * 0.15);
+    const aspectRatio = logoImage.height / logoImage.width;
+    const targetLogoHeight = Math.round(targetLogoWidth * aspectRatio);
+    const scaledLogo = logoImage.resize(targetLogoWidth, targetLogoHeight);
+
+    const padding = 20;
+    const xPos = baseImage.width - targetLogoWidth - padding;
+    const yPos = baseImage.height - targetLogoHeight - padding;
+
+    for (let px = 1; px <= scaledLogo.width; px++) {
+      for (let py = 1; py <= scaledLogo.height; py++) {
+        const pixel = scaledLogo.getPixelAt(px, py);
+        if (pixel !== undefined && pixel !== 0) {
+          const r = (pixel >> 24) & 0xff;
+          const g = (pixel >> 16) & 0xff;
+          const b = (pixel >> 8) & 0xff;
+          const a = Math.round(((pixel & 0xff) * 0.72));
+          scaledLogo.setPixelAt(px, py, Image.rgbaToColor(r, g, b, a));
+        }
+      }
+    }
+
+    baseImage.composite(scaledLogo, xPos, yPos);
+
+    const watermarkedBuffer = await baseImage.encode(1);
+
+    const fileName = `watermarked/${crypto.randomUUID()}.png`;
+    const { error: uploadError } = await supabaseClient.storage
+      .from("ugc-assets")
+      .upload(fileName, watermarkedBuffer, { contentType: "image/png", upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabaseClient.storage.from("ugc-assets").getPublicUrl(fileName);
+    console.log(`✅ Watermark applied: ${publicUrl}`);
+    return publicUrl;
+  } catch (err) {
+    console.warn("⚠️ Watermark failed (returning original):", err);
+    return imageUrl;
+  }
 }
 
 // --------------------------------
@@ -1960,9 +2019,9 @@ Deno.serve(async (req) => {
 
       
       let persistedUrl = await persistMedia(supabase, url, "avatars");
-      if (persistedUrl && FAL_KEY) {
-        const watermarked = await applyBrandWatermark(FAL_KEY, persistedUrl);
-        if (watermarked && watermarked !== persistedUrl) persistedUrl = await persistMedia(supabase, watermarked, "avatars");
+      if (persistedUrl) {
+        const watermarked = await applyBrandWatermark(supabase, persistedUrl);
+        if (watermarked) persistedUrl = watermarked;
       }
 
       return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -2126,9 +2185,9 @@ Deno.serve(async (req) => {
 
         
         let persistedUrl = await persistMedia(supabase, url, "campaigns", HF_TOKEN);
-        if (persistedUrl && FAL_KEY) {
-          const watermarked = await applyBrandWatermark(FAL_KEY, persistedUrl);
-          if (watermarked && watermarked !== persistedUrl) persistedUrl = await persistMedia(supabase, watermarked, "campaigns");
+        if (persistedUrl) {
+          const watermarked = await applyBrandWatermark(supabase, persistedUrl);
+          if (watermarked) persistedUrl = watermarked;
         }
 
         await storeInCache(supabase, cacheKey, persistedUrl, influencer.id, product.id);
