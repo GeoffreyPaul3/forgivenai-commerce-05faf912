@@ -1518,7 +1518,8 @@ async function runUnifiedVTON(
   scene?: string,
   style?: string,
   hairstyle?: string,
-  makeup?: string
+  makeup?: string,
+  brandLogoUrl?: string
 ): Promise<string> {
   const targetEthnicity = ethnicity || "person";
   const targetGender = gender || "female";
@@ -1941,7 +1942,8 @@ Deno.serve(async (req) => {
             setting,
             body.style || "",
             hairstyle,
-            makeup
+            makeup,
+            body.brandLogoUrl
           );
         } else {
           // Creating a baseline influencer identity portrait (no product selected)
@@ -2116,7 +2118,10 @@ Deno.serve(async (req) => {
           influencerEthnicity,
           influencerGender,
           scene,
-          body.style || ""
+          body.style || "",
+          undefined,
+          undefined,
+          body.brandLogoUrl
         );
 
         

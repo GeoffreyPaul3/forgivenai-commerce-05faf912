@@ -12,8 +12,27 @@ import { getAppMode, getRedirectUrl, type AppMode } from "@/lib/app-mode";
 
 type AuthMode = "login" | "signup" | "forgot" | "reset";
 
+/** Synchronously detect Supabase password-recovery tokens in the URL.
+ * Supabase appends: /auth#access_token=...&type=recovery
+ * We parse this BEFORE first render so the initial mode is correct,
+ * preventing the login form from flashing or the event being missed.
+ */
+function detectInitialAuthMode(): AuthMode {
+  if (typeof window === "undefined") return "login";
+  // Check URL hash fragment (primary format Supabase uses)
+  const hash = window.location.hash.substring(1);
+  if (hash) {
+    const params = new URLSearchParams(hash);
+    if (params.get("type") === "recovery") return "reset";
+  }
+  // Check query string (older or email-link format)
+  const search = new URLSearchParams(window.location.search);
+  if (search.get("type") === "recovery") return "reset";
+  return "login";
+}
+
 export default function AuthPage() {
-  const [mode, setMode] = useState<AuthMode>("login");
+  const [mode, setMode] = useState<AuthMode>(detectInitialAuthMode);
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [email, setEmail] = useState("");
@@ -34,7 +53,8 @@ export default function AuthPage() {
     else if (appMode === "agent") setRole("agent");
   }, [appMode]);
 
-  // Listen for PASSWORD_RECOVERY event — fires when user clicks the reset link in email
+  // Listen for PASSWORD_RECOVERY event — secondary safety net in case the
+  // hash is processed after mount (e.g. Supabase PKCE flow on some clients)
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
@@ -42,6 +62,12 @@ export default function AuthPage() {
       }
     });
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Belt-and-suspenders: if hash arrives after mount (SPA navigation), detect it
+  useEffect(() => {
+    const initialMode = detectInitialAuthMode();
+    if (initialMode === "reset") setMode("reset");
   }, []);
 
   const [pendingApproval, setPendingApproval] = useState(false);
@@ -120,8 +146,12 @@ export default function AuthPage() {
         }
 
       } else if (mode === "forgot") {
+        // redirectTo must exactly match one of the URLs whitelisted in:
+        // Supabase Dashboard → Authentication → URL Configuration → Redirect URLs
+        // All three portals are covered by using the current origin.
+        const redirectTo = `${window.location.origin}/auth`;
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth`,
+          redirectTo,
         });
         if (error) throw error;
         setResetSent(true);

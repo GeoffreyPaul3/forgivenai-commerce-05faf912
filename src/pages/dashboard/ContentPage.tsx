@@ -1695,35 +1695,50 @@ function InfluencerManager() {
       await new Promise(r => setTimeout(r, 1500));
       setGenerationStep(4); // Rendering Campaign
 
-      const { data, error } = await supabase.functions.invoke("ugc-generate", {
-        body: {
-          action: "generate-campaign-shot",
-          influencer: selectedInfluencer,
-          product: selectedProd,
-          style: styleMode,
-          scene: sceneType,
-        }
-      });
+      // Handle composite/grid products by generating separately for each variant
+      const variantsToGenerate = selectedProd.is_composite && selectedProd.variant_images?.length > 0 
+        ? selectedProd.variant_images 
+        : [selectedProd.images?.[0] || ""];
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      for (let i = 0; i < variantsToGenerate.length; i++) {
+        const variantUrl = variantsToGenerate[i];
+        
+        // Pass the variant image specifically for this generation
+        const modifiedProd = { ...selectedProd, images: [variantUrl] };
 
-      // Save to content gallery
-      const { error: insertError } = await supabase.from("content").insert({
-        type: "ai_visual",
-        title: `${selectedInfluencer.name} x ${selectedProd.name} Campaign`,
-        body: `Campaign Visual: ${styleMode.replace("_", " ")} styling in ${sceneType.replace("_", " ")} scene.`,
-        media_url: data.imageUrl,
-        product_id: selectedProduct,
-        metadata: {
-          influencer_id: selectedInfluencer.id,
-          style: styleMode,
-          scene: sceneType,
-          campaign_ready: true
-        } as any
-      });
+        const { data, error } = await supabase.functions.invoke("ugc-generate", {
+          body: {
+            action: "generate-campaign-shot",
+            influencer: selectedInfluencer,
+            product: modifiedProd,
+            style: styleMode,
+            scene: sceneType,
+            brandLogoUrl: sceneType === "forgiven_storefront" ? window.location.origin + "/forgiven.png" : undefined
+          }
+        });
 
-      if (insertError) throw insertError;
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        // Save to content gallery
+        const variantTitleSuffix = variantsToGenerate.length > 1 ? ` (Variant ${i + 1})` : "";
+        const { error: insertError } = await supabase.from("content").insert({
+          type: "ai_visual",
+          title: `${selectedInfluencer.name} x ${selectedProd.name} Campaign${variantTitleSuffix}`,
+          body: `Campaign Visual: ${styleMode.replace("_", " ")} styling in ${sceneType.replace("_", " ")} scene.`,
+          media_url: data.imageUrl,
+          product_id: selectedProduct,
+          metadata: {
+            influencer_id: selectedInfluencer.id,
+            style: styleMode,
+            scene: sceneType,
+            campaign_ready: true,
+            is_variant: variantsToGenerate.length > 1
+          } as any
+        });
+
+        if (insertError) throw insertError;
+      }
 
       if (data.fidelityScore !== undefined) setCampaignFidelityScore(data.fidelityScore);
       await refetchVisuals();
@@ -2023,6 +2038,12 @@ function InfluencerManager() {
                   <SelectItem value="high_fashion_runway">Runway Stage</SelectItem>
                   <SelectItem value="minimal_loft">Minimal Loft</SelectItem>
                   <SelectItem value="sunset_beach">Sunset Beach Editorial</SelectItem>
+                  <SelectItem value="forgiven_storefront">
+                    <div className="flex items-center gap-2">
+                      <img src="/forgiven.png" alt="Forgiven Logo" className="w-4 h-4 object-contain" />
+                      Forgiven Shopping Centre
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
