@@ -41,7 +41,14 @@ serve(async (req) => {
         sizes: p.sizes || (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.size || v.value || v.name).filter(Boolean))] : []) || (p.options?.find((o: any) => o.name?.toLowerCase().includes("size"))?.values || []),
         colors: p.colors || (p.variants && p.variants.length > 0 ? [...new Set(p.variants.map((v: any) => v.color || v.colour || v.name).filter(Boolean))] : []) || (p.options?.find((o: any) => o.name?.toLowerCase().includes("color") || o.name?.toLowerCase().includes("colour"))?.values || []),
         stock_quantity: stockQuantity,
-        stock_status: stockStatus
+        stock_status: stockStatus,
+        variants: Array.isArray(p.variants) ? p.variants.map((v: any) => ({
+          name: v.name || v.size || v.color || "Default",
+          size: v.size || null,
+          color: v.color || null,
+          stock_quantity: v.stockQuantity ?? v.inventory ?? v.quantity ?? stockQuantity,
+          sku: v.sku || p.sku || null
+        })) : []
       };
     });
 
@@ -75,7 +82,8 @@ serve(async (req) => {
         sizes: p.sizes,
         colors: p.colors,
         stock_quantity: p.stock_quantity,
-        stock_status: p.stock_status
+        stock_status: p.stock_status,
+        variants: p.variants
       };
 
       if (existingId) {

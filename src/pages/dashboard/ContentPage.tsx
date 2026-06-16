@@ -461,9 +461,12 @@ const ContentPage = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="font-heading text-2xl font-bold text-foreground tracking-tight">Content & UGC</h2>
-        <p className="text-muted-foreground text-sm font-body">AI-powered content generation & UGC video studio</p>
+      <div className="flex items-center gap-4">
+        <img src="/forgiven.png" alt="Forgiven AI Logo" className="w-12 h-12 object-contain" />
+        <div>
+          <h2 className="font-heading text-2xl font-bold text-foreground tracking-tight">Content Studio</h2>
+          <p className="text-muted-foreground text-sm font-body">AI-powered content generation & UGC video studio</p>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -1585,6 +1588,7 @@ function InfluencerManager() {
     name: "", gender: "female", ethnicity: "african", face_embedding: "", body_type: "tall_editorial",
     style_profile: "High-End Editorial", pose_style: "Dynamic Fashion"
   });
+  const [identityPhoto, setIdentityPhoto] = useState<File | null>(null);
   const [generatingIdentity, setGeneratingIdentity] = useState(false);
   const [campaignFidelityScore, setCampaignFidelityScore] = useState<number | null>(null);
   const [galleryPage, setGalleryPage] = useState(1);
@@ -1770,7 +1774,7 @@ function InfluencerManager() {
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `${title.toLowerCase().replace(/\s+/g, "-")}.png`;
+      link.download = `${title.toLowerCase().replace(/\\s+/g, "-")}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1788,13 +1792,20 @@ function InfluencerManager() {
     if (!newInfluencer.name) return;
     setGeneratingIdentity(true);
     try {
+      let base64Photo = null;
+      if (identityPhoto) {
+        base64Photo = await fileToBase64(identityPhoto);
+      }
+
       // 1. Generate identity reference image
       const { data: imgData, error: imgError } = await supabase.functions.invoke("ugc-generate", {
         body: { 
           action: "generate-avatar", 
           gender: newInfluencer.gender, 
           ethnicity: newInfluencer.ethnicity,
-          setting: "studio-portrait"
+          setting: "studio-portrait",
+          avatarImageBase64: base64Photo,
+          useExactPhoto: !!base64Photo
         }
       });
       if (imgError) throw imgError;
@@ -1805,10 +1816,12 @@ function InfluencerManager() {
         ...newInfluencer,
         avatar_url: imgData.imageUrl,
       } as any);
+
       if (insError) throw insError;
 
       queryClient.invalidateQueries({ queryKey: ["influencers"] });
       setShowCreate(false);
+      setIdentityPhoto(null);
       toast({ title: "Influencer identity locked!" });
     } catch (err: any) {
       toast({ title: "Failed to create identity", description: err.message, variant: "destructive" });
@@ -2305,6 +2318,21 @@ function InfluencerManager() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-1.5 pt-2">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                📸 Use Your Own Photo (Recommended)
+              </label>
+              <Input 
+                type="file" 
+                accept="image/*" 
+                onChange={e => e.target.files && setIdentityPhoto(e.target.files[0])}
+                className="rounded-xl file:bg-primary file:text-primary-foreground file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3 hover:file:bg-primary/90 text-sm cursor-pointer border-dashed border-2 bg-muted/10 h-14"
+              />
+              <p className="text-[10px] text-muted-foreground font-body">
+                Upload YOUR photo to use as the creator, or generate an AI avatar. The avatar will wear your actual product.
+              </p>
             </div>
 
             <div className="pt-4 space-y-3">

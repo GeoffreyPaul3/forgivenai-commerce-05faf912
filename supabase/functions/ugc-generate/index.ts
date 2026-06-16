@@ -16,6 +16,7 @@ Check for:
 3. Warped, melting, or mangled faces
 4. Crossed, asymmetric, or unrealistic eyes
 5. Severely deformed body proportions
+6. BRAND PRESENCE: Is the model placed in a luxury environment with "Forgiven Shopping Centre" or "FSC" branding visible? Fail if the image looks like a generic studio without branding.
 
 Return ONLY a valid JSON object in this format:
 {
@@ -172,8 +173,57 @@ async function applyBrandWatermark(supabaseClient: any, imageUrl: string): Promi
   }
 }
 
-// --------------------------------
+// --- ENTERPRISE BRAND STUDIO SYSTEM ---
+function buildEnterpriseBrandPrompt(sceneType: string, isVideo: boolean = false): string {
+  let sceneDescription = "";
+  const sceneLower = (sceneType || "").toLowerCase();
+  
+  if (sceneLower.includes("boutique") || sceneLower.includes("store")) {
+    sceneDescription = "SCENE: Luxury fashion store, premium displays, designer retail environment, FSC branded architecture.";
+  } else if (sceneLower.includes("runway")) {
+    sceneDescription = "SCENE: Fashion week runway, Forgiven Shopping Centre branding, professional fashion lighting, luxury audience atmosphere.";
+  } else if (sceneLower.includes("met gala") || sceneLower.includes("red carpet")) {
+    sceneDescription = "SCENE: Luxury red carpet, architectural lighting, premium event photography, brand identity integrated naturally.";
+  } else if (sceneLower.includes("lifestyle") || sceneLower.includes("hotel") || sceneLower.includes("penthouse")) {
+    sceneDescription = "SCENE: Five-star hotel, luxury penthouse, designer interiors, Forgiven branding subtly integrated.";
+  } else if (sceneLower.includes("outdoor") || sceneLower.includes("street")) {
+    sceneDescription = "SCENE: Luxury shopping district, premium storefront, elegant FSC signage, designer architecture.";
+  } else {
+    sceneDescription = "SCENE: Luxury FSC Studio, editorial photography.";
+  }
 
+  const basePrompt = `
+BRANDING & ENVIRONMENT (CRITICAL):
+You must render this image inside the "Forgiven Shopping Centre Signature Studio" ecosystem. 
+The aesthetic must feel like a Gucci Campaign Studio, Dolce & Gabbana Runway, Prada Editorial Set, Louis Vuitton Boutique, Met Gala Red Carpet, or Vogue Fashion Shoot.
+It must feel Luxury, Premium, Editorial, Fashion-forward, Global, and Trustworthy.
+Do NOT make it look Cheap, Generic, AI-looking, Stock-photo-looking, or Cartoonish.
+
+MANDATORY VISUAL ELEMENTS:
+- Large illuminated architectural luxury arch with magenta LED accent lighting along its inner curve.
+- Centered on the back wall inside the arch is the official brand logo: Three overlapping shopping bag icons (a large magenta bag in front containing a white 'F', a medium blue bag behind it to the left, and a small lime green bag behind the blue one), positioned above the bold magenta word "Forgiven" and smaller thin black text "Shopping Centre" aligned to the right.
+- Cream stone walls and Luxury marble flooring
+- Warm premium lighting and Brushed gold accents
+- Premium display shelves and Luxury fashion platform
+- Luxury boutique atmosphere
+
+BRAND COLOR SYSTEM:
+Incorporate the following colors naturally into the lighting accents, wall details, display structures, luxury decor, runway lighting, and background architecture: Magenta (#B0208D), Royal Blue (#1D3F8C), Lime Green (#8BC34A), White (#FFFFFF), Black (#111111).
+NEVER apply these colors directly to the product or garment. The product must remain untouched and the hero of the image.
+
+MODEL POSITIONING:
+Always keep the model slightly off-center in the composition. Never block the primary logo wall. Ensure the Forgiven logo visibility in the background. Maintain fashion magazine composition rules.
+
+${sceneDescription}
+`;
+
+  if (isVideo) {
+    return basePrompt + "\nVIDEO SPECIFICS: Maintain realistic movement, natural camera motion, luxury lighting, and a visible brand presence throughout the video. It must look like high-end Vogue, Harper's Bazaar, or Elle editorial standards.";
+  }
+
+  return basePrompt;
+}
+// --------------------------------
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -691,7 +741,7 @@ async function generateTrueMotionVideo(apiKey: string, imageUrl: string, prompt:
       
       The video must feel like:
       real iPhone creator footage. (${prompt})`,
-      negative_prompt: "slideshow, static, still image, blurry, distorted face, unnatural movement, warping, low resolution, jumping frames, generic background, robotic, zoom, pan",
+      negative_prompt: "slideshow, static, still image, blurry, distorted face, unnatural movement, warping, low resolution, jumping frames, generic background, robotic, zoom, pan, mutated hands, broken fingers, extra limbs, bad anatomy",
       aspect_ratio: "9:16",
       duration: 15,
       motion_score: 10,
@@ -1111,6 +1161,7 @@ async function verifyProductFidelity(
     `8. Accessories: Are buttons, zippers, buckles, pockets, and straps identical in count, color, and size?`,
     `9. Neckline: Is the collar shape, depth, and wings 100% correct? (For non-apparel like shoes/bags, score 10/10 if not applicable)`,
     `10. Sleeves: Are sleeve lengths, cuff structures, and shoulder seams matching? (For non-apparel like shoes/bags, score 10/10 if not applicable)`,
+    `11. Brand Presence: Is the model placed slightly off-center in a premium luxury environment with "Forgiven Shopping Centre" or "FSC" branding visible?`,
     ``,
     `Return ONLY a valid JSON object. Do NOT include markdown blocks or any other characters outside the JSON.`,
     `The JSON must follow this exact format:`,
@@ -1125,7 +1176,8 @@ async function verifyProductFidelity(
     `    "stitching": 10,`,
     `    "accessories": 10,`,
     `    "neckline": 10,`,
-    `    "sleeves": 10`,
+    `    "sleeves": 10,`,
+    `    "brand_presence": 10`,
     `  },`,
     `  "overall_score": 99,`,
     `  "reasoning": "Color matches perfectly, but the leather texture is slightly smoother in the generated image than the raw product image."`,
@@ -1205,6 +1257,7 @@ async function verifyVideoFidelity(
     `2. Warping & Mutations: Does the shape, neckline, buttons, or straps of the garment distort or change in count/geometry during motion?`,
     `3. Color Shifts: Do the fabric colors fade, change shades, or shift under moving light?`,
     `4. Product Matching: Does the garment in the video remain 100% identical to the reference product image throughout?`,
+    `5. Brand Environment: Does the video take place in a luxury environment with "Forgiven Shopping Centre" branding?`,
     ``,
     `Return ONLY a valid JSON object. Do NOT include markdown blocks or any other characters outside the JSON.`,
     `The JSON must follow this exact format:`,
@@ -1212,6 +1265,7 @@ async function verifyVideoFidelity(
     `  "drift_detected": false,`,
     `  "warping_detected": false,`,
     `  "color_shift_detected": false,`,
+    `  "brand_missing": false,`,
     `  "product_match_percentage": 98,`,
     `  "pass": true,`,
     `  "reasoning": "The garment is fully stable, textures do not slide or warp, color is locked perfectly with zero drift."`,
@@ -1476,6 +1530,39 @@ async function callImageAI(apiKey: string, prompt: string, references: { type: '
 async function persistMedia(supabaseClient: any, mediaUrl: string, folder: string, hfToken?: string) {
   try {
     if (!mediaUrl) return null;
+    
+    if (mediaUrl.startsWith("data:")) {
+      console.log(`Persisting base64 media to ${folder}...`);
+      const match = mediaUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        const contentType = match[1];
+        const base64Data = match[2];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: contentType });
+        
+        let extension = "png";
+        if (contentType.includes("jpeg") || contentType.includes("jpg")) extension = "jpg";
+        else if (contentType.includes("webp")) extension = "webp";
+        
+        const fileName = `${folder}/${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await supabaseClient.storage.from("ugc-assets").upload(fileName, blob, { contentType, upsert: true });
+        
+        if (uploadError) {
+          console.error("Storage upload error:", uploadError);
+          return mediaUrl;
+        }
+        
+        const { data: { publicUrl } } = supabaseClient.storage.from("ugc-assets").getPublicUrl(fileName);
+        console.log(`Successfully persisted base64 media to: ${publicUrl}`);
+        return publicUrl;
+      }
+    }
+
     console.log(`Persisting media from: ${mediaUrl.substring(0, 100)}...`);
     
     // Clean up gradio URLs if needed
@@ -1488,7 +1575,7 @@ async function persistMedia(supabaseClient: any, mediaUrl: string, folder: strin
     });
     
     if (!response.ok) {
-      console.warn(`Failed to fetch media for persistence: ${response.status} ${response.statusText}. URL was: ${mediaUrl}`);
+      console.warn(`Failed to fetch media for persistence: ${response.status} ${response.statusText}.`);
       return mediaUrl;
     }
     
@@ -1585,7 +1672,7 @@ async function runUnifiedVTON(
   console.log(`[Unified VTON] Starting pipeline — category: "${category}", description: "${description}", references count: ${productImages.length}`);
 
   if (productImages.length === 0) {
-    throw new Error("Generation blocked: no product image references provided.");
+    throw { status: 400, message: "Generation blocked: no product image references provided. Please ensure the product has an image." };
   }
 
   const primaryProductUrl = productImages[0];
@@ -1713,6 +1800,11 @@ async function runUnifiedVTON(
           } else if (attempt === 3) {
             strictnessPromptModifier = "CRITICAL AUDIT NOTICE: Zero tolerance for modifications. Every stitch, neckline, pattern, and button count must match the raw product image exactly.";
           }
+          if (lastReasoning) {
+            strictnessPromptModifier += ` \\nPREVIOUS AUDIT FAILED DUE TO: ${lastReasoning}. YOU MUST FIX THIS ISSUE IN THIS GENERATION.`;
+          }
+
+          const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
 
           const wanPrompt = [
             `Professional high-resolution fashion catalog photograph.`,
@@ -1729,10 +1821,11 @@ async function runUnifiedVTON(
             `  - DO NOT change the model's face, skin tone or ethnicity.`,
             `  - If you cannot reproduce the EXACT product, output a blank result rather than a wrong product.`,
             strictnessPromptModifier,
-            scene ? `SETTING: ${scene.replace(/_/g, " ")}.` : `Studio lighting, sharp focus, white background.`,
+            anatomyPrompt,
+            buildEnterpriseBrandPrompt(scene || "opulent fashion studio"),
             hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ``,
             makeup ? `MAKEUP: ${makeup}.` : ``,
-            `Photorealistic render. The generated image MUST be indistinguishable from a high-end catalog photo.`
+            `Photorealistic render. The generated image MUST be indistinguishable from a high-end luxury catalog photo.`
           ].join(" ");
 
           console.log(`[Unified VTON] Wan prompt (attempt ${attempt}): ${wanPrompt}`);
@@ -1831,11 +1924,10 @@ async function runUnifiedVTON(
     return bestResultUrl;
   }
 
-  throw new Error(
-    `CLEAN_FAILURE: Apparel virtual try-on failed after ${maxRetries} attempts. ` +
-    `None of the VTON engines produced a result matching the inventory product with acceptable fidelity (88%+ overall, 7+ per category). ` +
-    `Last auditor reasoning: ${lastReasoning || "All attempts timed out or failed to execute."}`
-  );
+  throw { 
+    status: 400, 
+    message: `Apparel virtual try-on failed: none of the engines produced a result with acceptable fidelity. Last reasoning: ${lastReasoning || "Timeout"}`
+  };
 }
 
 
@@ -1962,9 +2054,27 @@ Deno.serve(async (req) => {
       const makeup = body.makeup || "";
       const skinTone = body.skinTone || "";
       
+      let isComposite = false;
+      let variantImages: string[] = [];
+
+      try {
+        if (incomingProductId && !String(incomingProductId).startsWith("live_")) {
+          const { data: dbProduct, error: dbErr } = await supabase
+            .from("products")
+            .select("is_composite, variant_images")
+            .eq("id", incomingProductId)
+            .maybeSingle();
+          if (!dbErr && dbProduct) {
+            isComposite = dbProduct.is_composite;
+            variantImages = dbProduct.variant_images || [];
+          }
+        }
+      } catch (e) {
+        console.warn("[Inventory Gate] Failed to fetch composite status", e);
+      }
+
       console.log(`Generating avatar for ${productName} (${gender}, ${ethnicity}, ${skinTone}, ${hairstyle}, ${makeup}, ${setting})...`);
 
-      let url;
       try {
         if (primaryProductUrl) {
           let vtonPersonImage = referenceImage;
@@ -1975,12 +2085,13 @@ Deno.serve(async (req) => {
             const modelDesc = `Stunningly beautiful high-fashion supermodel. Striking editorial facial features. Top-tier modeling agency quality.`;
             const identityDesc = `MODEL GENDER: ${gender}. ETHNICITY/SKIN TONE: ${ethnicity} ${skinTone}.`;
             const styleDesc = `${hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ""} ${makeup ? `MAKEUP: ${makeup}.` : ""}`;
+            const luxurySetting = buildEnterpriseBrandPrompt(setting || "opulent fashion studio");
+            const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
             
             if (body.isUGC) {
-              baselinePrompt = `Authentic smartphone selfie. Lifestyle photography. ${modelDesc} ${identityDesc} ${styleDesc} SETTING: ${setting || "natural city street"}. 
-              CRITICAL: Natural skin texture, realistic casual lighting, unedited look, raw lifestyle feel, wearing casual undergarment or plain white t-shirt.`;
+              baselinePrompt = `Authentic smartphone selfie. Lifestyle photography. ${modelDesc} ${identityDesc} ${styleDesc} ENVIRONMENT AND BRANDING: ${luxurySetting} ${anatomyPrompt} CRITICAL: Natural skin texture, realistic casual lighting, unedited look, raw lifestyle feel, wearing casual undergarment or plain white t-shirt.`;
             } else {
-              baselinePrompt = `High-end fashion portrait. ${modelDesc} ${identityDesc} ${styleDesc} SETTING: ${setting || "studio"}. Wearing simple plain undergarment or white t-shirt.`;
+              baselinePrompt = `High-end luxury fashion portrait. ${modelDesc} ${identityDesc} ${styleDesc} ENVIRONMENT AND BRANDING: ${luxurySetting} ${anatomyPrompt} Wearing simple plain undergarment or white t-shirt.`;
             }
             // Generate a premium baseline model portrait
             const baselineUrl = await callImageAI(QWEN_API_KEY, baselinePrompt, []);
@@ -1988,43 +2099,72 @@ Deno.serve(async (req) => {
             console.log(`[generate-avatar] Generated baseline portrait: ${vtonPersonImage}`);
           }
           
-          // Map the exact product onto the reference image/generated baseline portrait
-          url = await runUnifiedVTON(
-            { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
-            vtonPersonImage,
-            productImages,
-            productCategory || "apparel",
-            productName || "garment",
-            supabase,
-            ethnicity,
-            gender,
-            setting,
-            body.style || "",
-            hairstyle,
-            makeup,
-            body.brandLogoUrl
-          );
+          if (isComposite && variantImages.length > 0) {
+            console.log(`[generate-avatar] Composite product detected with ${variantImages.length} variants. Processing multi-VTON loop...`);
+            const generatedUrls = [];
+            for (let i = 0; i < variantImages.length; i++) {
+              const variantUrl = variantImages[i];
+              console.log(`[generate-avatar] Generating VTON for variant ${i+1}/${variantImages.length}...`);
+              const genUrl = await runUnifiedVTON(
+                { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
+                vtonPersonImage,
+                [variantUrl],
+                productCategory || "apparel",
+                productName || "garment",
+                supabase,
+                ethnicity,
+                gender,
+                setting,
+                body.style || "",
+                hairstyle,
+                makeup,
+                body.brandLogoUrl
+              );
+              let persistedUrl = await persistMedia(supabase, genUrl, "avatars");
+              generatedUrls.push(persistedUrl);
+            }
+            return new Response(JSON.stringify({ success: true, imageUrls: generatedUrls }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          } else {
+            // Map the exact product onto the reference image/generated baseline portrait
+            const url = await runUnifiedVTON(
+              { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
+              vtonPersonImage,
+              productImages,
+              productCategory || "apparel",
+              productName || "garment",
+              supabase,
+              ethnicity,
+              gender,
+              setting,
+              body.style || "",
+              hairstyle,
+              makeup,
+              body.brandLogoUrl
+            );
+            let persistedUrl = await persistMedia(supabase, url, "avatars");
+            return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
         } else {
-          // Creating a baseline influencer identity portrait (no product selected)
-          const modelDesc = `Stunningly beautiful high-fashion supermodel. Striking editorial facial features.`;
-          const identityDesc = `GENDER: ${gender}. ETHNICITY/SKIN TONE: ${ethnicity} ${skinTone}.`;
-          const styleDesc = `${hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ""} ${makeup ? `MAKEUP: ${makeup}.` : ""}`;
-          const prompt = `High-end fashion portrait. ${modelDesc} ${identityDesc} ${styleDesc} SETTING: ${setting || "studio"}.`;
-          url = await callImageAI(QWEN_API_KEY, prompt, referenceImage ? [{ type: 'influencer' as const, url: referenceImage }] : []);
+          let url;
+          if (body.useExactPhoto && referenceImage) {
+            url = referenceImage;
+            console.log(`[generate-avatar] Using uploaded exact photo directly without AI generation.`);
+          } else {
+            // Creating a baseline influencer identity portrait (no product selected)
+            const modelDesc = `Stunningly beautiful high-fashion supermodel. Striking editorial facial features.`;
+            const identityDesc = `GENDER: ${gender}. ETHNICITY/SKIN TONE: ${ethnicity} ${skinTone}.`;
+            const styleDesc = `${hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ""} ${makeup ? `MAKEUP: ${makeup}.` : ""}`;
+            const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
+            const prompt = `High-end fashion portrait. ${modelDesc} ${identityDesc} ${styleDesc} SETTING: ${setting || "studio"}. ${anatomyPrompt}`;
+            url = await callImageAI(QWEN_API_KEY, prompt, referenceImage ? [{ type: 'influencer' as const, url: referenceImage }] : []);
+          }
+          let persistedUrl = await persistMedia(supabase, url, "avatars");
+          return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
       } catch (e) {
         console.error("Avatar generation failed:", e);
         throw e;
       }
-
-      
-      let persistedUrl = await persistMedia(supabase, url, "avatars");
-      if (persistedUrl) {
-        const watermarked = await applyBrandWatermark(supabase, persistedUrl);
-        if (watermarked) persistedUrl = watermarked;
-      }
-
-      return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
 
@@ -2063,7 +2203,8 @@ Deno.serve(async (req) => {
 
       // --- STAGE 3: REAL MOTION GENERATION ---
       console.log("Stage 3: Generating Real AI Video Motion...");
-      const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${productDescription || productName}`;
+      const enterprisePrompt = buildEnterpriseBrandPrompt(setting || body.scene || "studio", true);
+      const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${productDescription || productName}. ${enterprisePrompt}`;
       let videoUrl;
       
       try {
@@ -2185,10 +2326,7 @@ Deno.serve(async (req) => {
 
         
         let persistedUrl = await persistMedia(supabase, url, "campaigns", HF_TOKEN);
-        if (persistedUrl) {
-          const watermarked = await applyBrandWatermark(supabase, persistedUrl);
-          if (watermarked) persistedUrl = watermarked;
-        }
+
 
         await storeInCache(supabase, cacheKey, persistedUrl, influencer.id, product.id);
         return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import logo from "@/assets/forgiven.png";
+
 import {useLandingActions } from "@/hooks/useLandingActions";
 
 const Navbar = () => {
@@ -16,7 +16,7 @@ const Navbar = () => {
       <div className="container mx-auto px-6 h-20 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 group shrink-0">
           <div className="rounded-lg bg-white/80 flex items-center justify-center shrink-0">
-            <img src={logo} alt="Forgiven Shop Logo" width={50} height={50}/>
+            <img src="/forgiven.png" alt="Forgiven Shop Logo" width={50} height={50}/>
           </div>
           <div className="hidden sm:flex flex-col">
             <span className="font-heading text-xl font-bold text-white tracking-tight leading-none">Forgiven</span>

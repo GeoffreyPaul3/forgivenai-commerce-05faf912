@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { NavLink } from "@/components/NavLink";
 import { useState, useEffect } from "react";
-import logo from "@/assets/forgiven.png";
+
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 const vendorMenuItems = [
@@ -36,7 +36,7 @@ function VendorSidebar() {
       <SidebarContent>
         <div className="px-4 py-4 flex items-center gap-2">
           <div className="flex items-center justify-center rounded-lg bg-white/80 shrink-0">
-            <img src={logo} alt="Forgiven Shop Logo" width={50} height={50}/>
+            <img src="/forgiven.png" alt="Forgiven Shop Logo" width={50} height={50}/>
           </div>
           {!collapsed && (
             <div className="flex flex-col">

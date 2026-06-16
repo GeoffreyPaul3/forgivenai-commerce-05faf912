@@ -10,7 +10,7 @@ import {
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   SidebarProvider, SidebarTrigger, useSidebar,
 } from "@/components/ui/sidebar";
-import logo from "@/assets/forgiven.png";
+
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -47,7 +47,7 @@ function AdminSidebar() {
       <SidebarContent>
         <div className="px-4 py-4 flex items-center gap-2">
           <div className="rounded-lg bg-white/80 flex items-center justify-center shrink-0">
-           <img src={logo} alt="Forgiven Shop Logo" width={40} height={40}/>
+           <img src="/forgiven.png" alt="Forgiven Shop Logo" width={40} height={40}/>
           </div>
           {!collapsed && (
             <span className="font-heading text-lg font-bold text-sidebar-foreground">Forgiven Admin</span>
