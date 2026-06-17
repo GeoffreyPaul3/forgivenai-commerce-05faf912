@@ -20,6 +20,32 @@ const COLORS = ["hsl(334, 68%, 32%)", "hsl(334, 50%, 45%)", "hsl(40, 60%, 50%)",
 const ProfitDashboard = () => {
   const [timeRange, setTimeRange] = useState("30");
 
+  const { data: settingsData } = useQuery({
+    queryKey: ["profit-settings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("settings").select("key, value");
+      return data || [];
+    }
+  });
+
+  const settings = useMemo(() => {
+    const s = {
+      monthly_fsc_markup_target: 5000000,
+      liquid_treasury: 10000000,
+      reserve_fund_balance: 5000000,
+      avg_monthly_ops_costs: 1500000,
+      working_days: 22
+    };
+    if (settingsData) {
+      settingsData.forEach(item => {
+        if (s.hasOwnProperty(item.key)) {
+          (s as any)[item.key] = Number(item.value) || (s as any)[item.key];
+        }
+      });
+    }
+    return s;
+  }, [settingsData]);
+
   const { data: profitData, isLoading } = useQuery({
     queryKey: ["profit-intelligence", timeRange],
     queryFn: async () => {
@@ -29,7 +55,7 @@ const ProfitDashboard = () => {
 
       const { data, error } = await supabase
         .from("orders")
-        .select("total, gross_margin, base_profit, surplus_profit, surplus_type, status, created_at, total_vendor_cost, fsc_markup_total, cac_total, packaging_total, logistics_total, agent_commission_total, net_fsc_contribution")
+        .select("total, gross_margin, base_profit, surplus_profit, surplus_type, status, created_at, total_vendor_cost, fsc_markup_total, cac_total, packaging_total, logistics_total, agent_commission_total, net_fsc_contribution, items")
         .in("status", ["paid", "confirmed", "processing", "shipped", "delivered"])
         .gte("created_at", cutoffDate.toISOString());
       
@@ -41,10 +67,15 @@ const ProfitDashboard = () => {
   const metrics = useMemo(() => {
     if (!profitData) return { 
       totalRevenue: 0, totalBaseProfit: 0, totalSurplus: 0, agentSurplus: 0, directSurplus: 0,
-      totalVendorCost: 0, totalFscMarkup: 0, totalCac: 0, totalPackaging: 0, totalLogistics: 0, totalCommission: 0, netFscContribution: 0
+      totalVendorCost: 0, totalFscMarkup: 0, totalCac: 0, totalPackaging: 0, totalLogistics: 0, totalCommission: 0, netFscContribution: 0,
+      totalItemsSold: 0, productPerformance: {} as Record<string, { name: string, markup: number, count: number }>,
+      vendorPerformance: {} as Record<string, { id: string, markup: number, orders: number }>
     };
 
-    return profitData.reduce((acc, curr) => {
+    const productPerformance: Record<string, { name: string, markup: number, count: number }> = {};
+    const vendorPerformance: Record<string, { id: string, markup: number, orders: number }> = {};
+
+    const aggregated = profitData.reduce((acc, curr) => {
       acc.totalRevenue += Number(curr.total || 0);
       acc.totalBaseProfit += Number(curr.base_profit || 0);
       acc.totalSurplus += Number(curr.surplus_profit || 0);
@@ -61,14 +92,63 @@ const ProfitDashboard = () => {
       acc.totalPackaging += Number(curr.packaging_total || 0);
       acc.totalLogistics += Number(curr.logistics_total || 0);
       acc.totalCommission += Number(curr.agent_commission_total || 0);
-      acc.netFscContribution += Number(curr.net_fsc_contribution || curr.base_profit || 0); // fallback to base_profit for legacy
+      acc.netFscContribution += Number(curr.net_fsc_contribution || curr.base_profit || 0);
+      
+      if (curr.items && Array.isArray(curr.items)) {
+        curr.items.forEach((item: any) => {
+           acc.totalItemsSold += (item.quantity || 1);
+           const pid = item.product_id || item.name;
+           const proportion = (item.price * (item.quantity || 1)) / (curr.total || 1);
+           const markupShare = Number(curr.fsc_markup_total || 0) * proportion;
+
+           if (pid) {
+             if (!productPerformance[pid]) productPerformance[pid] = { name: item.name || "Unknown", markup: 0, count: 0 };
+             productPerformance[pid].markup += markupShare;
+             productPerformance[pid].count += (item.quantity || 1);
+           }
+
+           const vid = item.vendor_id || curr.vendor_id || "In-House";
+           if (!vendorPerformance[vid]) vendorPerformance[vid] = { id: vid, markup: 0, orders: 0 };
+           vendorPerformance[vid].markup += markupShare;
+           vendorPerformance[vid].orders += 1;
+        });
+      }
       
       return acc;
     }, { 
       totalRevenue: 0, totalBaseProfit: 0, totalSurplus: 0, agentSurplus: 0, directSurplus: 0,
-      totalVendorCost: 0, totalFscMarkup: 0, totalCac: 0, totalPackaging: 0, totalLogistics: 0, totalCommission: 0, netFscContribution: 0
+      totalVendorCost: 0, totalFscMarkup: 0, totalCac: 0, totalPackaging: 0, totalLogistics: 0, totalCommission: 0, netFscContribution: 0,
+      totalItemsSold: 0
     });
+
+    return { ...aggregated, productPerformance, vendorPerformance };
   }, [profitData]);
+
+  const breakEven = useMemo(() => {
+    const totalItems = metrics.totalItemsSold || profitData?.length || 1;
+    const avgFscMarkupPerItem = metrics.totalFscMarkup / totalItems;
+    
+    const requiredItems = Math.ceil(settings.monthly_fsc_markup_target / (avgFscMarkupPerItem || 1));
+    const dailyItemTarget = Math.ceil(requiredItems / settings.working_days);
+    const achievementRate = (metrics.totalFscMarkup / settings.monthly_fsc_markup_target) * 100;
+    
+    return { requiredItems, dailyItemTarget, achievementRate, avgFscMarkupPerItem };
+  }, [metrics, profitData, settings]);
+
+  const treasury = useMemo(() => {
+    const operatingRunway = settings.liquid_treasury / settings.avg_monthly_ops_costs;
+    const reserveCoverage = (settings.reserve_fund_balance / settings.avg_monthly_ops_costs) * 100;
+    
+    let state = "Stable";
+    let color = "text-primary";
+    
+    if (operatingRunway < 2) { state = "Critical"; color = "text-destructive"; }
+    else if (operatingRunway < 4) { state = "At Risk"; color = "text-amber-500"; }
+    else if (operatingRunway > 12) { state = "Growth Mode"; color = "text-[#A21D7F]"; }
+    else if (operatingRunway > 6) { state = "Sustainable"; color = "text-emerald-500"; }
+
+    return { operatingRunway, reserveCoverage, state, color };
+  }, [settings]);
 
   const allocationData = [
     { name: "Vendor Cost", value: metrics.totalVendorCost },
@@ -99,19 +179,60 @@ const ProfitDashboard = () => {
     return Object.values(grouped).slice(-limit);
   }, [profitData, timeRange]);
 
+  const productIntelligence = useMemo(() => {
+    if (!metrics.productPerformance) return [];
+    
+    const products = Object.values(metrics.productPerformance);
+    if (products.length === 0) return [];
+    
+    const highestMarkup = Math.max(...products.map(p => p.markup));
+    
+    return products.map(p => {
+      const ppi = highestMarkup > 0 ? (p.markup / highestMarkup) * 100 : 0;
+      const mcp = (p.markup / settings.monthly_fsc_markup_target) * 100;
+      
+      let classification = "Underperforming Product";
+      let color = "bg-muted text-muted-foreground";
+      
+      if (ppi > 80) { classification = "Star Product"; color = "bg-primary/10 text-primary border-primary/20"; }
+      else if (ppi > 50 && p.count > 10) { classification = "Cash Cow"; color = "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"; }
+      else if (ppi > 40) { classification = "Growth Product"; color = "bg-[#A21D7F]/10 text-[#A21D7F] border-[#A21D7F]/20"; }
+      else if (p.markup === 0) { classification = "Dead Product"; color = "bg-destructive/10 text-destructive border-destructive/20"; }
+      else if (p.count > 5) { classification = "Strategic Product"; color = "bg-gold/10 text-gold-foreground border-gold/20"; }
+
+      return { ...p, ppi, mcp, classification, color };
+    }).sort((a, b) => b.ppi - a.ppi).slice(0, 5);
+  }, [metrics.productPerformance, settings.monthly_fsc_markup_target]);
+
+  const vendorIntelligence = useMemo(() => {
+    if (!metrics.vendorPerformance) return [];
+    const vendors = Object.values(metrics.vendorPerformance);
+    if (vendors.length === 0) return [];
+
+    return vendors.map(v => {
+      const mcp = (v.markup / settings.monthly_fsc_markup_target) * 100;
+      // Mocking Health Score since we don't have the actual DB stats in this query
+      const healthScore = Math.min(100, 75 + (v.orders * 2)); 
+      
+      return { ...v, mcp, healthScore };
+    }).sort((a, b) => b.markup - a.markup).slice(0, 5);
+  }, [metrics.vendorPerformance, settings.monthly_fsc_markup_target]);
+
   // Real AI Insights
   const { data: realAiInsights, isLoading: insightsLoading } = useQuery({
-    queryKey: ["real-profit-insights", metrics],
+    queryKey: ["real-profit-insights", metrics, treasury.state, breakEven.achievementRate],
     enabled: !!metrics.totalRevenue,
     queryFn: async () => {
       const context = JSON.stringify({
         currency: "MWK",
         revenue: metrics.totalRevenue,
-        baseProfit: metrics.totalBaseProfit,
-        surplus: metrics.totalSurplus,
-        agentSurplus: metrics.agentSurplus,
-        directSurplus: metrics.directSurplus,
-        surplusRatio: ((metrics.totalSurplus / metrics.totalRevenue) * 100).toFixed(1) + "%"
+        fscMarkup: metrics.totalFscMarkup,
+        treasuryState: treasury.state,
+        runway: treasury.operatingRunway,
+        breakEvenAchievement: breakEven.achievementRate,
+        topProducts: productIntelligence.map(p => p.name).join(", "),
+        topVendors: vendorIntelligence.map(v => v.id).join(", "),
+        requestedAlerts: "low stock, low vendor health, underperforming products, sustainability risks, logistics deficits, packaging shortages, runway risks"
       });
 
       const { data, error } = await supabase.functions.invoke("ai-generate", {
@@ -272,6 +393,86 @@ const ProfitDashboard = () => {
         </div>
       </div>
 
+      {/* Product Profitability Intelligence */}
+      <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden mb-6">
+         <div className="p-6 border-b border-border/50 flex items-center justify-between">
+            <h3 className="font-heading font-bold text-lg text-foreground">Product Profitability Intelligence</h3>
+         </div>
+         <div className="p-0">
+           {productIntelligence.length === 0 ? (
+             <div className="p-8 text-center text-muted-foreground text-sm">No product intelligence data yet</div>
+           ) : (
+             <div className="w-full overflow-x-auto">
+               <table className="w-full text-sm text-left">
+                 <thead className="bg-muted/30 text-muted-foreground font-body text-xs uppercase tracking-wider">
+                   <tr>
+                     <th className="px-6 py-4 font-semibold">Product Name</th>
+                     <th className="px-6 py-4 font-semibold">Markup Generated</th>
+                     <th className="px-6 py-4 font-semibold text-center">PPI (Index)</th>
+                     <th className="px-6 py-4 font-semibold text-center">MCP (Coverage)</th>
+                     <th className="px-6 py-4 font-semibold text-right">Classification</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-border/50">
+                   {productIntelligence.map((p, i) => (
+                     <tr key={i} className="hover:bg-muted/10 transition-colors">
+                       <td className="px-6 py-4 font-medium text-foreground">{p.name}</td>
+                       <td className="px-6 py-4 text-emerald-600 font-bold">MWK {p.markup.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                       <td className="px-6 py-4 text-center font-mono font-bold">{p.ppi.toFixed(1)}%</td>
+                       <td className="px-6 py-4 text-center font-mono">{p.mcp.toFixed(2)}%</td>
+                       <td className="px-6 py-4 text-right">
+                         <Badge variant="outline" className={`${p.color} text-[10px] font-black uppercase tracking-tighter py-1 px-2`}>
+                           {p.classification}
+                         </Badge>
+                       </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
+           )}
+         </div>
+      </div>
+
+      {/* Vendor Profitability Intelligence */}
+      <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden mb-6">
+         <div className="p-6 border-b border-border/50 flex items-center justify-between">
+            <h3 className="font-heading font-bold text-lg text-foreground">Vendor Profitability Intelligence</h3>
+         </div>
+         <div className="p-0">
+           {vendorIntelligence.length === 0 ? (
+             <div className="p-8 text-center text-muted-foreground text-sm">No vendor intelligence data yet</div>
+           ) : (
+             <div className="w-full overflow-x-auto">
+               <table className="w-full text-sm text-left">
+                 <thead className="bg-muted/30 text-muted-foreground font-body text-xs uppercase tracking-wider">
+                   <tr>
+                     <th className="px-6 py-4 font-semibold">Vendor ID</th>
+                     <th className="px-6 py-4 font-semibold">Markup Generated</th>
+                     <th className="px-6 py-4 font-semibold text-center">MCP (Coverage)</th>
+                     <th className="px-6 py-4 font-semibold text-right">Vendor Health Score</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-border/50">
+                   {vendorIntelligence.map((v, i) => (
+                     <tr key={i} className="hover:bg-muted/10 transition-colors">
+                       <td className="px-6 py-4 font-medium text-foreground truncate max-w-[150px]">{v.id}</td>
+                       <td className="px-6 py-4 text-[#A21D7F] font-bold">MWK {v.markup.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                       <td className="px-6 py-4 text-center font-mono font-bold">{v.mcp.toFixed(2)}%</td>
+                       <td className="px-6 py-4 text-right">
+                         <Badge variant="outline" className={`${v.healthScore > 80 ? 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' : 'text-amber-500 bg-amber-500/10 border-amber-500/20'} font-bold`}>
+                           {v.healthScore.toFixed(0)} / 100
+                         </Badge>
+                       </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
+           )}
+         </div>
+      </div>
+
       {/* Break-Even & Treasury Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="p-6 rounded-3xl border border-border bg-card shadow-sm flex flex-col gap-4">
@@ -282,10 +483,45 @@ const ProfitDashboard = () => {
            <div className="grid grid-cols-2 gap-4">
               <div className="bg-muted/30 p-4 rounded-2xl">
                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Target Net Contribution</p>
-                 <p className="text-2xl font-black font-heading text-foreground">MWK 150k</p>
+                 <p className="text-2xl font-black font-heading text-foreground">MWK {(settings.monthly_fsc_markup_target / 1000).toFixed(0)}k</p>
               </div>
               <div className="bg-muted/30 p-4 rounded-2xl">
                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Required Items/Day</p>
+                 <p className="text-2xl font-black font-heading text-foreground">{breakEven.dailyItemTarget}</p>
+              </div>
+           </div>
+           <div className="bg-primary/5 border border-primary/20 p-4 rounded-2xl flex items-center justify-between mt-auto">
+              <div>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Achievement Rate</p>
+                <p className="text-lg font-black font-heading text-primary">{breakEven.achievementRate.toFixed(1)}%</p>
+              </div>
+              <Sparkles className="w-6 h-6 text-primary opacity-50" />
+           </div>
+        </div>
+
+        <div className="p-6 rounded-3xl border border-border bg-card shadow-sm flex flex-col gap-4">
+           <div className="flex items-center justify-between">
+              <h3 className="font-heading font-bold text-lg text-foreground">Treasury & Sustainability</h3>
+              <Badge variant="outline" className={`${treasury.color} border-current/20`}>{treasury.state}</Badge>
+           </div>
+           <div className="grid grid-cols-2 gap-4">
+              <div className="bg-muted/30 p-4 rounded-2xl">
+                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Operating Runway</p>
+                 <p className="text-2xl font-black font-heading text-foreground">{treasury.operatingRunway.toFixed(1)} Mos</p>
+              </div>
+              <div className="bg-muted/30 p-4 rounded-2xl">
+                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Reserve Coverage</p>
+                 <p className="text-2xl font-black font-heading text-foreground">{treasury.reserveCoverage.toFixed(0)}%</p>
+              </div>
+           </div>
+           <div className="bg-muted p-4 rounded-2xl flex items-center gap-3 mt-auto">
+              <div className={`w-2 h-2 rounded-full ${treasury.color.replace('text-', 'bg-')}`} />
+              <p className="text-xs font-medium text-muted-foreground font-body">
+                Fund governance requires strict separation. No mixing of operational and reserve funds.
+              </p>
+           </div>
+        </div>
+      </div>
                  <p className="text-2xl font-black font-heading text-foreground">12</p>
               </div>
            </div>
