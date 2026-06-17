@@ -522,40 +522,7 @@ const ProfitDashboard = () => {
            </div>
         </div>
       </div>
-                 <p className="text-2xl font-black font-heading text-foreground">12</p>
-              </div>
-           </div>
-           <div className="mt-2">
-             <div className="flex justify-between text-xs font-bold mb-2">
-                <span>Achievement Rate</span>
-                <span className="text-emerald-500">85%</span>
-             </div>
-             <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-               <div className="h-full bg-emerald-500 rounded-full" style={{ width: '85%' }} />
-             </div>
-           </div>
-        </div>
 
-        <div className="p-6 rounded-3xl border border-border bg-card shadow-sm flex flex-col gap-4">
-           <div className="flex items-center justify-between">
-              <h3 className="font-heading font-bold text-lg text-foreground">Treasury & Sustainability</h3>
-              <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/10">Growth Mode</Badge>
-           </div>
-           <div className="grid grid-cols-2 gap-4">
-              <div className="bg-muted/30 p-4 rounded-2xl">
-                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Operating Runway</p>
-                 <p className="text-2xl font-black font-heading text-foreground">6.2 Mos</p>
-              </div>
-              <div className="bg-muted/30 p-4 rounded-2xl">
-                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Reserve Coverage</p>
-                 <p className="text-2xl font-black font-heading text-foreground">115%</p>
-              </div>
-           </div>
-           <p className="text-xs text-muted-foreground font-body mt-2 leading-relaxed">
-             Operations are fully covered. Current reserve fund supports 6+ months of sustainable scaling.
-           </p>
-        </div>
-      </div>
 
       {/* AI Insights Layer */}
       <div className="p-6 rounded-3xl border border-gold/30 bg-gold/5 relative overflow-hidden group">
