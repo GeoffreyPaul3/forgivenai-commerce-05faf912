@@ -900,6 +900,8 @@ function UGCStudio() {
           category: selectedProd.category,
           images: Array.isArray(selectedProd.images) ? selectedProd.images.filter(Boolean) : [],
           description: selectedProd.description,
+          is_composite: selectedProd.is_composite ?? false,
+          variant_images: Array.isArray(selectedProd.variant_images) ? selectedProd.variant_images.filter(Boolean) : [],
         },
         influencerImageUrl: currentAvatar,
         avatarGender,
