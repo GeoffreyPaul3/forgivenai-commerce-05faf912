@@ -157,46 +157,48 @@ export default function VendorPerformancePage() {
         )}
       </div>
 
-      {/* Performance Breakdown */}
-      <Card className="rounded-[2.5rem] border-0 bg-card shadow-2xl shadow-black/5 overflow-hidden">
-        <CardHeader className="bg-muted/20 p-8 border-b border-border/50">
-          <CardTitle className="font-heading text-xl font-black flex items-center gap-3">
-            <Zap className="w-6 h-6 text-primary" /> Weighted Ranking Intelligence
-          </CardTitle>
-          <CardDescription>How your platform rank is calculated across weighted vectors</CardDescription>
-        </CardHeader>
-        <CardContent className="p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {[
-              { label: "Confirmation Speed", weight: "30%", val: kpis.confirmationSpeed, icon: Clock, color: "bg-emerald-500" },
-              { label: "Acceptance Rate", weight: "30%", val: kpis.acceptanceRate, icon: CheckCircle2, color: "bg-[#A21D7F]" },
-              { label: "Fulfillment Success", weight: "25%", val: kpis.fulfillmentSuccess, icon: Package, color: "bg-primary" },
-              { label: "Product Quality", weight: "15%", val: kpis.productQuality, icon: Star, color: "bg-gold" },
-            ].map(m => (
-              <div key={m.label} className="space-y-4">
-                <div className="flex items-center justify-between">
-                   <div className="flex items-center gap-2">
-                      <m.icon className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80">{m.label}</span>
-                   </div>
-                   <span className="text-[10px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-full">{m.weight}</span>
+      {/* Performance Breakdown - Admin Only */}
+      {urlVendorId && (
+        <Card className="rounded-[2.5rem] border-0 bg-card shadow-2xl shadow-black/5 overflow-hidden">
+          <CardHeader className="bg-muted/20 p-8 border-b border-border/50">
+            <CardTitle className="font-heading text-xl font-black flex items-center gap-3">
+              <Zap className="w-6 h-6 text-primary" /> Vendor Health Score
+            </CardTitle>
+            <CardDescription>Internal ranking: Reliability 50% + Quality 50%</CardDescription>
+          </CardHeader>
+          <CardContent className="p-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {[
+                { label: "Confirmation Speed", weight: "25%", val: kpis.confirmationSpeed, icon: Clock, color: "bg-emerald-500" },
+                { label: "Acceptance Rate", weight: "25%", val: kpis.acceptanceRate, icon: CheckCircle2, color: "bg-[#A21D7F]" },
+                { label: "Fulfillment Success", weight: "25%", val: kpis.fulfillmentSuccess, icon: Package, color: "bg-primary" },
+                { label: "Product Quality", weight: "25%", val: kpis.productQuality, icon: Star, color: "bg-gold" },
+              ].map(m => (
+                <div key={m.label} className="space-y-4">
+                  <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-2">
+                        <m.icon className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80">{m.label}</span>
+                     </div>
+                     <span className="text-[10px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-full">{m.weight}</span>
+                  </div>
+                  <div className="flex items-end justify-between gap-4">
+                     <span className="text-3xl font-heading font-black tracking-tight">{m.val}%</span>
+                     <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden mb-2">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${m.val}%` }}
+                          transition={{ duration: 1, delay: 0.2 }}
+                          className={`h-full ${m.color} shadow-lg shadow-black/10`}
+                        />
+                     </div>
+                  </div>
                 </div>
-                <div className="flex items-end justify-between gap-4">
-                   <span className="text-3xl font-heading font-black tracking-tight">{m.val}%</span>
-                   <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden mb-2">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${m.val}%` }}
-                        transition={{ duration: 1, delay: 0.2 }}
-                        className={`h-full ${m.color} shadow-lg shadow-black/10`}
-                      />
-                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPI Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

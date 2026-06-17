@@ -558,6 +558,13 @@ export type Database = {
           vendor_confirmation_status: string | null
           vendor_confirmed_at: string | null
           updated_at: string
+          total_vendor_cost: number | null
+          fsc_markup_total: number | null
+          cac_total: number | null
+          packaging_total: number | null
+          logistics_total: number | null
+          agent_commission_total: number | null
+          net_fsc_contribution: number | null
         }
         Insert: {
           agent_id?: string | null
@@ -582,6 +589,13 @@ export type Database = {
           vendor_confirmation_status?: string | null
           vendor_confirmed_at?: string | null
           updated_at?: string
+          total_vendor_cost?: number | null
+          fsc_markup_total?: number | null
+          cac_total?: number | null
+          packaging_total?: number | null
+          logistics_total?: number | null
+          agent_commission_total?: number | null
+          net_fsc_contribution?: number | null
         }
         Update: {
           agent_id?: string | null
@@ -606,6 +620,13 @@ export type Database = {
           vendor_confirmation_status?: string | null
           vendor_confirmed_at?: string | null
           updated_at?: string
+          total_vendor_cost?: number | null
+          fsc_markup_total?: number | null
+          cac_total?: number | null
+          packaging_total?: number | null
+          logistics_total?: number | null
+          agent_commission_total?: number | null
+          net_fsc_contribution?: number | null
         }
         Relationships: [
           {
@@ -647,6 +668,12 @@ export type Database = {
           subcategory: string | null
           tags: string[] | null
           updated_at: string
+          rights_type: string | null
+          landed_cost: number | null
+          cac_allocation_pct: number | null
+          packaging_allocation: number | null
+          logistics_allocation: number | null
+          fsc_markup_pct: number | null
         }
         Insert: {
           ai_description?: string | null
@@ -670,6 +697,12 @@ export type Database = {
           subcategory?: string | null
           tags?: string[] | null
           updated_at?: string
+          rights_type?: string | null
+          landed_cost?: number | null
+          cac_allocation_pct?: number | null
+          packaging_allocation?: number | null
+          logistics_allocation?: number | null
+          fsc_markup_pct?: number | null
         }
         Update: {
           ai_description?: string | null
@@ -693,6 +726,12 @@ export type Database = {
           subcategory?: string | null
           tags?: string[] | null
           updated_at?: string
+          rights_type?: string | null
+          landed_cost?: number | null
+          cac_allocation_pct?: number | null
+          packaging_allocation?: number | null
+          logistics_allocation?: number | null
+          fsc_markup_pct?: number | null
         }
         Relationships: [
           {

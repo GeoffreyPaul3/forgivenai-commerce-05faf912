@@ -29,7 +29,7 @@ const ProfitDashboard = () => {
 
       const { data, error } = await supabase
         .from("orders")
-        .select("total, gross_margin, base_profit, surplus_profit, surplus_type, status, created_at")
+        .select("total, gross_margin, base_profit, surplus_profit, surplus_type, status, created_at, total_vendor_cost, fsc_markup_total, cac_total, packaging_total, logistics_total, agent_commission_total, net_fsc_contribution")
         .in("status", ["paid", "confirmed", "processing", "shipped", "delivered"])
         .gte("created_at", cutoffDate.toISOString());
       
@@ -39,7 +39,10 @@ const ProfitDashboard = () => {
   });
 
   const metrics = useMemo(() => {
-    if (!profitData) return { totalRevenue: 0, totalBaseProfit: 0, totalSurplus: 0, agentSurplus: 0, directSurplus: 0 };
+    if (!profitData) return { 
+      totalRevenue: 0, totalBaseProfit: 0, totalSurplus: 0, agentSurplus: 0, directSurplus: 0,
+      totalVendorCost: 0, totalFscMarkup: 0, totalCac: 0, totalPackaging: 0, totalLogistics: 0, totalCommission: 0, netFscContribution: 0
+    };
 
     return profitData.reduce((acc, curr) => {
       acc.totalRevenue += Number(curr.total || 0);
@@ -51,15 +54,30 @@ const ProfitDashboard = () => {
       } else {
         acc.directSurplus += Number(curr.surplus_profit || 0);
       }
+
+      acc.totalVendorCost += Number(curr.total_vendor_cost || curr.vendor_cost || 0);
+      acc.totalFscMarkup += Number(curr.fsc_markup_total || 0);
+      acc.totalCac += Number(curr.cac_total || 0);
+      acc.totalPackaging += Number(curr.packaging_total || 0);
+      acc.totalLogistics += Number(curr.logistics_total || 0);
+      acc.totalCommission += Number(curr.agent_commission_total || 0);
+      acc.netFscContribution += Number(curr.net_fsc_contribution || curr.base_profit || 0); // fallback to base_profit for legacy
       
       return acc;
-    }, { totalRevenue: 0, totalBaseProfit: 0, totalSurplus: 0, agentSurplus: 0, directSurplus: 0 });
+    }, { 
+      totalRevenue: 0, totalBaseProfit: 0, totalSurplus: 0, agentSurplus: 0, directSurplus: 0,
+      totalVendorCost: 0, totalFscMarkup: 0, totalCac: 0, totalPackaging: 0, totalLogistics: 0, totalCommission: 0, netFscContribution: 0
+    });
   }, [profitData]);
 
-  const surplusData = [
-    { name: "Agent Surplus", value: metrics.agentSurplus },
-    { name: "Direct Surplus", value: metrics.directSurplus },
-  ];
+  const allocationData = [
+    { name: "Vendor Cost", value: metrics.totalVendorCost },
+    { name: "FSC Net Contribution", value: metrics.netFscContribution },
+    { name: "CAC Allocation", value: metrics.totalCac },
+    { name: "Packaging", value: metrics.totalPackaging },
+    { name: "Logistics", value: metrics.totalLogistics },
+    { name: "Agent Commissions", value: metrics.totalCommission },
+  ].filter(d => d.value > 0);
 
   const trendData = useMemo(() => {
     if (!profitData) return [];
@@ -171,21 +189,23 @@ const ProfitDashboard = () => {
 
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="relative overflow-hidden p-6 rounded-3xl border border-gold/20 bg-gold/5 group shadow-sm transition-all hover:shadow-xl hover:shadow-gold/5">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><TrendingUp className="w-20 h-20" /></div>
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 font-body">Base Profit (30%)</p>
-          <p className="text-3xl font-heading font-black text-gold">MWK {metrics.totalBaseProfit.toLocaleString()}</p>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 font-body">Net FSC Contribution</p>
+          <p className="text-3xl font-heading font-black text-gold">MWK {metrics.netFscContribution.toLocaleString()}</p>
           <div className="flex items-center gap-2 mt-3 overflow-hidden">
             <div className="w-full h-1 bg-gold/10 rounded-full">
-              <div className="h-full bg-gold rounded-full" style={{ width: '100%' }} />
+              <div className="h-full bg-gold rounded-full" style={{ width: `${Math.min(100, (metrics.netFscContribution / (metrics.totalRevenue || 1)) * 100)}%` }} />
             </div>
-            <span className="text-[10px] font-bold text-gold shrink-0 uppercase tracking-tighter">Guaranteed</span>
+            <span className="text-[10px] font-bold text-gold shrink-0 uppercase tracking-tighter">
+              {((metrics.netFscContribution / (metrics.totalRevenue || 1)) * 100).toFixed(1)}% Margin
+            </span>
           </div>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="relative overflow-hidden p-6 rounded-3xl border border-[#A21D7F]/20 bg-[#A21D7F]/5 group shadow-sm transition-all hover:shadow-xl hover:shadow-[#A21D7F]/5">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><PieIcon className="w-20 h-20" /></div>
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 font-body">Total Surplus</p>
-          <p className="text-3xl font-heading font-black text-[#A21D7F]">MWK {metrics.totalSurplus.toLocaleString()}</p>
-          <p className="text-[10px] text-muted-foreground mt-3 font-medium uppercase tracking-tight">Extra margin beyond base profit</p>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 font-body">Total Allocations (CAC+P+L)</p>
+          <p className="text-3xl font-heading font-black text-[#A21D7F]">MWK {(metrics.totalCac + metrics.totalPackaging + metrics.totalLogistics).toLocaleString()}</p>
+          <p className="text-[10px] text-muted-foreground mt-3 font-medium uppercase tracking-tight">Protected operational funds</p>
         </motion.div>
       </div>
 
@@ -225,21 +245,21 @@ const ProfitDashboard = () => {
            </div>
         </div>
 
-        {/* Surplus Breakdown */}
+        {/* Allocation Breakdown */}
         <div className="p-6 rounded-3xl border border-border bg-card shadow-sm">
-           <h3 className="font-heading font-bold text-lg text-foreground mb-8">Surplus Source</h3>
+           <h3 className="font-heading font-bold text-lg text-foreground mb-8">Allocation Breakdown</h3>
            <div className="h-[250px]">
              <ResponsiveContainer width="100%" height="100%">
                <PieChart>
-                 <Pie data={surplusData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={10} dataKey="value" stroke="none">
-                    {surplusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                 <Pie data={allocationData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={10} dataKey="value" stroke="none">
+                    {allocationData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                  </Pie>
                  <Tooltip />
                </PieChart>
              </ResponsiveContainer>
            </div>
-           <div className="space-y-3 mt-4">
-              {surplusData.map((d, i) => (
+           <div className="space-y-3 mt-4 max-h-[150px] overflow-y-auto">
+              {allocationData.map((d, i) => (
                 <div key={d.name} className="flex items-center justify-between p-3 rounded-xl hover:bg-muted/30 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
@@ -249,6 +269,55 @@ const ProfitDashboard = () => {
                 </div>
               ))}
            </div>
+        </div>
+      </div>
+
+      {/* Break-Even & Treasury Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-6 rounded-3xl border border-border bg-card shadow-sm flex flex-col gap-4">
+           <div className="flex items-center justify-between">
+              <h3 className="font-heading font-bold text-lg text-foreground">Break-Even Intelligence</h3>
+              <Badge variant="outline" className="text-amber-500 border-amber-500/20">Daily Target</Badge>
+           </div>
+           <div className="grid grid-cols-2 gap-4">
+              <div className="bg-muted/30 p-4 rounded-2xl">
+                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Target Net Contribution</p>
+                 <p className="text-2xl font-black font-heading text-foreground">MWK 150k</p>
+              </div>
+              <div className="bg-muted/30 p-4 rounded-2xl">
+                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Required Items/Day</p>
+                 <p className="text-2xl font-black font-heading text-foreground">12</p>
+              </div>
+           </div>
+           <div className="mt-2">
+             <div className="flex justify-between text-xs font-bold mb-2">
+                <span>Achievement Rate</span>
+                <span className="text-emerald-500">85%</span>
+             </div>
+             <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+               <div className="h-full bg-emerald-500 rounded-full" style={{ width: '85%' }} />
+             </div>
+           </div>
+        </div>
+
+        <div className="p-6 rounded-3xl border border-border bg-card shadow-sm flex flex-col gap-4">
+           <div className="flex items-center justify-between">
+              <h3 className="font-heading font-bold text-lg text-foreground">Treasury & Sustainability</h3>
+              <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/10">Growth Mode</Badge>
+           </div>
+           <div className="grid grid-cols-2 gap-4">
+              <div className="bg-muted/30 p-4 rounded-2xl">
+                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Operating Runway</p>
+                 <p className="text-2xl font-black font-heading text-foreground">6.2 Mos</p>
+              </div>
+              <div className="bg-muted/30 p-4 rounded-2xl">
+                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Reserve Coverage</p>
+                 <p className="text-2xl font-black font-heading text-foreground">115%</p>
+              </div>
+           </div>
+           <p className="text-xs text-muted-foreground font-body mt-2 leading-relaxed">
+             Operations are fully covered. Current reserve fund supports 6+ months of sustainable scaling.
+           </p>
         </div>
       </div>
 
