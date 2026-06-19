@@ -324,54 +324,6 @@ async function mergeAudioVideo(apiKey: string, videoUrl: string, audioUrl: strin
   return videoUrl;
 }
 
-async function concatenateVideoClips(apiKey: string, videoUrls: string[]): Promise<string> {
-  if (videoUrls.length === 1) return videoUrls[0];
-  console.log(`[Concat] Concatenating ${videoUrls.length} product clips via Fal.ai FFmpeg...`);
-
-  // Build an ffmpeg concat filter: -i input0 -i input1 ... -filter_complex '[0:v][1:v]concat=n=2:v=1[outv]' -map '[outv]' output.mp4
-  const inputs = videoUrls.map(url => ({ url }));
-  const filterInputs = videoUrls.map((_, i) => `[${i}:v]`).join("");
-  const inputFlags = videoUrls.map((_, i) => `-i input${i}`).join(" ");
-  const ffmpegCommand = `${inputFlags} -filter_complex '${filterInputs}concat=n=${videoUrls.length}:v=1[outv]' -map '[outv]' -c:v libx264 -preset fast output.mp4`;
-
-  try {
-    const res = await fetch("https://queue.fal.run/fal-ai/ffmpeg-api", {
-      method: "POST",
-      headers: { "Authorization": `Key ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ inputs, ffmpeg_command: ffmpegCommand }),
-    });
-
-    if (!res.ok) {
-      console.warn(`[Concat] FFmpeg submission failed (${res.status}). Falling back to first clip.`);
-      return videoUrls[0];
-    }
-
-    const { request_id } = await res.json();
-    let attempts = 0;
-    while (attempts < 60) {
-      attempts++;
-      await new Promise(r => setTimeout(r, 3000));
-      const statusRes = await fetch(`https://queue.fal.run/fal-ai/ffmpeg-api/requests/${request_id}`, {
-        headers: { "Authorization": `Key ${apiKey}` }
-      });
-      const data = await statusRes.json();
-      if (data.status === "COMPLETED") {
-        const url = data.response?.video?.url || data.response?.output_url || data.response?.url;
-        if (url) { console.log(`[Concat] ✅ Concatenation complete: ${url}`); return url; }
-      }
-      if (data.status === "FAILED") {
-        console.warn("[Concat] FFmpeg concat task failed. Falling back to first clip.");
-        return videoUrls[0];
-      }
-    }
-    console.warn("[Concat] Concatenation timed out. Falling back to first clip.");
-    return videoUrls[0];
-  } catch (err) {
-    console.warn("[Concat] Concatenation threw. Falling back to first clip:", err);
-    return videoUrls[0];
-  }
-}
-
 async function callTextAI(apiKey: string, prompt: string, model = "qwen-plus") {
   const res = await fetch(`${QWEN_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -2230,125 +2182,52 @@ Deno.serve(async (req) => {
       }
       if (!referenceImage) throw new Error("Influencer identity or photo is required.");
 
-      // --- COMPOSITE/GRID PRODUCT DETECTION ---
-      // If the product is a grid (e.g., 5 items in one photo), generate one clip per variant and concatenate
-      const gridVariants: string[] | null = (
-        body.product?.is_composite === true &&
-        Array.isArray(body.product?.variant_images) &&
-        body.product.variant_images.length > 1
-      ) ? body.product.variant_images.filter(Boolean) : null;
+      // --- STAGE 2: VTON MASTER FRAME ---
+      console.log("Stage 2: Creating Luxury VTON Master Frame...");
+      const masterFrameUrl = await runUnifiedVTON(
+        { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
+        referenceImage,
+        productImages,
+        productCategory || "apparel",
+        productName || "garment",
+        supabase,
+        avatarEthnicity,
+        avatarGender,
+        setting || body.scene || "",
+        style || "",
+        hairstyle || "",
+        makeup || ""
+      );
+      const persistedMasterUrl = await persistMedia(supabase, masterFrameUrl, "master_frames");
+      console.log(`✅ Master Frame created: ${persistedMasterUrl}`);
 
-      // --- STAGE 2: VTON MASTER FRAME(S) ---
-      let persistedMasterUrl: string;
-      let videoUrl: string | undefined;
-
-      if (gridVariants) {
-        // ── Multi-Product Grid Path ──
-        // Generate one VTON frame + short motion clip per variant, then concatenate all clips
-        console.log(`Stage 2: Grid product — ${gridVariants.length} variants detected. Generating sequential VTON frames + clips...`);
-        const clipUrls: string[] = [];
-        let firstMasterFrame = "";
-
-        for (let vi = 0; vi < gridVariants.length; vi++) {
-          const variantUrl = gridVariants[vi];
-          console.log(`Stage 2.${vi + 1}/${gridVariants.length}: VTON for grid variant ${vi + 1}...`);
-          try {
-            const frameUrl = await runUnifiedVTON(
-              { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
-              referenceImage,
-              [variantUrl],
-              productCategory || "apparel",
-              productName || "garment",
-              supabase,
-              avatarEthnicity,
-              avatarGender,
-              setting || body.scene || "",
-              style || "",
-              hairstyle || "",
-              makeup || ""
-            );
-            const persistedFrame = await persistMedia(supabase, frameUrl, "master_frames");
-            if (vi === 0) firstMasterFrame = persistedFrame;
-            console.log(`✅ Frame ${vi + 1} ready: ${persistedFrame}`);
-
-            // Animate this VTON frame into a short motion clip
-            const clipPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName} (product ${vi + 1} of ${gridVariants.length}). Natural movement, fashion showcase.`;
-            let clipUrl: string | undefined;
-            try {
-              if (FAL_KEY) clipUrl = await generateTrueMotionVideo(FAL_KEY, persistedFrame, clipPrompt);
-            } catch {
-              try { if (FAL_KEY) clipUrl = await callVeoVideo(FAL_KEY, persistedFrame, clipPrompt); } catch {}
-            }
-            if (!clipUrl && QWEN_API_KEY) {
-              try { clipUrl = await callWanxVideo(QWEN_API_KEY, persistedFrame, clipPrompt); } catch {}
-            }
-            if (clipUrl) {
-              const persistedClip = await persistMedia(supabase, clipUrl, "clips");
-              clipUrls.push(persistedClip);
-              console.log(`✅ Clip ${vi + 1} ready: ${persistedClip}`);
-            } else {
-              console.warn(`⚠️ Clip ${vi + 1} generation skipped — no engine succeeded.`);
-            }
-          } catch (variantErr: any) {
-            console.warn(`⚠️ Variant ${vi + 1} VTON failed (skipping): ${variantErr.message || variantErr}`);
-          }
+      // --- STAGE 3: REAL MOTION GENERATION ---
+      console.log("Stage 3: Generating Real AI Video Motion...");
+      const enterprisePrompt = buildEnterpriseBrandPrompt(setting || body.scene || "studio", true);
+      const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${productDescription || productName}. ${enterprisePrompt}`;
+      let videoUrl;
+      
+      try {
+        if (FAL_KEY) {
+          console.log("Calling Kling 1.5 Pro (True Motion Engine) via Fal.ai...");
+          videoUrl = await generateTrueMotionVideo(FAL_KEY, masterFrameUrl, videoPrompt);
+        } else {
+          throw new Error("FAL_KEY missing");
         }
-
-        if (clipUrls.length === 0) throw new Error("Grid product video: no clips were produced for any variant.");
-
-        persistedMasterUrl = firstMasterFrame;
-
-        // Stage 3: Concatenate all variant clips into one multi-product showcase video
-        console.log(`Stage 3: Concatenating ${clipUrls.length} product clips into final multi-product video...`);
-        videoUrl = await concatenateVideoClips(FAL_KEY, clipUrls);
-
-      } else {
-        // ── Single-Product Path (original, unchanged) ──
-        console.log("Stage 2: Creating Luxury VTON Master Frame...");
-        const masterFrameUrl = await runUnifiedVTON(
-          { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
-          referenceImage,
-          productImages,
-          productCategory || "apparel",
-          productName || "garment",
-          supabase,
-          avatarEthnicity,
-          avatarGender,
-          setting || body.scene || "",
-          style || "",
-          hairstyle || "",
-          makeup || ""
-        );
-        persistedMasterUrl = await persistMedia(supabase, masterFrameUrl, "master_frames");
-        console.log(`✅ Master Frame created: ${persistedMasterUrl}`);
-
-        // --- STAGE 3: REAL MOTION GENERATION ---
-        console.log("Stage 3: Generating Real AI Video Motion...");
-        const enterprisePrompt = buildEnterpriseBrandPrompt(setting || body.scene || "studio", true);
-        const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${productDescription || productName}. ${enterprisePrompt}`;
-        
+      } catch (e) {
+        console.warn("Kling failed, trying Veo 3.1 Lite...", e);
         try {
           if (FAL_KEY) {
-            console.log("Calling Kling 1.5 Pro (True Motion Engine) via Fal.ai...");
-            videoUrl = await generateTrueMotionVideo(FAL_KEY, masterFrameUrl, videoPrompt);
+            videoUrl = await callVeoVideo(FAL_KEY, masterFrameUrl, videoPrompt);
           } else {
             throw new Error("FAL_KEY missing");
           }
-        } catch (e) {
-          console.warn("Kling failed, trying Veo 3.1 Lite...", e);
-          try {
-            if (FAL_KEY) {
-              videoUrl = await callVeoVideo(FAL_KEY, masterFrameUrl, videoPrompt);
-            } else {
-              throw new Error("FAL_KEY missing");
-            }
-          } catch (veoError) {
-            console.warn("Veo failed, falling back to Wanx...", veoError);
-            if (QWEN_API_KEY) {
-              videoUrl = await callWanxVideo(QWEN_API_KEY, masterFrameUrl, videoPrompt);
-            } else {
-              throw new Error("All high-motion engines failed.");
-            }
+        } catch (veoError) {
+          console.warn("Veo failed, falling back to Wanx...", veoError);
+          if (QWEN_API_KEY) {
+            videoUrl = await callWanxVideo(QWEN_API_KEY, masterFrameUrl, videoPrompt);
+          } else {
+            throw new Error("All high-motion engines failed.");
           }
         }
       }
