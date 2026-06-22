@@ -125,7 +125,8 @@ serve(async (req) => {
         success: true,
         checkout_url: response.checkout_url,
         tx_ref: response.tx_ref || generatedTxRef,
-        provider: provider.toLowerCase()
+        provider: provider.toLowerCase(),
+        ...(response.extra ? { extra: response.extra } : {}),
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

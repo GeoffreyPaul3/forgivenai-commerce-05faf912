@@ -17,6 +17,8 @@ export interface InitializePaymentResponse {
   checkout_url?: string;
   tx_ref?: string;
   error?: string;
+  /** Provider-specific extra data (e.g. OneKhusa TAN details) */
+  extra?: Record<string, unknown>;
 }
 
 export interface VerifyPaymentParams {

@@ -39,33 +39,40 @@ export class OneKhusaProvider implements PaymentProvider {
   /**
    * Step 1: Get an access token from OneKhusa.
    * POST /account/getAccessToken
-   * Body: { apiKey, apiSecret }
-   * Returns: { accessToken, ... }
+   * Body: { apiKey, apiSecret, organisationId, merchantAccountNumber }
+   * Returns: { accessToken, expiresOn, expiryInMinutes }
    */
   private async getAccessToken(): Promise<string> {
     this.validateConfig();
+
+    const body = {
+      apiKey: this.apiKey,
+      apiSecret: this.apiSecret,
+      organisationId: this.organisationId,
+      merchantAccountNumber: Number(this.merchantAccountNumber),
+    };
+
+    console.log("OneKhusa getAccessToken request body:", JSON.stringify(body));
 
     const response = await fetch(`${this.baseUrl}/account/getAccessToken`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "Accept-Language": "en",
       },
-      body: JSON.stringify({
-        apiKey: this.apiKey,
-        apiSecret: this.apiSecret,
-      }),
+      body: JSON.stringify(body),
     });
 
     const data = await response.json().catch(() => ({}));
+    console.log("OneKhusa getAccessToken response:", JSON.stringify(data));
 
     if (!response.ok) {
-      const msg = data?.message || data?.error || `Auth failed [${response.status}]`;
-      throw new Error(`OneKhusa Auth Error: ${msg}`);
+      const detail = data?.detail || data?.message || data?.error || `Auth failed [${response.status}]`;
+      const errors = data?.errors ? ` Errors: ${data.errors.join(", ")}` : "";
+      throw new Error(`OneKhusa Auth Error: ${detail}${errors}`);
     }
 
-    const token = data?.data?.accessToken || data?.accessToken;
+    const token = data?.accessToken || data?.data?.accessToken;
     if (!token) {
       throw new Error(`OneKhusa Auth: accessToken not found in response. Got: ${JSON.stringify(data)}`);
     }
@@ -88,62 +95,65 @@ export class OneKhusaProvider implements PaymentProvider {
     const idempotencyKey = `FSC-${params.tx_ref}`;
 
     const callbackUrl = params.callback_url || "";
-    const successUrl  = params.return_url   || "https://agents.forgivensc.com";
-    const failureUrl  = params.return_url   || "https://agents.forgivensc.com";
+    const successUrl  = params.return_url   || "https://forgivensc.com";
+    const failureUrl  = params.return_url   || "https://forgivensc.com";
 
-    const response = await fetch(`${this.baseUrl}/checkout/rtp/initiate`, {
+    // The Request To Pay Checkout endpoint per docs:
+    // POST /collections/requestToPay/initiate (NOT /checkout/rtp/initiate)
+    const rtpBody = {
+      merchantAccountNumber: Number(this.merchantAccountNumber),
+      transactionAmount: Number(params.amount),
+      transactionDescription: params.title || params.description || `Forgiven Shopping Centre Order`,
+      referenceNumber: params.tx_ref,
+      capturedBy: "system@forgivensc.com",
+    };
+
+    console.log("OneKhusa requestToPay body:", JSON.stringify(rtpBody));
+
+    const response = await fetch(`${this.baseUrl}/collections/requestToPay/initiate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
         "Authorization": `Bearer ${accessToken}`,
+        "Accept-Language": "en",
         "X-Idempotency-Key": idempotencyKey,
       },
-      body: JSON.stringify({
-        authentication: {
-          apiSecret: this.apiSecret,
-        },
-        merchant: {
-          organisationId: this.organisationId,
-          merchantAccountNumber: Number(this.merchantAccountNumber),
-        },
-        payment: {
-          sourceReferenceNumber: params.tx_ref,
-          description: params.title || params.description || `Forgiven Shopping Centre Order`,
-          amount: Number(params.amount),
-          currency: params.currency || "MWK",
-          successRedirectionUrl: successUrl,
-          failureRedirectionUrl: failureUrl,
-          callbackApiUrl: callbackUrl,
-        },
-      }),
+      body: JSON.stringify(rtpBody),
     });
 
     const data = await response.json().catch(() => ({}));
+    console.log("OneKhusa requestToPay response:", JSON.stringify(data));
 
     if (!response.ok) {
-      const msg = data?.message || data?.error || `OneKhusa checkout init failed [${response.status}]`;
+      const detail = data?.detail || data?.message || data?.error || `OneKhusa RTP init failed [${response.status}]`;
+      const errors = data?.errors ? ` Errors: ${data.errors.join(", ")}` : "";
       console.error("OneKhusa initializePayment error:", JSON.stringify(data));
-      throw new Error(msg);
+      throw new Error(`${detail}${errors}`);
     }
 
-    // Extract the paymentTransactionId from response
-    const paymentTransactionId =
-      data?.data?.paymentTransactionId ||
-      data?.paymentTransactionId ||
-      data?.data?.sourceReferenceNumber ||
-      params.tx_ref;
+    // Response: { merchantAccountNumber, timedAccountNumber, expiryDate, expiryInMinutes }
+    const timedAccountNumber = data?.timedAccountNumber || data?.data?.timedAccountNumber;
 
-    // Construct the checkout URL per docs:
-    // https://checkout.onekhusa.com/requestToPay/initiate?ptid={paymentTransactionId}
-    const checkoutUrl = `${CHECKOUT_BASE}/requestToPay/initiate?ptid=${paymentTransactionId}`;
+    // Build a checkout URL using the checkout base + TAN
+    // Customer uses this TAN to pay via their bank/MNO app
+    const checkoutUrl = timedAccountNumber
+      ? `${CHECKOUT_BASE}/pay?tan=${timedAccountNumber}&ref=${params.tx_ref}&amount=${params.amount}&currency=${params.currency || "MWK"}`
+      : `${CHECKOUT_BASE}/pay`;
 
-    console.log(`✅ OneKhusa checkout initiated: ${checkoutUrl}`);
+    console.log(`✅ OneKhusa TAN generated: ${timedAccountNumber}, checkout: ${checkoutUrl}`);
 
     return {
       success: true,
       checkout_url: checkoutUrl,
-      tx_ref: data?.data?.sourceReferenceNumber || params.tx_ref,
+      tx_ref: params.tx_ref,
+      // Pass the TAN in the response so the WhatsApp agent can tell the customer
+      extra: {
+        timedAccountNumber,
+        expiryDate: data?.expiryDate,
+        expiryInMinutes: data?.expiryInMinutes,
+        merchantAccountNumber: data?.merchantAccountNumber,
+      },
     };
   }
 
