@@ -58,9 +58,17 @@ const SettingsPage = () => {
     whatsapp: "+265997128899",
     website: "https://www.forgivenshoppingcentre.com",
   });
+  
+  const [paymentSettings, setPaymentSettings] = useState({
+    default_payment_provider: "paychangu",
+    paychangu_enabled: "true",
+    onekhusa_enabled: "false"
+  });
+  const [savingPayments, setSavingPayments] = useState(false);
 
   useEffect(() => {
     fetchUserData();
+    fetchPaymentSettings();
   }, []);
 
   useEffect(() => {
@@ -108,6 +116,27 @@ const SettingsPage = () => {
   };
 
   
+  const fetchPaymentSettings = async () => {
+    const { data } = await supabase.from('settings').select('*').in('key', ['default_payment_provider', 'paychangu_enabled', 'onekhusa_enabled']);
+    if (data) {
+       const settingsObj: any = { ...paymentSettings };
+       data.forEach(item => { settingsObj[item.key] = item.value; });
+       setPaymentSettings(settingsObj);
+    }
+  };
+
+  const handleSavePaymentSettings = async () => {
+    setSavingPayments(true);
+    const updates = Object.entries(paymentSettings).map(([key, value]) => ({ key, value }));
+    const { error } = await supabase.from('settings').upsert(updates, { onConflict: 'key' });
+    setSavingPayments(false);
+    if (error) {
+      toast({ title: "Failed to save settings", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Payment Settings Saved", description: "Your payment routing has been updated." });
+    }
+  };
+
   const fetchSyncLogs = async () => {
     const { data } = await supabase.from("sync_logs").select("*").order("created_at", { ascending: false }).limit(5);
     if (data) setSyncLogs(data);
@@ -266,6 +295,9 @@ const SettingsPage = () => {
           <TabsTrigger value="general" className="flex-1 gap-2">
             <Settings className="w-4 h-4" /> General
           </TabsTrigger>
+          <TabsTrigger value="payments" className="flex-1 gap-2">
+            <Banknote className="w-4 h-4" /> Payments
+          </TabsTrigger>
           <TabsTrigger value="team" className="flex-1 gap-2">
             <Users className="w-4 h-4" /> Team Management
             {isAdmin && pendingUsers.length > 0 && (
@@ -368,6 +400,73 @@ const SettingsPage = () => {
               </div>
             </div>
             <Button onClick={() => toast({ title: "Settings saved" })}>Save Settings</Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="payments" className="space-y-6">
+          <div className="rounded-xl border border-border bg-card p-6 space-y-6">
+            <div>
+              <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
+                <Banknote className="w-5 h-5 text-gold" /> Payment Gateways
+              </h3>
+              <p className="text-sm text-muted-foreground font-body">Configure payment routing and providers.</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid gap-4">
+                <div className="flex items-center justify-between p-4 border border-border rounded-lg bg-surface">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">Default Provider</p>
+                    <p className="text-xs text-muted-foreground">Select which gateway to use for new checkout sessions.</p>
+                  </div>
+                  <select 
+                    className="p-2 border border-border rounded-md bg-background text-sm"
+                    value={paymentSettings.default_payment_provider}
+                    onChange={e => setPaymentSettings({...paymentSettings, default_payment_provider: e.target.value})}
+                  >
+                    <option value="paychangu">PayChangu</option>
+                    <option value="onekhusa">OneKhusa</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between p-4 border border-border rounded-lg bg-surface">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">Enable PayChangu</p>
+                    <p className="text-xs text-muted-foreground">Allow payments via PayChangu.</p>
+                  </div>
+                  <select 
+                    className="p-2 border border-border rounded-md bg-background text-sm"
+                    value={paymentSettings.paychangu_enabled}
+                    onChange={e => setPaymentSettings({...paymentSettings, paychangu_enabled: e.target.value})}
+                  >
+                    <option value="true">Enabled</option>
+                    <option value="false">Disabled</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between p-4 border border-border rounded-lg bg-surface">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">Enable OneKhusa</p>
+                    <p className="text-xs text-muted-foreground">Allow payments via OneKhusa (Enterprise).</p>
+                  </div>
+                  <select 
+                    className="p-2 border border-border rounded-md bg-background text-sm"
+                    value={paymentSettings.onekhusa_enabled}
+                    onChange={e => setPaymentSettings({...paymentSettings, onekhusa_enabled: e.target.value})}
+                  >
+                    <option value="true">Enabled</option>
+                    <option value="false">Disabled</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end">
+                <Button onClick={handleSavePaymentSettings} disabled={savingPayments} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+                  {savingPayments ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Save Payment Settings
+                </Button>
+              </div>
+            </div>
           </div>
         </TabsContent>
 

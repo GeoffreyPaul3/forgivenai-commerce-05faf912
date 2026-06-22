@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { PaymentOrchestrator } from "./orchestrator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,9 +13,6 @@ serve(async (req) => {
   }
 
   try {
-    const PAYCHANGU_SECRET_KEY = Deno.env.get("PAYCHANGU_SECRET_KEY");
-    if (!PAYCHANGU_SECRET_KEY) throw new Error("PAYCHANGU_SECRET_KEY not configured");
-
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
@@ -22,7 +20,17 @@ serve(async (req) => {
     const MESSAGING_SERVICE_SID = Deno.env.get("MESSAGING_SERVICE_SID") ?? "";
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const orchestrator = new PaymentOrchestrator();
     const requestUrl = new URL(req.url);
+
+    // Fetch default provider from settings
+    let defaultProvider = 'paychangu';
+    try {
+      const { data: setting } = await supabase.from('settings').select('value').eq('key', 'default_payment_provider').maybeSingle();
+      if (setting && setting.value) defaultProvider = setting.value;
+    } catch(e) {
+      console.error("Could not fetch default provider, falling back to paychangu");
+    }
 
     if (req.method === "GET") {
       const txRef = requestUrl.searchParams.get("tx_ref") ?? "";
@@ -36,7 +44,7 @@ serve(async (req) => {
         const result = await verifyAndSyncPayment({
           txRef,
           redirectUrl,
-          paychanguSecretKey: PAYCHANGU_SECRET_KEY,
+          orchestrator,
           supabase,
           twilio: {
             accountSid: TWILIO_ACCOUNT_SID,
@@ -50,8 +58,6 @@ serve(async (req) => {
         console.error("Verification error:", error);
         const msg = error instanceof Error ? error.message : "Internal Server Error";
         
-        // If it's a database trigger error, we still want to show a friendly page
-        // or potentially redirect to the success page anyway if the payment was actually confirmed
         return htmlResponse(
           "Payment Sync Issue", 
           `Your payment was processed, but we encountered an error updating our records: ${msg}. Please contact support with your reference: ${txRef}`, 
@@ -74,54 +80,42 @@ serve(async (req) => {
       title,
       description,
       return_url,
+      provider = defaultProvider,
     } = body;
 
     if (action === "create_payment") {
       const generatedTxRef = tx_ref || `FG-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 
-      // callback_url  → server-side webhook (this edge function verifies + syncs the order)
-      // return_url    → where the USER'S BROWSER lands after payment (Vercel frontend)
       const FRONTEND_URL = "https://agents.forgivensc.com";
       const callbackUrl = `${SUPABASE_URL}/functions/v1/create-payment`;
       const browserReturnUrl = `${FRONTEND_URL}/create-payment?tx_ref=${generatedTxRef}`;
 
-      const response = await fetch("https://api.paychangu.com/payment", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${PAYCHANGU_SECRET_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          amount: String(amount),
-          currency: currency || "MWK",
-          email: email || "",
-          first_name: first_name || "",
-          last_name: last_name || "",
-          callback_url: callbackUrl,
-          return_url: browserReturnUrl,
-          tx_ref: generatedTxRef,
-          customization: {
-            title: title || "Forgiven Shopping Centre Order",
-            description: description || "Payment for your order",
-          },
-          meta: {
-            order_id: order_id || "",
-          },
-        }),
+      const activeProvider = orchestrator.getProvider(provider);
+
+      const response = await activeProvider.initializePayment({
+        amount: String(amount),
+        currency: currency || "MWK",
+        email: email || "",
+        first_name: first_name || "",
+        last_name: last_name || "",
+        callback_url: callbackUrl,
+        return_url: browserReturnUrl,
+        tx_ref: generatedTxRef,
+        title: title || "Forgiven Shopping Centre Order",
+        description: description || "Payment for your order",
+        order_id: order_id || "",
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        console.error("PayChangu error:", data);
-        throw new Error(data.message || `PayChangu error [${response.status}]`);
+      if (!response.success) {
+         throw new Error(response.error || 'Failed to initialize payment');
       }
 
       if (order_id) {
         await supabase
           .from("orders")
           .update({
-            payment_reference: data.data?.data?.tx_ref || data.data?.tx_ref || generatedTxRef,
+            payment_reference: response.tx_ref || generatedTxRef,
+            payment_provider: provider.toLowerCase(),
           })
           .eq("id", order_id)
           .throwOnError();
@@ -129,8 +123,9 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({
         success: true,
-        checkout_url: data.data?.checkout_url || data.checkout_url,
-        tx_ref: data.data?.data?.tx_ref || data.data?.tx_ref || generatedTxRef,
+        checkout_url: response.checkout_url,
+        tx_ref: response.tx_ref || generatedTxRef,
+        provider: provider.toLowerCase()
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -142,7 +137,7 @@ serve(async (req) => {
       const result = await verifyAndSyncPayment({
         txRef: tx_ref,
         orderId: order_id,
-        paychanguSecretKey: PAYCHANGU_SECRET_KEY,
+        orchestrator,
         supabase,
         twilio: {
           accountSid: TWILIO_ACCOUNT_SID,
@@ -159,8 +154,32 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    
+    if (action === "webhook") {
+       // Identify provider from body or query params
+       const webhookProvider = orchestrator.getProvider(provider || 'onekhusa');
+       const webhookResult = await webhookProvider.handleWebhook(req);
+       
+       if (webhookResult.success && webhookResult.tx_ref) {
+          // Sync it
+          await verifyAndSyncPayment({
+            txRef: webhookResult.tx_ref,
+            orchestrator,
+            supabase,
+            twilio: {
+              accountSid: TWILIO_ACCOUNT_SID,
+              authToken: TWILIO_AUTH_TOKEN,
+              messagingServiceSid: MESSAGING_SERVICE_SID,
+            },
+            preVerifiedStatus: webhookResult.status,
+            externalReference: webhookResult.external_reference
+          });
+       }
+       
+       return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
-    throw new Error("Invalid action. Use 'create_payment' or 'verify_payment'.");
+    throw new Error("Invalid action. Use 'create_payment', 'verify_payment' or 'webhook'.");
   } catch (error) {
     console.error("Payment error:", error);
     const msg = error instanceof Error ? error.message : "Unknown error";
@@ -175,52 +194,60 @@ async function verifyAndSyncPayment({
   txRef,
   orderId,
   redirectUrl,
-  paychanguSecretKey,
+  orchestrator,
   supabase,
   twilio,
+  preVerifiedStatus,
+  externalReference
 }: {
   txRef: string;
   orderId?: string;
   redirectUrl?: string;
-  paychanguSecretKey: string;
+  orchestrator: PaymentOrchestrator;
   supabase: any;
   twilio: { accountSid: string; authToken: string; messagingServiceSid: string };
+  preVerifiedStatus?: 'paid' | 'pending' | 'failed' | 'cancelled' | 'unknown';
+  externalReference?: string;
 }) {
-  const response = await fetch(`https://api.paychangu.com/verify-payment/${txRef}`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${paychanguSecretKey}`,
-    },
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    console.error("PayChangu verify error:", data);
-    throw new Error(data.message || `Verification error [${response.status}]`);
-  }
-
-  const externalStatus = String(data.data?.status || data.status || "unknown").toLowerCase();
-  const paymentStatus = externalStatus === "success" ? "paid" : externalStatus;
-
   // Find order by tx_ref if orderId not provided
   const orderQuery = orderId
     ? supabase.from("orders").select("*").eq("id", orderId).maybeSingle()
     : supabase.from("orders").select("*").eq("payment_reference", txRef).maybeSingle();
   const { data: existingOrder } = await orderQuery;
+  
+  if (!existingOrder) {
+     throw new Error(`Order not found for tx_ref: ${txRef}`);
+  }
+
+  const providerName = existingOrder.payment_provider || 'paychangu';
+  const provider = orchestrator.getProvider(providerName);
+
+  let paymentStatus = preVerifiedStatus;
+  let providerData = null;
+  let finalExternalRef = externalReference;
+
+  if (!paymentStatus) {
+    const response = await provider.verifyPayment({ tx_ref: txRef });
+    paymentStatus = response.status;
+    providerData = response.data;
+    if (response.external_reference) finalExternalRef = response.external_reference;
+  }
 
   if (existingOrder) {
     const wasPaid = existingOrder.status === "paid";
+    
+    const updates: any = {
+      status: paymentStatus === "paid" ? "paid" : existingOrder.status,
+    };
+    if (finalExternalRef) updates.external_reference = finalExternalRef;
 
     await supabase
       .from("orders")
-      .update({
-        status: paymentStatus === "paid" ? "paid" : existingOrder.status,
-      })
+      .update(updates)
       .eq("id", existingOrder.id)
       .throwOnError();
       
-      console.log(`✅ Order ${existingOrder.id} status synced to: ${paymentStatus === "paid" ? "paid" : existingOrder.status}`);
+    console.log(`✅ Order ${existingOrder.id} status synced to: ${paymentStatus === "paid" ? "paid" : existingOrder.status}`);
 
     if (paymentStatus === "paid" && !wasPaid && existingOrder.customer_phone && twilio.accountSid && twilio.authToken && twilio.messagingServiceSid) {
       const customerName = existingOrder.customer_name ? ` ${existingOrder.customer_name.split(" ")[0]}` : "";
@@ -236,13 +263,13 @@ async function verifyAndSyncPayment({
 
   const redirectTarget = redirectUrl
     ? withQueryParams(redirectUrl, {
-        status: paymentStatus,
+        status: paymentStatus || 'unknown',
         tx_ref: txRef,
         order_id: existingOrder?.id || orderId || "",
       })
     : "";
 
-  return { status: paymentStatus, data, redirectTarget };
+  return { status: paymentStatus, data: providerData, redirectTarget };
 }
 
 function withQueryParams(target: string, params: Record<string, string>) {

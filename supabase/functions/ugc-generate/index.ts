@@ -2006,7 +2006,12 @@ Deno.serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const referenceImage = body.avatarImageUrl || body.avatarImageBase64;
+    // Blob URLs (blob://...) are client-side only — the server cannot fetch them.
+    // Prefer avatarImageBase64 when avatarImageUrl is a blob URL.
+    const rawAvatarRef = body.avatarImageUrl;
+    const referenceImage = (rawAvatarRef && !rawAvatarRef.startsWith("blob:"))
+      ? rawAvatarRef
+      : (body.avatarImageBase64 || null);
 
     // ═══════════════════════════════════════════════════════
     // INVENTORY VALIDATION GATE
@@ -2125,8 +2130,16 @@ Deno.serve(async (req) => {
 
       try {
         if (primaryProductUrl) {
-          let vtonPersonImage = referenceImage;
-          
+          let vtonPersonImage: string | null = referenceImage;
+
+          // If the reference image is a raw base64 data URI, persist it to storage
+          // so VTON APIs receive a fetchable public URL instead of a raw data URI.
+          if (vtonPersonImage && vtonPersonImage.startsWith("data:")) {
+            console.log("[generate-avatar] Persisting uploaded base64 reference image to storage...");
+            vtonPersonImage = await persistMedia(supabase, vtonPersonImage, "uploads");
+            console.log(`[generate-avatar] Uploaded reference image URL: ${vtonPersonImage}`);
+          }
+
           if (!vtonPersonImage) {
             console.log(`[generate-avatar] No reference image provided. Generating high-quality baseline portrait for ${gender} ${ethnicity}...`);
             let baselinePrompt = "";
@@ -2224,7 +2237,10 @@ Deno.serve(async (req) => {
       if (productImages.length === 0) throw new Error("Generation blocked: no product image.");
       console.log("Stage 1: Product Lock Engine verified.");
 
-      let referenceImage = body.influencerImageUrl || body.avatarImageUrl;
+      // Blob URLs (blob://...) are client-side only and cannot be fetched server-side.
+      // If influencerImageUrl is a blob URL, treat it as absent so we fall back to avatarImageBase64.
+      const rawRef = body.influencerImageUrl || body.avatarImageUrl;
+      let referenceImage = (rawRef && !rawRef.startsWith("blob:")) ? rawRef : null;
       if (avatarImageBase64 && !referenceImage) {
         referenceImage = await persistMedia(supabase, avatarImageBase64, "uploads");
       }
