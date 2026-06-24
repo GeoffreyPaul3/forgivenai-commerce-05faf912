@@ -98,25 +98,38 @@ export class OneKhusaProvider implements PaymentProvider {
     const successUrl  = params.return_url   || "https://www.forgivenshoppingcentre.com";
     const failureUrl  = params.return_url   || "https://www.forgivenshoppingcentre.com";
 
-    // The Request To Pay Checkout endpoint per docs:
-    // POST /collections/requestToPay/initiate (NOT /checkout/rtp/initiate)
+    // Checkout RTP endpoint per docs:
+    // POST /checkout/rtp/initiate
+    // Docs: https://docs.onekhusa.com/api-reference/collections/request-to-pay-checkout
     const rtpBody = {
-      merchantAccountNumber: Number(this.merchantAccountNumber),
-      transactionAmount: Number(params.amount),
-      transactionDescription: params.title || params.description || `Forgiven Shopping Centre Order`,
-      referenceNumber: params.tx_ref,
-      capturedBy: "geofreypaul40@gmail.com",
+      authentication: {
+        apiKey: this.apiKey,
+        apiSecret: this.apiSecret,
+      },
+      merchant: {
+        organisationId: this.organisationId,
+        merchantAccountNumber: Number(this.merchantAccountNumber),
+      },
+      payment: {
+        sourceReferenceNumber: params.tx_ref,
+        description: params.title || params.description || `Forgiven Shopping Centre Order`,
+        amount: Number(params.amount),
+      },
+      route: {
+        successRedirectionUrl: successUrl,
+        failureRedirectionUrl: failureUrl,
+        callbackApiUrl: callbackUrl || successUrl,
+      }
     };
 
-    console.log("OneKhusa requestToPay body:", JSON.stringify(rtpBody));
+    console.log("OneKhusa checkout/rtp/initiate body:", JSON.stringify(rtpBody));
 
-    const response = await fetch(`${this.baseUrl}/collections/requestToPay/initiate`, {
+    const response = await fetch(`${this.baseUrl}/checkout/rtp/initiate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
         "Authorization": `Bearer ${accessToken}`,
-        "Accept-Language": "en",
         "X-Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify(rtpBody),
@@ -132,24 +145,35 @@ export class OneKhusaProvider implements PaymentProvider {
       throw new Error(`${detail}${errors}`);
     }
 
-    // Response: { merchantAccountNumber, timedAccountNumber, expiryDate, expiryInMinutes }
-    const timedAccountNumber = data?.timedAccountNumber || data?.data?.timedAccountNumber;
+    // Response fields:
+    // - timedAccountNumber: TAN for direct mobile money / bank transfers
+    // - paymentTransactionId: PTID used to redirect to the hosted checkout page
+    const timedAccountNumber  = data?.timedAccountNumber  || data?.data?.timedAccountNumber;
+    const paymentTransactionId = data?.paymentTransactionId || data?.data?.paymentTransactionId;
 
-    // Build a checkout URL using the checkout base + TAN
-    // Customer uses this TAN to pay via their bank/MNO app
-    const checkoutUrl = timedAccountNumber
-      ? `${CHECKOUT_BASE}/pay?tan=${timedAccountNumber}&ref=${params.tx_ref}&amount=${params.amount}&currency=${params.currency || "MWK"}`
-      : `${CHECKOUT_BASE}/pay`;
+    // The hosted checkout URL (per OneKhusa docs):
+    // https://checkout.onekhusa.com/requestToPay/initiate?ptid={paymentTransactionId}
+    // The TAN is for customers who prefer to pay via their own bank/MNO app directly.
+    const checkoutUrl = paymentTransactionId
+      ? `${CHECKOUT_BASE}/requestToPay/initiate?ptid=${paymentTransactionId}`
+      : timedAccountNumber
+        ? `${CHECKOUT_BASE}/requestToPay/initiate?ptid=${timedAccountNumber}`
+        : null;
 
-    console.log(`✅ OneKhusa TAN generated: ${timedAccountNumber}, checkout: ${checkoutUrl}`);
+    if (!checkoutUrl) {
+      console.error("OneKhusa RTP response missing paymentTransactionId and timedAccountNumber:", JSON.stringify(data));
+      throw new Error("OneKhusa did not return a paymentTransactionId or timedAccountNumber to build a checkout URL.");
+    }
+
+    console.log(`✅ OneKhusa checkout URL: ${checkoutUrl} (TAN: ${timedAccountNumber}, PTID: ${paymentTransactionId})`);
 
     return {
       success: true,
       checkout_url: checkoutUrl,
       tx_ref: params.tx_ref,
-      // Pass the TAN in the response so the WhatsApp agent can tell the customer
       extra: {
         timedAccountNumber,
+        paymentTransactionId,
         expiryDate: data?.expiryDate,
         expiryInMinutes: data?.expiryInMinutes,
         merchantAccountNumber: data?.merchantAccountNumber,
