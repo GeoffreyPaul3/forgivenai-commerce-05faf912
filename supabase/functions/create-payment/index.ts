@@ -84,9 +84,9 @@ serve(async (req) => {
     } = body;
 
     if (action === "create_payment") {
-      const generatedTxRef = tx_ref || `FG-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+      const generatedTxRef = tx_ref ? tx_ref.replace(/[^a-zA-Z0-9]/g, "") : `FG${Date.now()}${Math.floor(Math.random() * 100000)}`;
 
-      const FRONTEND_URL = "https://agents.forgivensc.com";
+      const FRONTEND_URL = "https://www.forgivenshoppingcentre.com";
       const callbackUrl = `${SUPABASE_URL}/functions/v1/create-payment`;
       const browserReturnUrl = `${FRONTEND_URL}/create-payment?tx_ref=${generatedTxRef}`;
 

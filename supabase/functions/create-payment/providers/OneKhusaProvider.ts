@@ -95,8 +95,8 @@ export class OneKhusaProvider implements PaymentProvider {
     const idempotencyKey = `FSC-${params.tx_ref}`;
 
     const callbackUrl = params.callback_url || "";
-    const successUrl  = params.return_url   || "https://forgivensc.com";
-    const failureUrl  = params.return_url   || "https://forgivensc.com";
+    const successUrl  = params.return_url   || "https://www.forgivenshoppingcentre.com";
+    const failureUrl  = params.return_url   || "https://www.forgivenshoppingcentre.com";
 
     // The Request To Pay Checkout endpoint per docs:
     // POST /collections/requestToPay/initiate (NOT /checkout/rtp/initiate)
@@ -105,7 +105,7 @@ export class OneKhusaProvider implements PaymentProvider {
       transactionAmount: Number(params.amount),
       transactionDescription: params.title || params.description || `Forgiven Shopping Centre Order`,
       referenceNumber: params.tx_ref,
-      capturedBy: "system@forgivensc.com",
+      capturedBy: "geofreypaul40@gmail.com",
     };
 
     console.log("OneKhusa requestToPay body:", JSON.stringify(rtpBody));

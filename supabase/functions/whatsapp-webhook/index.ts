@@ -778,7 +778,9 @@ ${productList}`;
         await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: cleanText });
 
         // ── Calculate Delivery Fee if Smart Deliveries ──
-        let finalOrderTotal = orderData.price * orderData.quantity;
+        const parsedPrice = typeof orderData.price === 'string' ? parseFloat(orderData.price.replace(/,/g, '')) : orderData.price;
+        const parsedQty = typeof orderData.quantity === 'string' ? parseInt(orderData.quantity, 10) : orderData.quantity;
+        let finalOrderTotal = (parsedPrice || 0) * (parsedQty || 1);
         let finalStatus = "pending";
         let deliveryFee = 0;
         const isSmartDelivery = orderData.courier && orderData.courier.toLowerCase().includes("smart");
@@ -802,8 +804,8 @@ ${productList}`;
           items: [{ 
             product_id: product?.id || null, 
             name: orderData.product_name, 
-            quantity: orderData.quantity, 
-            price: orderData.price,
+            quantity: parsedQty || 1, 
+            price: parsedPrice || 0,
             size: orderData.size,
             color: orderData.color
           }] as any,
