@@ -395,19 +395,19 @@ serve(async (req) => {
           const { data: messages } = await supabase.from("messages").select("*").eq("conversation_id", convo.id).order("created_at", { ascending: false }).limit(3);
           const lastAiMsg = messages?.find(m => m.role === "ai");
           
-          if (lastAiMsg && (lastAiMsg.content.includes("*Total:*") || lastAiMsg.content.includes("*Product:*"))) {
+          if (lastAiMsg && (lastAiMsg.content.includes("*Total:*") || lastAiMsg.content.includes("*Product:*") || lastAiMsg.content.includes("MWK"))) {
             const c = lastAiMsg.content;
             // Flexible regex to handle different AI formatting
-            const productMatch  = c.match(/\*Product:\*\s*(.+)/) || c.match(/\*\*([^*]+)\*\*/);
-            const quantityMatch = c.match(/\*Quantity:\*\s*(\d+)/);
-            const sizeMatch     = c.match(/\*Size:\*\s*(.+)/);
-            const colorMatch    = c.match(/\*Colour:\*\s*(.+)/);
-            const priceMatch    = c.match(/\*(?:Price|Total):\*\s*MWK\s*([\d,]+)/) || c.match(/MWK\s*([\d,.]+)/);
-            const nameMatch     = c.match(/\*Name:\*\s*(.+)/);
-            const emailMatch    = c.match(/\*Email:\*\s*(.+)/);
-            const addressMatch  = c.match(/\*Address:\*\s*(.+)/);
-            const phoneMatch    = c.match(/\*Phone:\*\s*(.+)/);
-            const courierMatch  = c.match(/\*Courier:\*\s*(.+)/);
+            const productMatch  = c.match(/\*Product:\*\s*(.+)/i) || c.match(/\*\*([^*]+)\*\*/) || c.match(/{{(.+?)}}/) || c.match(/image of\s+\*?\*?(.+?)\*?\*?\s+now/i);
+            const quantityMatch = c.match(/\*Quantity:\*\s*(\d+)/i) || c.match(/✅\s*Quantity:\s*(\d+)/i);
+            const sizeMatch     = c.match(/\*Size:\*\s*(.+)/i) || c.match(/✅\s*Size:\s*(.+)/i);
+            const colorMatch    = c.match(/\*Colour:\*\s*(.+)/i) || c.match(/✅\s*Colour:\s*(.+)/i);
+            const priceMatch    = c.match(/\*(?:Price|Total):\*\s*MWK\s*([\d,]+)/i) || c.match(/✅\s*Price:\s*MWK\s*([\d,]+)/i) || c.match(/MWK\s*([\d,.]+)/i);
+            const nameMatch     = c.match(/\*Name:\*\s*(.+)/i) || c.match(/✅\s*Name:\s*(.+)/i);
+            const emailMatch    = c.match(/\*Email:\*\s*(.+)/i) || c.match(/✅\s*Email:\s*(.+)/i);
+            const addressMatch  = c.match(/\*(?:Address|Delivery address):\*\s*(.+)/i) || c.match(/✅\s*(?:Address|Delivery address):\s*(.+)/i);
+            const phoneMatch    = c.match(/\*Phone:\*\s*(.+)/i) || c.match(/✅\s*Phone:\s*(.+)/i);
+            const courierMatch  = c.match(/\*Courier:\*\s*(.+)/i) || c.match(/✅\s*Courier:\s*(.+)/i);
 
             if (productMatch && priceMatch) {
               orderData = {
