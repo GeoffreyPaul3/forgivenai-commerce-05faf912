@@ -34,16 +34,14 @@ serve(async (req) => {
 
     if (req.method === "GET") {
       const txRef = requestUrl.searchParams.get("tx_ref") ?? "";
-      const redirectUrl = requestUrl.searchParams.get("redirect_url") ?? "https://agents.forgivensc.com/create-payment";
 
       if (!txRef) {
-        return htmlResponse("Payment reference missing", "We could not verify this payment because the transaction reference was not provided.", "error");
+        return htmlResponse("Payment reference missing", "We could not verify this payment because the transaction reference was not provided.", "error", "");
       }
 
       try {
         const result = await verifyAndSyncPayment({
           txRef,
-          redirectUrl,
           orchestrator,
           supabase,
           twilio: {
@@ -53,15 +51,22 @@ serve(async (req) => {
           },
         });
 
-        return Response.redirect(result.redirectTarget, 302);
+        const status = result.status ?? "unknown";
+        if (status === "paid" || status === "success") {
+          return htmlResponse("Payment Confirmed! 🎉", "Thank you for your order! Your payment has been received and we're already getting it ready for you.", "success", txRef, result.data);
+        } else if (status === "pending") {
+          return htmlResponse("Payment Pending", "Your payment is still being processed. You'll receive a WhatsApp message once it clears — usually within a few minutes.", "pending", txRef);
+        } else {
+          return htmlResponse("Verification Failed", `We couldn't verify your payment. Please WhatsApp us and quote your reference: ${txRef}`, "error", txRef);
+        }
       } catch (error) {
         console.error("Verification error:", error);
         const msg = error instanceof Error ? error.message : "Internal Server Error";
-        
         return htmlResponse(
-          "Payment Sync Issue", 
-          `Your payment was processed, but we encountered an error updating our records: ${msg}. Please contact support with your reference: ${txRef}`, 
-          "warning"
+          "Payment Sync Issue",
+          `Your payment was processed, but we encountered an issue updating our records. Please WhatsApp us with your reference: ${txRef}`,
+          "warning",
+          txRef
         );
       }
     }
@@ -86,9 +91,11 @@ serve(async (req) => {
     if (action === "create_payment") {
       const generatedTxRef = tx_ref ? tx_ref.replace(/[^a-zA-Z0-9]/g, "") : `FG${Date.now()}${Math.floor(Math.random() * 100000)}`;
 
-      const FRONTEND_URL = "https://www.forgivenshoppingcentre.com";
+      // Browser return URL loops back to this edge function's GET handler.
+      // It verifies the payment server-side and serves a branded HTML receipt page
+      // with a 5-second auto-redirect to WhatsApp — no React SPA dependency at all.
       const callbackUrl = `${SUPABASE_URL}/functions/v1/create-payment`;
-      const browserReturnUrl = `${FRONTEND_URL}/create-payment?tx_ref=${generatedTxRef}`;
+      const browserReturnUrl = `${SUPABASE_URL}/functions/v1/create-payment?tx_ref=${generatedTxRef}`;
 
       const activeProvider = orchestrator.getProvider(provider);
 
@@ -335,133 +342,253 @@ function withQueryParams(target: string, params: Record<string, string>) {
   return url.toString();
 }
 
-function htmlResponse(title: string, message: string, tone: "success" | "pending" | "error") {
+const WA_NUMBER = "265997128899"; // Forgiven Shopping Centre WhatsApp sales agent
+const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent("Hi! I just completed my payment and I'd like an update on my order 😊")}`;
+const STORE_URL = "https://www.forgivenshoppingcentre.com";
+
+function htmlResponse(
+  title: string,
+  message: string,
+  tone: "success" | "pending" | "error" | "warning",
+  txRef: string,
+  _providerData?: unknown
+) {
   const isSuccess = tone === "success";
-  const accentHsl = isSuccess ? "152, 60%, 42%" : tone === "pending" ? "38, 92%, 50%" : "0, 72%, 51%";
-  const redirectUrl = "https://agents.forgivensc.com";
-  
-  return new Response(`<!doctype html>
+  const isPending = tone === "pending";
+  const accentHsl = isSuccess
+    ? "152, 60%, 42%"
+    : isPending
+    ? "38, 92%, 50%"
+    : "0, 72%, 51%";
+
+  const iconSvg = isSuccess
+    ? `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`
+    : isPending
+    ? `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`
+    : `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+
+  const waIconSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>`;
+
+  return new Response(
+    `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${title} | Forgiven Shopping Centre</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
       :root {
         --accent: ${accentHsl};
-        --bg: #f8fafc;
-        --card-bg: #ffffff;
-        --text-main: #0f172a;
-        --text-muted: #64748b;
+        --accent-light: hsla(${accentHsl}, 0.12);
+        --accent-solid: hsl(${accentHsl});
+        --bg: #f0f4f8;
+        --card: #ffffff;
+        --text: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --wa-green: #25d366;
+        --wa-dark: #128c7e;
       }
-      * { box-sizing: border-box; }
-      body { 
-        margin: 0; 
-        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-        background: radial-gradient(circle at top right, hsla(var(--accent), 0.05), transparent), var(--bg);
-        color: var(--text-main);
+      body {
+        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background:
+          radial-gradient(ellipse at top right, hsla(${accentHsl}, 0.10), transparent 55%),
+          radial-gradient(ellipse at bottom left, hsla(${accentHsl}, 0.06), transparent 55%),
+          var(--bg);
+        color: var(--text);
+        min-height: 100vh;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 100vh;
         padding: 24px;
       }
-      .card { 
-        width: 100%; 
-        max-width: 440px; 
-        background: var(--card-bg); 
-        border-radius: 32px; 
-        padding: 48px 32px; 
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08); 
+      .card {
+        width: 100%;
+        max-width: 460px;
+        background: var(--card);
+        border-radius: 28px;
+        padding: 48px 36px 40px;
+        box-shadow:
+          0 32px 64px -16px rgba(0,0,0,0.10),
+          0 0 0 1px rgba(0,0,0,0.04);
         text-align: center;
         position: relative;
         overflow: hidden;
-        animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        animation: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
       }
-      @keyframes slideUp {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(28px) scale(0.97); }
+        to   { opacity: 1; transform: translateY(0)   scale(1); }
       }
-      .card::before {
-        content: '';
+      .stripe {
         position: absolute;
         top: 0; left: 0; right: 0;
-        height: 6px;
-        background: hsl(var(--accent));
+        height: 5px;
+        background: linear-gradient(90deg, var(--accent-solid), hsla(${accentHsl}, 0.4));
       }
-      .icon-box {
-        width: 80px;
-        height: 80px;
-        background: hsla(var(--accent), 0.1);
-        border-radius: 24px;
+      .brand {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 28px;
+      }
+      .icon-ring {
+        width: 88px;
+        height: 88px;
+        background: var(--accent-light);
+        border-radius: 28px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 32px;
-        color: hsl(var(--accent));
+        margin: 0 auto 24px;
+        color: var(--accent-solid);
+        animation: pop 0.4s 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
       }
-      h1 { margin: 0 0 16px; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
-      p { margin: 0 0 32px; line-height: 1.6; color: var(--text-muted); font-size: 17px; }
-      .btn {
-        display: inline-block;
-        background: hsl(var(--accent));
-        color: white;
+      @keyframes pop {
+        from { transform: scale(0.5); opacity: 0; }
+        to   { transform: scale(1);   opacity: 1; }
+      }
+      h1 {
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        line-height: 1.2;
+        margin-bottom: 12px;
+        color: var(--text);
+      }
+      .subtitle {
+        font-size: 15px;
+        line-height: 1.65;
+        color: var(--muted);
+        margin-bottom: 28px;
+      }
+      .divider {
+        height: 1px;
+        background: var(--border);
+        margin: 0 -36px 28px;
+      }
+      ${txRef ? `.ref-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-bottom: 24px;
+        font-size: 13px;
+      }
+      .ref-label { color: var(--muted); font-weight: 500; }
+      .ref-value { font-family: monospace; font-size: 12px; color: var(--text); word-break: break-all; text-align: right; max-width: 65%; }` : ""}
+      .btn-wa {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+        background: var(--wa-green);
+        color: #fff;
         text-decoration: none;
-        padding: 16px 32px;
+        padding: 16px 24px;
         border-radius: 16px;
-        font-weight: 600;
-        transition: all 0.2s ease;
-        box-shadow: 0 10px 15px -3px hsla(var(--accent), 0.3);
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        box-shadow: 0 10px 24px -4px rgba(37, 211, 102, 0.40);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        margin-bottom: 12px;
       }
-      .btn:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px hsla(var(--accent), 0.4); }
-      .redirect-msg {
-        margin-top: 24px;
+      .btn-wa:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 30px -6px rgba(37, 211, 102, 0.50);
+      }
+      .btn-store {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        background: transparent;
+        color: var(--muted);
+        text-decoration: none;
+        padding: 13px 24px;
+        border-radius: 16px;
         font-size: 14px;
-        color: var(--text-muted);
+        font-weight: 600;
+        border: 1.5px solid var(--border);
+        transition: all 0.2s ease;
       }
-      .dots::after {
-        content: '...';
-        animation: dots 1.5s infinite;
+      .btn-store:hover {
+        border-color: var(--accent-solid);
+        color: var(--accent-solid);
+        background: var(--accent-light);
       }
-      @keyframes dots {
-        0% { content: '.'; }
-        33% { content: '..'; }
-        66% { content: '...'; }
+      .countdown-bar-wrap {
+        margin-top: 20px;
+        background: var(--border);
+        border-radius: 100px;
+        height: 4px;
+        overflow: hidden;
+      }
+      .countdown-bar {
+        height: 100%;
+        background: var(--wa-green);
+        border-radius: 100px;
+        width: 100%;
+        transition: width 1s linear;
+      }
+      .countdown-text {
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--muted);
+        text-align: center;
       }
     </style>
     ${isSuccess ? `<script>
-      setTimeout(() => {
-        window.location.href = "${redirectUrl}";
-      }, 5000);
+      var SECONDS = 5;
+      var remaining = SECONDS;
+      function tick() {
+        remaining--;
+        var bar = document.getElementById('cbar');
+        var txt = document.getElementById('ctxt');
+        if (bar) bar.style.width = (remaining / SECONDS * 100) + '%';
+        if (txt) txt.textContent = 'Opening WhatsApp in ' + remaining + 's…';
+        if (remaining <= 0) {
+          window.location.href = '${WA_LINK}';
+        }
+      }
+      window.addEventListener('DOMContentLoaded', function() {
+        setInterval(tick, 1000);
+      });
     </script>` : ""}
   </head>
   <body>
     <div class="card">
-      <div class="icon-box">
-        ${isSuccess ? 
-          `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>` :
-          `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`
-        }
-      </div>
+      <div class="stripe"></div>
+      <div class="brand">Forgiven Shopping Centre</div>
+      <div class="icon-ring">${iconSvg}</div>
       <h1>${title}</h1>
-      <p>${message}</p>
-      <a href="${redirectUrl}" class="btn">Return to Store</a>
-      ${isSuccess ? `<div class="redirect-msg">Redirecting to store in <span id="timer">5</span>s<span class="dots"></span></div>
-      <script>
-        let timeLeft = 5;
-        const timerEl = document.getElementById('timer');
-        setInterval(() => {
-          if (timeLeft > 0) {
-            timeLeft--;
-            timerEl.textContent = timeLeft;
-          }
-        }, 1000);
-      </script>` : ""}
+      <p class="subtitle">${message}</p>
+      <div class="divider"></div>
+      ${txRef ? `<div class="ref-row"><span class="ref-label">Reference</span><span class="ref-value">${txRef}</span></div>` : ""}
+      <a href="${WA_LINK}" class="btn-wa">
+        ${waIconSvg}
+        ${isSuccess ? "Chat With Us on WhatsApp" : "Contact Us on WhatsApp"}
+      </a>
+      <a href="${STORE_URL}" class="btn-store">Visit Our Website</a>
+      ${isSuccess ? `
+      <div class="countdown-bar-wrap"><div class="countdown-bar" id="cbar"></div></div>
+      <div class="countdown-text" id="ctxt">Opening WhatsApp in 5s…</div>` : ""}
     </div>
   </body>
-</html>`, {
-    headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
-  });
+</html>`,
+    { headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } }
+  );
 }
 
 async function sendTwilioMessage(accountSid: string, authToken: string, messagingServiceSid: string, to: string, body: string) {
