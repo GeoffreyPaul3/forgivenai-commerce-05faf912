@@ -250,37 +250,40 @@ export class OneKhusaProvider implements PaymentProvider {
       const rawBody = await req.text();
       const body = rawBody ? JSON.parse(rawBody) : {};
 
-      // OneKhusa webhook payload typically contains event type and data
+      // OneKhusa RTP webhook payload
       const eventType = body?.event || body?.eventType || "";
+      
+      // The actual tx_ref we sent is stored in metaData.ReferenceNumber.
+      // sourceReferenceNumber in the webhook is the mobile network's reference (like RZ260625EKZ9)
       const txRef =
+        body?.metaData?.ReferenceNumber ||
         body?.data?.sourceReferenceNumber ||
         body?.sourceReferenceNumber ||
         body?.data?.paymentTransactionId ||
         body?.paymentTransactionId;
 
+      // The status is stored in transactionStatusCode ("S" for Success, "F" for Failed)
       const statusStr = String(
-        body?.data?.status || body?.status || "unknown"
-      ).toLowerCase();
+        body?.transactionStatusCode || body?.data?.status || body?.status || "unknown"
+      ).toUpperCase();
 
       let paymentStatus: WebhookResponse["status"] = "unknown";
-      if (["successful", "success", "paid", "completed"].includes(statusStr) ||
+      if (["S", "SUCCESSFUL", "SUCCESS", "PAID", "COMPLETED"].includes(statusStr) ||
           eventType === "payrequest.success") {
         paymentStatus = "paid";
-      } else if (statusStr === "failed" || eventType === "payrequest.failed") {
+      } else if (["F", "FAILED", "REVERSED"].includes(statusStr) || eventType === "payrequest.failed" || eventType === "payrequest.reversed") {
         paymentStatus = "failed";
-      } else if (statusStr === "pending") {
+      } else if (statusStr === "P" || statusStr === "PENDING") {
         paymentStatus = "pending";
-      } else if (statusStr === "reversed" || eventType === "payrequest.reversed") {
-        paymentStatus = "failed";
       }
 
-      console.log(`OneKhusa webhook received: event=${eventType}, tx_ref=${txRef}, status=${paymentStatus}`);
+      console.log(`OneKhusa webhook received: event=${eventType}, tx_ref=${txRef}, status=${paymentStatus}, raw_status=${statusStr}`);
 
       return {
         success: true,
         tx_ref: txRef,
         status: paymentStatus,
-        external_reference: body?.data?.paymentTransactionId,
+        external_reference: body?.transactionReferenceNumber || body?.data?.paymentTransactionId,
         raw_body: rawBody,
       };
     } catch (err: any) {
