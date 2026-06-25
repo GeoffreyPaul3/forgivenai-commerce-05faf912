@@ -111,12 +111,22 @@ serve(async (req) => {
       }
 
       if (order_id) {
+        const orderUpdates: Record<string, unknown> = {
+          payment_reference: response.tx_ref || generatedTxRef,
+          payment_provider: provider.toLowerCase(),
+        };
+
+        // Fix 3: Store OneKhusa PTID (paymentTransactionId) as external_reference
+        // so verifyPayment can use the correct identifier later
+        const ptid = (response.extra as any)?.paymentTransactionId;
+        if (ptid) {
+          orderUpdates.external_reference = ptid;
+          console.log(`✅ Stored OneKhusa PTID as external_reference: ${ptid}`);
+        }
+
         await supabase
           .from("orders")
-          .update({
-            payment_reference: response.tx_ref || generatedTxRef,
-            payment_provider: provider.toLowerCase(),
-          })
+          .update(orderUpdates)
           .eq("id", order_id)
           .throwOnError();
       }
@@ -180,6 +190,47 @@ serve(async (req) => {
        return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Fix 5: Auto-detect OneKhusa server-side callbacks.
+    // OneKhusa POSTs a notification without an 'action' field — detect by presence of
+    // sourceReferenceNumber or paymentTransactionId at the root or inside data.
+    const isOneKhusaCallback =
+      !action &&
+      (body?.data?.sourceReferenceNumber ||
+        body?.data?.paymentTransactionId ||
+        body?.sourceReferenceNumber ||
+        body?.paymentTransactionId);
+
+    if (isOneKhusaCallback) {
+      console.log("Detected OneKhusa server callback (no 'action' field):", JSON.stringify(body));
+      // Re-use the req object — but we already consumed it; rebuild a fake Request with the raw body
+      const fakeReq = new Request(req.url, {
+        method: "POST",
+        headers: req.headers,
+        body: JSON.stringify(body),
+      });
+      const webhookProvider = orchestrator.getProvider("onekhusa");
+      const webhookResult = await webhookProvider.handleWebhook(fakeReq);
+
+      if (webhookResult.success && webhookResult.tx_ref) {
+        await verifyAndSyncPayment({
+          txRef: webhookResult.tx_ref,
+          orchestrator,
+          supabase,
+          twilio: {
+            accountSid: TWILIO_ACCOUNT_SID,
+            authToken: TWILIO_AUTH_TOKEN,
+            messagingServiceSid: MESSAGING_SERVICE_SID,
+          },
+          preVerifiedStatus: webhookResult.status,
+          externalReference: webhookResult.external_reference,
+        });
+      }
+
+      return new Response(JSON.stringify({ received: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     throw new Error("Invalid action. Use 'create_payment', 'verify_payment' or 'webhook'.");
   } catch (error) {
     console.error("Payment error:", error);
@@ -228,7 +279,10 @@ async function verifyAndSyncPayment({
   let finalExternalRef = externalReference;
 
   if (!paymentStatus) {
-    const response = await provider.verifyPayment({ tx_ref: txRef });
+    // Fix 4: Pass PTID (stored as external_reference) to verifyPayment
+    // so OneKhusa can look up by PTID instead of the internal tx_ref
+    const ptid = existingOrder.external_reference || undefined;
+    const response = await provider.verifyPayment({ tx_ref: txRef, ptid });
     paymentStatus = response.status;
     providerData = response.data;
     if (response.external_reference) finalExternalRef = response.external_reference;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,6 +8,8 @@ export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const txRef = searchParams.get("tx_ref") ?? "";
+  // OneKhusa may pass ?status=success|failed on the redirect URL
+  const urlStatus = searchParams.get("status") ?? "";
   const [state, setState] = useState<PaymentState>("loading");
   const [orderDetails, setOrderDetails] = useState<{
     amount?: number;
@@ -15,6 +17,7 @@ export default function PaymentSuccess() {
     customer?: string;
   }>({});
   const [countdown, setCountdown] = useState(8);
+  const retryCount = useRef(0);
 
   useEffect(() => {
     if (!txRef) {
@@ -50,12 +53,30 @@ export default function PaymentSuccess() {
               customer: order.customer_name,
             });
           }
+        } else if (status === "pending") {
+          setState("pending");
         } else {
-          setState(status === "pending" ? "pending" : "error");
+          // "unknown" or anything else: retry once after 4 seconds
+          // (OneKhusa may not have settled the transaction yet)
+          if (retryCount.current < 1) {
+            retryCount.current += 1;
+            console.log(`Payment status "${status}" — retrying verification in 4s (attempt ${retryCount.current})...`);
+            setTimeout(verify, 4000);
+          } else {
+            console.warn(`Payment status still "${status}" after retry. Showing error.`);
+            setState("error");
+          }
         }
       } catch (err) {
         console.error("Payment verification error:", err);
-        setState("error");
+        // On network/edge-function error, retry once
+        if (retryCount.current < 1) {
+          retryCount.current += 1;
+          console.log(`Verification threw an error — retrying in 4s...`);
+          setTimeout(verify, 4000);
+        } else {
+          setState("error");
+        }
       }
     };
 
@@ -150,7 +171,7 @@ export default function PaymentSuccess() {
 
   const body =
     state === "loading"
-      ? "Please wait while we confirm your payment with PayChangu."
+      ? "Please wait while we confirm your payment with OneKhusa. This may take a few seconds…"
       : state === "success"
       ? `Your payment has been confirmed and your order is now being processed.${
           orderDetails.customer ? ` Thank you, ${orderDetails.customer}!` : ""

@@ -23,6 +23,8 @@ export interface InitializePaymentResponse {
 
 export interface VerifyPaymentParams {
   tx_ref: string;
+  /** Provider-specific payment transaction ID (e.g. OneKhusa PTID) — preferred over tx_ref for verification */
+  ptid?: string;
 }
 
 export interface VerifyPaymentResponse {

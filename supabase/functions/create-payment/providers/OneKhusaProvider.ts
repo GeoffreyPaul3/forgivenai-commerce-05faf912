@@ -183,13 +183,19 @@ export class OneKhusaProvider implements PaymentProvider {
 
   /**
    * Verify a payment by its reference.
-   * Uses the GET /checkout/rtp/{sourceReferenceNumber} or similar endpoint.
+   * Prefers the paymentTransactionId (PTID) stored as external_reference on the order,
+   * because OneKhusa's verification endpoint is keyed by PTID, not sourceReferenceNumber.
+   * Falls back to tx_ref if no PTID is available.
    */
   async verifyPayment(params: VerifyPaymentParams): Promise<VerifyPaymentResponse> {
     try {
       const accessToken = await this.getAccessToken();
 
-      const response = await fetch(`${this.baseUrl}/checkout/rtp/${params.tx_ref}`, {
+      // Prefer PTID for verification — OneKhusa keys its status endpoint by PTID
+      const lookupId = params.ptid || params.tx_ref;
+      console.log(`OneKhusa verifyPayment: looking up by ${params.ptid ? "PTID" : "tx_ref"} = ${lookupId}`);
+
+      const response = await fetch(`${this.baseUrl}/checkout/rtp/${lookupId}`, {
         method: "GET",
         headers: {
           "Accept": "application/json",
@@ -198,9 +204,11 @@ export class OneKhusaProvider implements PaymentProvider {
       });
 
       const data = await response.json().catch(() => ({}));
+      console.log(`OneKhusa verifyPayment response [${response.status}]:`, JSON.stringify(data));
 
       if (!response.ok) {
         console.warn(`OneKhusa verifyPayment failed [${response.status}]:`, data);
+        // If we used tx_ref and it failed, the PTID may not have been stored yet — return unknown
         return { status: "unknown", data };
       }
 
@@ -208,20 +216,22 @@ export class OneKhusaProvider implements PaymentProvider {
         data?.data?.status || data?.status || "unknown"
       ).toLowerCase();
 
+      console.log(`OneKhusa raw status string: "${externalStatus}"`);
+
       let paymentStatus: VerifyPaymentResponse["status"] = "unknown";
-      if (["successful", "success", "paid", "completed"].includes(externalStatus)) {
+      if (["successful", "success", "paid", "completed", "approved"].includes(externalStatus)) {
         paymentStatus = "paid";
-      } else if (externalStatus === "failed" || externalStatus === "reversed") {
+      } else if (["failed", "reversed", "declined", "error"].includes(externalStatus)) {
         paymentStatus = "failed";
-      } else if (externalStatus === "pending") {
+      } else if (externalStatus === "pending" || externalStatus === "processing") {
         paymentStatus = "pending";
-      } else if (externalStatus === "cancelled") {
+      } else if (externalStatus === "cancelled" || externalStatus === "canceled") {
         paymentStatus = "cancelled";
       }
 
       return {
         status: paymentStatus,
-        external_reference: data?.data?.paymentTransactionId || data?.data?.transactionId,
+        external_reference: data?.data?.paymentTransactionId || data?.data?.transactionId || data?.paymentTransactionId,
         amount: data?.data?.amount,
         data,
       };
