@@ -37,6 +37,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import type { Tables } from "@/integrations/supabase/types";
 import { motion, AnimatePresence } from "framer-motion";
+import { VariationSelector } from "@/components/VariationSelector";
 // Removed legacy videoAssembler import as per True Motion Engine upgrade
 
 type Content = Tables<"content">;
@@ -496,6 +497,7 @@ function ContentManager() {
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [selectedProduct, setSelectedProduct] = useState("none");
+  const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
   const [editItem, setEditItem] = useState<Content | null>(null);
   const [viewItem, setViewItem] = useState<Content | null>(null);
   const [deleteItem, setDeleteItem] = useState<Content | null>(null);
@@ -522,17 +524,29 @@ function ContentManager() {
     try {
       const product = allProducts?.find((p: any) => p.id === selectedProduct);
       const typeMap: Record<string, string> = { description: "product-description", social_post: "social-post", campaign: "campaign" };
-      const { data, error } = await supabase.functions.invoke("ai-generate", {
-        body: { type: typeMap[genType] || "social-post", productName: product?.name || "General", productCategory: product?.category || "", productPrice: product?.price || 0, currency: product?.currency || "MWK", context: genContext },
-      });
-      if (error) throw error;
-      if (data?.content) {
-        const labels: Record<string, string> = { social_post: "Social Post", campaign: "Campaign", description: "Description" };
-        await supabase.from("content").insert({ type: genType, title: `${labels[genType] || genType} - ${product?.name || "General"}`, body: data.content, product_id: selectedProduct !== "none" ? selectedProduct : null, status: "draft" });
-        await refetch();
-        toast({ title: "Content generated & saved!" });
-        setGenContext("");
+      const labels: Record<string, string> = { social_post: "Social Post", campaign: "Campaign", description: "Description" };
+      
+      const varsToGen = selectedVariations.length > 0 ? selectedVariations : [{ url: product?.images?.[0] }];
+      
+      for (const variant of varsToGen) {
+        const customContext = variant.details ? 
+          `Specific variation: ${variant.details.primaryColor || ""} ${variant.details.garmentType || ""} with ${variant.details.sleeve || ""} ${variant.details.neckline || ""}. ${genContext}` 
+          : genContext;
+          
+        const titleSuffix = variant.details?.primaryColor ? ` - ${variant.details.primaryColor}` : "";
+
+        const { data, error } = await supabase.functions.invoke("ai-generate", {
+          body: { type: typeMap[genType] || "social-post", productName: product?.name || "General", productCategory: product?.category || "", productPrice: product?.price || 0, currency: product?.currency || "MWK", context: customContext, imageUrl: variant.url },
+        });
+        if (error) throw error;
+        if (data?.content) {
+          await supabase.from("content").insert({ type: genType, title: `${labels[genType] || genType} - ${product?.name || "General"}${titleSuffix}`, body: data.content, product_id: selectedProduct !== "none" ? selectedProduct : null, status: "draft" });
+        }
       }
+      
+      await refetch();
+      toast({ title: `Content generated for ${varsToGen.length} variation(s)!` });
+      setGenContext("");
     } catch {
       toast({ title: "Generation failed", variant: "destructive" });
     } finally {
@@ -593,6 +607,12 @@ function ContentManager() {
               label="Select Product for Content"
               placeholder="No product selected"
             />
+            {selectedProduct && selectedProduct !== "none" && allProducts?.find((p: any) => p.id === selectedProduct) && (
+              <VariationSelector 
+                product={allProducts?.find((p: any) => p.id === selectedProduct)}
+                onVariationsChange={setSelectedVariations}
+              />
+            )}
           </div>
         </div>
         <Textarea placeholder="Additional context or instructions..." value={genContext} onChange={e => setGenContext(e.target.value)} className="min-h-[60px]" />
@@ -749,6 +769,7 @@ function UGCStudio() {
   // Pipeline state
   const [step, setStep] = useState(1);
   const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
   const [avatarGender, setAvatarGender] = useState("female");
   const [avatarEthnicity, setAvatarEthnicity] = useState("african");
   const [avatarSetting, setAvatarSetting] = useState("studio");
@@ -767,6 +788,7 @@ function UGCStudio() {
   const [videoUrl, setVideoUrl] = useState("");
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoFidelityScore, setVideoFidelityScore] = useState<number | null>(null);
+  const [multipleVideoUrls, setMultipleVideoUrls] = useState<string[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -890,111 +912,117 @@ function UGCStudio() {
     }
     setGeneratingVideo(true);
     setVideoProgress(5);
+    setMultipleVideoUrls([]);
+    setVideoUrl("");
+    
     try {
-      const body: any = {
-        action: "generate-ugc-video",
-        productImageUrl: selectedProd.images?.[0],
-        product: {
-          id: selectedProd.id,
-          name: selectedProd.name,
-          category: selectedProd.category,
-          images: Array.isArray(selectedProd.images) ? selectedProd.images.filter(Boolean) : [],
-          description: selectedProd.description,
-          is_composite: selectedProd.is_composite ?? false,
-          variant_images: Array.isArray(selectedProd.variant_images) ? selectedProd.variant_images.filter(Boolean) : [],
-        },
-        influencerImageUrl: currentAvatar,
-        avatarGender,
-        avatarEthnicity,
-        productName: selectedProd.name,
-        productCategory: selectedProd.category,
-        productDescription: selectedProd.description,
-        isUGC,
-        setting: avatarSetting,
-        scriptText: script
-      };
-
-      if (uploadedFile && uploadedFile.type.startsWith("image/")) {
-        const base64 = await fileToBase64(uploadedFile);
-        body.avatarImageBase64 = base64;
-      }
-
-      // Phase 1: Submit job — returns immediately with { pending: true, requestId, statusUrl, responseUrl, masterFrameUrl }
-      const { data: submitData, error: submitError } = await supabase.functions.invoke("ugc-generate", { body });
-      if (submitError) throw submitError;
-      if (submitData?.error) throw new Error(submitData.error);
-
-      if (submitData?.masterFrameUrl) setAvatarUrl(submitData.masterFrameUrl);
-      if (submitData?.fidelityScore !== undefined) setVideoFidelityScore(submitData.fidelityScore);
-      setVideoProgress(30);
-
-      if (!submitData?.pending) {
-        // Already have a video URL (unexpected synchronous path)
-        if (submitData?.videoUrl) {
-          setVideoUrl(submitData.videoUrl);
-          setStep(4);
-          toast({ title: "UGC Video Ready!" });
+      const varsToGen = selectedVariations.length > 0 ? selectedVariations : [{ url: selectedProd.images?.[0] }];
+      const resultUrls: string[] = [];
+      
+      for (const [idx, variant] of varsToGen.entries()) {
+        if (varsToGen.length > 1) {
+          toast({ title: `Rendering Video ${idx + 1}/${varsToGen.length}...` });
         }
-        return;
-      }
+        
+        const body: any = {
+          action: "generate-ugc-video",
+          productImageUrl: variant.url,
+          product: {
+            id: selectedProd.id,
+            name: selectedProd.name,
+            category: selectedProd.category,
+            images: Array.isArray(selectedProd.images) ? selectedProd.images.filter(Boolean) : [],
+            description: selectedProd.description,
+            is_composite: selectedProd.is_composite ?? false,
+            variant_images: Array.isArray(selectedProd.variant_images) ? selectedProd.variant_images.filter(Boolean) : [],
+          },
+          influencerImageUrl: currentAvatar,
+          avatarGender,
+          avatarEthnicity,
+          productName: selectedProd.name,
+          productCategory: selectedProd.category,
+          productDescription: selectedProd.description,
+          variantDetails: variant.details,
+          isUGC,
+          setting: avatarSetting,
+          scriptText: script
+        };
 
-      // Phase 2: Poll check-video-status until job completes
-      toast({ title: "🎬 Video job submitted!", description: "Kling is generating your video. Polling for result..." });
-      const { requestId, statusUrl: jobStatusUrl, responseUrl: jobResponseUrl } = submitData;
+        if (uploadedFile && uploadedFile.type.startsWith("image/")) {
+          const base64 = await fileToBase64(uploadedFile);
+          body.avatarImageBase64 = base64;
+        }
 
-      let pollAttempt = 0;
-      const MAX_POLLS = 90; // 90 × 4s = 6 minutes max
-      const POLL_INTERVAL_MS = 4000;
+        // Phase 1: Submit job
+        const { data: submitData, error: submitError } = await supabase.functions.invoke("ugc-generate", { body });
+        if (submitError) throw submitError;
+        if (submitData?.error) throw new Error(submitData.error);
 
-      while (pollAttempt < MAX_POLLS) {
-        pollAttempt++;
-        await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+        if (submitData?.masterFrameUrl && idx === 0) setAvatarUrl(submitData.masterFrameUrl);
+        if (submitData?.fidelityScore !== undefined && idx === 0) setVideoFidelityScore(submitData.fidelityScore);
+        setVideoProgress(30);
 
-        // Progress animation: ramp from 30% → 90% over polling window
-        setVideoProgress(Math.min(90, 30 + Math.floor((pollAttempt / MAX_POLLS) * 60)));
-
-        const { data: statusData, error: statusError } = await supabase.functions.invoke("ugc-generate", {
-          body: {
-            action: "check-video-status",
-            requestId,
-            statusUrl: jobStatusUrl,
-            responseUrl: jobResponseUrl,
-            masterFrameUrl: submitData.masterFrameUrl,
-            productName: selectedProd.name,
-            voiceId: body.voiceId,
-            musicPrompt: body.musicPrompt,
-            scriptText: script,
-            setting: avatarSetting,
+        if (!submitData?.pending) {
+          if (submitData?.videoUrl) {
+            resultUrls.push(submitData.videoUrl);
           }
-        });
-
-        if (statusError) {
-          console.warn(`[poll] Attempt ${pollAttempt} error:`, statusError.message);
           continue;
         }
-        if (statusData?.error) {
-          throw new Error(statusData.error);
-        }
 
-        if (statusData?.status === "COMPLETED" && statusData?.videoUrl) {
-          setVideoUrl(statusData.videoUrl);
-          setVideoProgress(100);
-          setStep(4);
-          toast({ title: "🎬 UGC Video Created!", description: "Your video is ready to download." });
-          return;
+        // Phase 2: Poll check-video-status
+        if (varsToGen.length === 1) {
+          toast({ title: "🎬 Video job submitted!", description: "Kling is generating your video. Polling for result..." });
         }
+        
+        const { requestId, statusUrl: jobStatusUrl, responseUrl: jobResponseUrl } = submitData;
+        let pollAttempt = 0;
+        const MAX_POLLS = 90; 
+        const POLL_INTERVAL_MS = 4000;
+        let jobCompleted = false;
 
-        if (statusData?.status === "FAILED") {
-          throw new Error(statusData.error || "Video generation failed on Fal.ai");
+        while (pollAttempt < MAX_POLLS && !jobCompleted) {
+          pollAttempt++;
+          await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+          setVideoProgress(Math.min(90, 30 + Math.floor((pollAttempt / MAX_POLLS) * 60)));
+
+          const { data: statusData, error: statusError } = await supabase.functions.invoke("ugc-generate", {
+            body: {
+              action: "check-video-status",
+              requestId,
+              statusUrl: jobStatusUrl,
+              responseUrl: jobResponseUrl,
+              masterFrameUrl: submitData.masterFrameUrl,
+              productName: selectedProd.name,
+              voiceId: body.voiceId,
+              musicPrompt: body.musicPrompt,
+              scriptText: script,
+              setting: avatarSetting,
+            }
+          });
+
+          if (statusError) continue;
+          if (statusData?.error) throw new Error(statusData.error);
+
+          if (statusData?.status === "COMPLETED" && statusData?.videoUrl) {
+            resultUrls.push(statusData.videoUrl);
+            jobCompleted = true;
+          } else if (statusData?.status === "FAILED") {
+            throw new Error(statusData.error || "Video generation failed on Fal.ai");
+          }
         }
-
-        // Still IN_PROGRESS — keep polling
-        if (pollAttempt % 5 === 0) {
-          console.log(`[poll] Attempt ${pollAttempt}/${MAX_POLLS} — still waiting...`);
+        
+        if (!jobCompleted) {
+          throw new Error("Video generation timed out after 6 minutes.");
         }
       }
-
-      throw new Error("Video generation timed out after 6 minutes. Please try again.");
+      
+      setVideoProgress(100);
+      setStep(4);
+      if (resultUrls.length > 0) {
+        setVideoUrl(resultUrls[0]);
+        setMultipleVideoUrls(resultUrls);
+        toast({ title: `🎬 ${resultUrls.length} UGC Video(s) Created!`, description: "Your videos are ready to download." });
+      }
     } catch (err: any) {
       toast({ title: "Video generation failed", description: err?.message, variant: "destructive" });
     } finally {
@@ -1169,10 +1197,16 @@ function UGCStudio() {
               )}
 
               {selectedProduct && selectedProduct !== "" && (
-                <div className="flex justify-end">
-                  <Button onClick={() => setStep(2)} className="gap-2">
-                    Lock & Continue <ChevronRight className="w-4 h-4" />
-                  </Button>
+                <div className="flex flex-col gap-4">
+                  <VariationSelector 
+                    product={selectedProd} 
+                    onVariationsChange={setSelectedVariations} 
+                  />
+                  <div className="flex justify-end">
+                    <Button onClick={() => setStep(2)} className="gap-2">
+                      Lock & Continue <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1536,9 +1570,24 @@ function UGCStudio() {
               </div>
 
               {/* Video Player */}
-              {videoUrl && (
+              {(videoUrl || multipleVideoUrls.length > 0) && (
                 <div className="rounded-xl border border-border bg-card p-6 space-y-4">
                   <h4 className="font-heading text-lg font-semibold">📺 Video Preview</h4>
+                  
+                  {multipleVideoUrls.length > 1 && (
+                    <div className="flex gap-2 mb-2 overflow-x-auto pb-2">
+                      {multipleVideoUrls.map((url, idx) => (
+                        <button 
+                          key={idx}
+                          onClick={() => setVideoUrl(url)}
+                          className={`px-3 py-1 text-xs rounded-full border transition-colors ${videoUrl === url ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border hover:border-primary/50"}`}
+                        >
+                          Video {idx + 1}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="aspect-[9/16] max-h-[500px] rounded-xl overflow-hidden border border-border bg-charcoal mx-auto shadow-2xl">
                     <video src={videoUrl} controls autoPlay loop className="w-full h-full object-contain" />
                   </div>
@@ -1551,7 +1600,7 @@ function UGCStudio() {
                     }} className="flex-1 gap-2 h-12" size="lg">
                       <Download className="w-4 h-4" /> Download MP4
                     </Button>
-                    <Button variant="outline" onClick={() => { setVideoUrl(""); }} className="h-12 gap-2">
+                    <Button variant="outline" onClick={() => { setVideoUrl(""); setMultipleVideoUrls([]); }} className="h-12 gap-2">
                       <RefreshCw className="w-4 h-4" /> Regenerate
                     </Button>
                   </div>
@@ -1573,6 +1622,7 @@ function InfluencerManager() {
   const queryClient = useQueryClient();
   const [selectedInfluencer, setSelectedInfluencer] = useState<any>(null);
   const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
   const [styleMode, setStyleMode] = useState("luxury_campaign");
   const [sceneType, setSceneType] = useState("studio");
   const [generating, setGenerating] = useState(false);
@@ -1701,16 +1751,17 @@ function InfluencerManager() {
       await new Promise(r => setTimeout(r, 1500));
       setGenerationStep(4); // Rendering Campaign
 
-      // Handle composite/grid products by generating separately for each variant
-      const variantsToGenerate = selectedProd.is_composite && selectedProd.variant_images?.length > 0 
-        ? selectedProd.variant_images 
-        : [selectedProd.images?.[0] || ""];
+      // Handle composite/grid products by generating separately for each selected variant
+      const variantsToGenerate = selectedVariations.length > 0 
+        ? selectedVariations 
+        : [{ url: selectedProd.images?.[0] }];
 
       // Track last successful response outside the loop to avoid scoping issues
       let lastData: any = null;
 
       for (let i = 0; i < variantsToGenerate.length; i++) {
-        const variantUrl = variantsToGenerate[i];
+        const variant = variantsToGenerate[i];
+        const variantUrl = variant.url;
         
         // Pass the variant image specifically for this generation
         const modifiedProd = { ...selectedProd, images: [variantUrl] };
@@ -1722,6 +1773,7 @@ function InfluencerManager() {
             product: modifiedProd,
             style: styleMode,
             scene: sceneType,
+            variantDetails: variant.details,
             brandLogoUrl: window.location.origin + "/forgiven.png"
           }
         });
@@ -2014,6 +2066,12 @@ function InfluencerManager() {
               label="Select Product to Wear"
               placeholder="Select product to wear..."
             />
+            {selectedProduct && selectedProduct !== "none" && allProducts?.find((p: any) => p.id === selectedProduct) && (
+              <VariationSelector 
+                product={allProducts?.find((p: any) => p.id === selectedProduct)}
+                onVariationsChange={setSelectedVariations}
+              />
+            )}
           </div>
 
           <div className="pt-4 border-t border-border/50 space-y-4">

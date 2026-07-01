@@ -60,7 +60,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { imageUrl, productId } = await req.json();
+    const { imageUrl, productId, forceRegenerate = false } = await req.json();
     if (!imageUrl) throw { status: 400, message: "imageUrl is required" };
 
     const QWEN_API_KEY = Deno.env.get("QWEN_API_KEY") || "";
@@ -69,22 +69,56 @@ serve(async (req) => {
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
 
-    console.log(`Starting image decomposition for: ${imageUrl}`);
+    // 1. Robust Cache Invalidation
+    // Generate a SHA-256 hash of the productId + imageUrl combination
+    const hashData = new TextEncoder().encode(`${productId || 'no-id'}_${imageUrl}`);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", hashData);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const cacheKey = "decompose_" + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    console.log(`Starting image decomposition for: ${imageUrl}. Cache key: ${cacheKey}`);
+
+    if (!forceRegenerate) {
+      const { data: cached } = await supabase.from("ugc_cache").select("metadata").eq("cache_key", cacheKey).maybeSingle();
+      if (cached && cached.metadata && cached.metadata.variants) {
+        console.log("Cache hit for decomposed image variants!");
+        return new Response(JSON.stringify({ 
+          success: true, 
+          analysis: cached.metadata.analysis,
+          variants: cached.metadata.variants,
+          cached: true
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
 
     // Call Qwen VL to analyze the image
-    const prompt = `You are a strict fashion catalog segmenter. 
-Analyze the image and detect EVERY INDIVIDUAL garment/product (e.g., in a grid, collage, or multi-item photo).
+    const prompt = `You are an expert enterprise fashion catalog segmenter. 
+Analyze the image and accurately detect the layout and EVERY INDIVIDUAL garment.
+ADAPTIVE GRID DETECTION: The image could be a single product, a 3x3 grid, a 4x2 collage, or contain Front/Back views.
+VIEW CLASSIFICATION: You MUST classify the view. If you see the Front and Back of the SAME garment, treat them as the SAME product but choose the BEST Front view for the bounding box. Only separate items if they are distinct colour variants or different garments entirely.
 Return ONLY a valid JSON object. Do not include markdown blocks.
-For each garment, you MUST provide its precise 2D bounding box as [ymin, xmin, ymax, xmax] where coordinates are normalized from 0 to 1000 (e.g., [0, 0, 500, 500] is the top-left quarter).
+
+For each distinct garment/colour variation, provide:
+1. Precise 2D bounding box as [ymin, xmin, ymax, xmax] (normalized 0-1000).
+2. Rich structured metadata exactly matching this schema.
+
 Format:
 {
-  "garment_count": 2,
-  "layout_type": "grid",
+  "layout_type": "grid | single | collage | front_and_back",
   "garments": [
     {
-      "color": "Red",
-      "type": "Dress",
-      "description": "Red floral summer dress",
+      "variationId": 1,
+      "name": "Blue Tweed 2PC Skirt Suit",
+      "primaryColor": "Blue",
+      "secondaryColor": "White",
+      "garmentType": "Women's Two-Piece Skirt Suit",
+      "fit": "Slim Fit",
+      "sleeve": "Long Sleeve",
+      "neckline": "Notch Lapel",
+      "pattern": "Tweed",
+      "season": "Winter",
+      "confidence": 98,
+      "view": "Front",
       "box_2d": [100, 100, 900, 450]
     }
   ]
@@ -159,13 +193,14 @@ Format:
           }
         }
 
-        // Apply background removal to isolate the garment perfectly if Fal is available
+        // Apply background removal to isolate the garment perfectly if Fal is available (optional downstream enhancement)
         if (FAL_KEY) {
           try {
+            // Note: We already have a clean crop. We run background removal on the crop, ensuring no partial limbs from the original image.
             const bgRemoved = await removeBackground(FAL_KEY, croppedUrl);
             croppedUrl = await persistMedia(supabase, bgRemoved, "decomposed") || croppedUrl;
           } catch (e) {
-            console.warn("Background removal failed for crop:", e);
+            console.warn("Background removal failed for crop, falling back to clean crop:", e);
           }
         }
 
@@ -180,14 +215,22 @@ Format:
       variants.push({ url: imageUrl, details: analysisResult.garments?.[0] || {} });
     }
 
-    // Update DB if productId provided
+    // Update DB if productId provided - only update decomposition_data to not break existing schema, cache the variations for AI layer.
     if (productId && !productId.toString().startsWith('live_')) {
       await supabase.from("products").update({
-        is_composite: true,
+        is_composite: variants.length > 1,
         decomposition_data: analysisResult,
         variant_images: variants.map(v => v.url)
       }).eq("id", productId);
     }
+
+    // Cache the detection result in ugc_cache for runtime AI orchestration
+    await supabase.from("ugc_cache").upsert({
+      cache_key: cacheKey,
+      image_url: imageUrl,
+      metadata: { analysis: analysisResult, variants },
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString() // Cache for 30 days
+    }, { onConflict: "cache_key" });
 
     return new Response(JSON.stringify({ 
       success: true, 
