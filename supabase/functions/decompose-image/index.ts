@@ -92,79 +92,33 @@ serve(async (req) => {
     }
 
     // Call Qwen VL to analyze the image
-    const prompt = `You are an expert fashion catalog segmenter specializing in deduplication.
+    const prompt = `You are a fashion catalog analyst. Analyze this product image and identify the physical garment layout.
 
-THE MOST IMPORTANT RULE:
-A catalog image that shows the FRONT and BACK of the same garment in the SAME COLOR = ONE (1) entry, not two.
-COUNT colors, not views. 3 colors = 3 entries. Period.
+YOUR ONLY JOB: Tell me the total number of physical garments/mannequins shown, how they are arranged, and the color of each one.
 
-STEP 1 — COUNT THE DISTINCT COLORS:
-Look at the image and count how many DIFFERENT colors of the garment are shown.
-Ignore whether they are shown from the front, back, or both.
+RULES:
+- Count EVERY physical garment/mannequin shown, even if they are the exact same color. (e.g., if there are 5 mannequins total, totalPhysicalCount is 5).
+- Use specific color names: "Sky Blue", "Jet Black", "Ivory White", "Olive Green", "Burgundy Wine", "Camel Brown"
+- For arrangement: look at how the garments are physically laid out in the photo
+- CRITICAL SPATIAL ORDERING: You MUST list the items in the EXACT SPATIAL ORDER they appear in the image, strictly reading from LEFT to RIGHT, and TOP to BOTTOM. Your array index will be mapped directly to geometric crops of the image, so if you list them out of order, the crops will have the wrong labels and colors!
 
-STEP 2 — CREATE ONE ENTRY PER COLOR:
-For each color, create exactly ONE entry. Choose the best front-facing view bounding box.
+ARRANGEMENT OPTIONS:
+- "single": one garment
+- "horizontal_N": N garments side by side in a single horizontal row (e.g. horizontal_5 = 5 garments in a row)
+- "vertical_N": N garments stacked in a single vertical column
+- "grid_RxC": Garments arranged in R rows and C columns (e.g. grid_2x2 = 4 garments total, grid_3x2 = 6 garments total)
+- "front_back_N": N distinct garments shown with BOTH front and back view (2 rows × N columns grid). The total physical count in this case is 2*N, but we will extract the top row.
 
-STEP 3 — NAME COLORS PRECISELY:
-Use exact color names. Examples: "Olive Green", "Burgundy Wine", "Ivory White", "Jet Black", "Dusty Rose", "Cobalt Blue", "Camel Brown".
-Never say "Multicolor" unless the garment has a print/pattern that is inherently multicolored.
-
-EXAMPLES:
-- Image shows Olive Green dress (front) + Olive Green dress (back) + Black dress (front) + Black dress (back) = 2 entries: Olive Green, Black
-- Image shows Red blazer + Blue blazer + White blazer (all front-facing, grid layout) = 3 entries: Red, Blue, White  
-- Image shows a single garment = 1 entry
-
-Return ONLY a valid JSON object, no markdown, no explanation.
-
+Return ONLY valid JSON, no markdown, no explanation:
 {
-  "layout_type": "single | grid | collage | front_and_back",
-  "distinct_color_count": 3,
-  "garments": [
-    {
-      "variationId": 1,
-      "name": "Olive Green 2-Piece Set",
-      "primaryColor": "Olive Green",
-      "secondaryColor": null,
-      "garmentType": "Two-Piece Set",
-      "fit": "Regular",
-      "sleeve": "Long Sleeve",
-      "neckline": "V-Neck",
-      "pattern": "Solid",
-      "season": "All-Season",
-      "confidence": 97,
-      "view": "Front",
-      "box_2d": [0, 0, 1000, 333]
-    },
-    {
-      "variationId": 2,
-      "name": "Black 2-Piece Set",
-      "primaryColor": "Jet Black",
-      "secondaryColor": null,
-      "garmentType": "Two-Piece Set",
-      "fit": "Regular",
-      "sleeve": "Long Sleeve",
-      "neckline": "V-Neck",
-      "pattern": "Solid",
-      "season": "All-Season",
-      "confidence": 97,
-      "view": "Front",
-      "box_2d": [0, 334, 1000, 666]
-    },
-    {
-      "variationId": 3,
-      "name": "Burgundy 2-Piece Set",
-      "primaryColor": "Burgundy Wine",
-      "secondaryColor": null,
-      "garmentType": "Two-Piece Set",
-      "fit": "Regular",
-      "sleeve": "Long Sleeve",
-      "neckline": "V-Neck",
-      "pattern": "Solid",
-      "season": "All-Season",
-      "confidence": 97,
-      "view": "Front",
-      "box_2d": [0, 667, 1000, 1000]
-    }
+  "totalPhysicalCount": 5,
+  "arrangement": "horizontal_5",
+  "items": [
+    { "position": 1, "name": "Sky Blue", "garmentType": "2-Piece Set", "confidence": 96 },
+    { "position": 2, "name": "Sky Blue", "garmentType": "2-Piece Set", "confidence": 94 },
+    { "position": 3, "name": "Jet Black", "garmentType": "2-Piece Set", "confidence": 97 },
+    { "position": 4, "name": "Ivory White", "garmentType": "2-Piece Set", "confidence": 92 },
+    { "position": 5, "name": "Olive Green", "garmentType": "2-Piece Set", "confidence": 95 }
   ]
 }`;
 
@@ -186,105 +140,203 @@ Return ONLY a valid JSON object, no markdown, no explanation.
 
     const data = await res.json();
     const rawContent = data.output?.choices?.[0]?.message?.content?.[0]?.text || "{}";
+    console.log("Qwen raw response:", rawContent.substring(0, 500));
     const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-    let analysisResult;
+    let analysisResult: any = {};
     try {
       analysisResult = JSON.parse(jsonMatch ? jsonMatch[0] : "{}");
     } catch (e) {
-      analysisResult = { garment_count: 1, garments: [{ type: "unknown", color: "unknown" }] };
+      analysisResult = { totalPhysicalCount: 1, items: [], arrangement: "single" };
     }
 
-    let variants = [];
-    
+    const detectedItems: any[] = analysisResult.items || [];
+    const arrangement: string = analysisResult.arrangement || "single";
+    const physicalCount = Math.max(1, analysisResult.totalPhysicalCount || detectedItems.length || 1);
+
+    console.log(`Detected ${physicalCount} physical items, arrangement: ${arrangement}. Items: ${detectedItems.map((c:any)=>c.name).join(', ')}`);
+
+    let variants: any[] = [];
+
     try {
-      // Dynamic import ImageScript
       const { Image } = await import("https://deno.land/x/imagescript@1.2.15/mod.ts");
       
       const imgRes = await fetch(imageUrl);
       if (!imgRes.ok) throw new Error("Failed to fetch source image for cropping");
       const imgBuffer = new Uint8Array(await imgRes.arrayBuffer());
       const baseImage = await Image.decode(imgBuffer);
-      const width = baseImage.width;
-      const height = baseImage.height;
+      const W = baseImage.width;
+      const H = baseImage.height;
 
-      // ── Server-Side Color Deduplication ──────────────────────────────────────────
-      // Safety net: Qwen sometimes returns front+back pairs as separate entries with the
-      // same primaryColor. We collapse these to one entry per unique color, keeping
-      // the highest-confidence one. This guarantees 3 colors = 3 entries always.
-      const rawGarments: any[] = analysisResult.garments || [];
-      const colorMap = new Map<string, any>();
-      for (const g of rawGarments) {
-        const colorKey = (g.primaryColor || "unknown").toLowerCase().trim();
-        const existing = colorMap.get(colorKey);
-        // Keep the one with the higher confidence, or prefer "Front" view
-        if (!existing) {
-          colorMap.set(colorKey, g);
-        } else {
-          const existingConf = existing.confidence || 0;
-          const newConf = g.confidence || 0;
-          const existingIsFront = (existing.view || "").toLowerCase().includes("front");
-          const newIsFront = (g.view || "").toLowerCase().includes("front");
-          if ((!existingIsFront && newIsFront) || (existingIsFront === newIsFront && newConf > existingConf)) {
-            colorMap.set(colorKey, g);
-          }
-        }
-      }
-      const garments = Array.from(colorMap.values());
-      console.log(`Qwen returned ${rawGarments.length} garments → deduplicated to ${garments.length} unique colors.`);
-      // Update analysisResult so the stored metadata reflects deduplicated result
-      analysisResult.garments = garments;
-      // ─────────────────────────────────────────────────────────────────────────────
+      console.log(`Image dimensions: ${W}x${H}, cropping ${physicalCount} sections from arrangement: ${arrangement}`);
 
-      for (let i = 0; i < garments.length; i++) {
-        const g = garments[i];
-        let croppedUrl = imageUrl;
+      // ── Algorithmic Equal-Division Cropping ──────────────────────────────────────
+      
+      type CropBox = { x: number; y: number; w: number; h: number };
+
+      function getCropSections(arrangement: string, count: number, W: number, H: number): CropBox[] {
+        const n = Math.max(1, count);
         
-        if (g.box_2d && Array.isArray(g.box_2d) && g.box_2d.length === 4) {
-          const [ymin, xmin, ymax, xmax] = g.box_2d;
-          
-          const yPx = Math.max(0, Math.round((ymin / 1000) * height));
-          const xPx = Math.max(0, Math.round((xmin / 1000) * width));
-          const hPx = Math.min(height - yPx, Math.round(((ymax - ymin) / 1000) * height));
-          const wPx = Math.min(width - xPx, Math.round(((xmax - xmin) / 1000) * width));
+        if (arrangement.startsWith("front_back_")) {
+          // 2-row grid: top row = front views, bottom row = back views
+          // We take ONLY the top half (front views) and split into N equal columns
+          // Here count is total physical garments (e.g. 6), meaning 3 columns (N=3)
+          const cols = Math.max(1, Math.floor(n / 2));
+          const topH = Math.floor(H / 2);
+          const colW = Math.floor(W / cols);
+          return Array.from({ length: cols }, (_, i) => ({
+            x: i * colW,
+            y: 0,
+            w: i === cols - 1 ? W - i * colW : colW, // last column takes remainder
+            h: topH,
+          }));
+        }
+        
+        if (arrangement.startsWith("horizontal_") || arrangement === "horizontal") {
+          const colW = Math.floor(W / n);
+          return Array.from({ length: n }, (_, i) => ({
+            x: i * colW,
+            y: 0,
+            w: i === n - 1 ? W - i * colW : colW,
+            h: H,
+          }));
+        }
 
-          if (wPx > 10 && hPx > 10) {
-            // Clone base image and crop
-            const clone = baseImage.clone();
-            const cropped = clone.crop(xPx, yPx, wPx, hPx);
-            const croppedBuffer = await cropped.encode(1); // PNG
-            
-            const fileName = `decomposed/${crypto.randomUUID()}.png`;
-            const { error: uploadError } = await supabase.storage.from("ugc-assets").upload(fileName, croppedBuffer, { contentType: "image/png" });
-            
-            if (!uploadError) {
-              croppedUrl = supabase.storage.from("ugc-assets").getPublicUrl(fileName).data.publicUrl;
+        if (arrangement.startsWith("vertical_") || arrangement === "vertical") {
+          const rowH = Math.floor(H / n);
+          return Array.from({ length: n }, (_, i) => ({
+            x: 0,
+            y: i * rowH,
+            w: W,
+            h: i === n - 1 ? H - i * rowH : rowH,
+          }));
+        }
+
+        if (arrangement.startsWith("grid_")) {
+          // e.g., grid_2x2 or grid_3x2
+          const parts = arrangement.split('_')[1].split('x');
+          const rows = parseInt(parts[0]) || 2;
+          const cols = parseInt(parts[1]) || 2;
+          
+          const rowH = Math.floor(H / rows);
+          const colW = Math.floor(W / cols);
+          const grids = [];
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              grids.push({
+                x: c * colW,
+                y: r * rowH,
+                w: c === cols - 1 ? W - c * colW : colW,
+                h: r === rows - 1 ? H - r * rowH : rowH,
+              });
             }
           }
+          return grids.slice(0, n);
         }
 
-        // Apply background removal to isolate the garment perfectly if Fal is available (optional downstream enhancement)
-        if (FAL_KEY) {
+        // Fallback
+        return [{ x: 0, y: 0, w: W, h: H }];
+      }
+
+      const sections = getCropSections(arrangement, physicalCount, W, H);
+      console.log(`Generated ${sections.length} crop sections`);
+
+      // Color Family Deduplication Map
+      const COLOR_FAMILIES: Record<string, string[]> = {
+        black:    ["black", "jet black", "jet", "ebony", "onyx", "charcoal black"],
+        white:    ["white", "ivory white", "ivory", "cream", "off-white", "pearl"],
+        red:      ["red", "cherry red", "cherry", "scarlet", "crimson", "ruby"],
+        blue:     ["blue", "cobalt blue", "cobalt", "navy", "royal blue", "sapphire", "denim", "midnight blue", "sky blue"],
+        green:    ["green", "olive green", "olive", "army green", "dark olive", "forest green", "sage", "hunter green", "moss", "khaki green"],
+        brown:    ["brown", "camel brown", "camel", "tan", "beige", "khaki", "sand", "mocha", "taupe", "coffee"],
+        pink:     ["pink", "dusty rose", "rose", "blush", "mauve", "fuchsia", "hot pink", "coral pink"],
+        purple:   ["purple", "violet", "lavender", "plum", "lilac", "grape"],
+        orange:   ["orange", "rust", "terracotta", "burnt orange", "amber"],
+        gray:     ["gray", "grey", "charcoal", "silver", "ash", "slate", "steel"],
+        burgundy: ["burgundy", "burgundy wine", "wine", "maroon", "oxblood", "bordeaux"],
+        yellow:   ["yellow", "mustard", "gold", "lemon", "golden"],
+      };
+      
+      function getColorFamily(color: string): string {
+        const c = (color || "").toLowerCase().trim();
+        for (const [family, aliases] of Object.entries(COLOR_FAMILIES)) {
+          if (aliases.some(alias => c.includes(alias) || alias.includes(c))) return family;
+        }
+        return c; // fallback
+      }
+
+      const seenColorFamilies = new Set<string>();
+
+      for (let i = 0; i < sections.length; i++) {
+        const section = sections[i];
+        const itemMeta = detectedItems[i] || { name: `Color ${i + 1}`, garmentType: "Garment", confidence: 90 };
+        const colorFamily = getColorFamily(itemMeta.name);
+
+        // Skip if we already have a crop for this color family
+        if (seenColorFamilies.has(colorFamily)) {
+          console.log(`Skipping duplicate color family: ${colorFamily} (original color: ${itemMeta.name})`);
+          continue;
+        }
+
+        let croppedUrl = imageUrl;
+
+        if (section.w > 20 && section.h > 20) {
           try {
-            // Note: We already have a clean crop. We run background removal on the crop, ensuring no partial limbs from the original image.
+            const clone = baseImage.clone();
+            const cropped = clone.crop(section.x, section.y, section.w, section.h);
+            const croppedBuffer = await cropped.encode(1); // PNG
+
+            const fileName = `decomposed/${crypto.randomUUID()}.png`;
+            const { error: uploadError } = await supabase.storage
+              .from("ugc-assets")
+              .upload(fileName, croppedBuffer, { contentType: "image/png" });
+
+            if (!uploadError) {
+              croppedUrl = supabase.storage.from("ugc-assets").getPublicUrl(fileName).data.publicUrl;
+              console.log(`Cropped variation ${i + 1} (${itemMeta.name}): x=${section.x} y=${section.y} w=${section.w} h=${section.h} → ${croppedUrl}`);
+            }
+          } catch (cropErr) {
+            console.warn(`Crop failed for section ${i + 1}:`, cropErr);
+          }
+        }
+
+        // Apply background removal to the clean crop (not the original image)
+        if (FAL_KEY && croppedUrl !== imageUrl) {
+          try {
             const bgRemoved = await removeBackground(FAL_KEY, croppedUrl);
             croppedUrl = await persistMedia(supabase, bgRemoved, "decomposed") || croppedUrl;
           } catch (e) {
-            console.warn("Background removal failed for crop, falling back to clean crop:", e);
+            console.warn(`BG removal failed for crop ${i + 1}, using clean crop:`, e);
           }
         }
 
+        seenColorFamilies.add(colorFamily);
+
         variants.push({
           url: croppedUrl,
-          details: g
+          details: {
+            variationId: variants.length + 1,
+            name: `${itemMeta.name} ${itemMeta.garmentType || "Garment"}`,
+            primaryColor: itemMeta.name,
+            garmentType: itemMeta.garmentType || "Garment",
+            confidence: itemMeta.confidence || 95,
+            view: "Front",
+            section: { x: section.x, y: section.y, w: section.w, h: section.h },
+          }
         });
       }
+      
+      // Update analysisResult for cache compatibility based on the deduplicated variants
+      analysisResult.distinctColorCount = variants.length;
+      analysisResult.garments = variants.map(v => v.details);
+      // ─────────────────────────────────────────────────────────────────────────────
+
     } catch (e) {
       console.error("ImageScript cropping failed:", e);
-      // Fallback: just use original image if cropping entirely crashes
+      // Fallback: single variant with the full image
       variants.push({ url: imageUrl, details: analysisResult.garments?.[0] || {} });
     }
 
-    // Update DB if productId provided - only update decomposition_data to not break existing schema, cache the variations for AI layer.
+    // Update product metadata (non-breaking — only sets is_composite and variant_images)
     if (productId && !productId.toString().startsWith('live_')) {
       await supabase.from("products").update({
         is_composite: variants.length > 1,
@@ -293,12 +345,12 @@ Return ONLY a valid JSON object, no markdown, no explanation.
       }).eq("id", productId);
     }
 
-    // Cache the detection result in ugc_cache for runtime AI orchestration
+    // Cache the result
     await supabase.from("ugc_cache").upsert({
       cache_key: cacheKey,
       image_url: imageUrl,
       metadata: { analysis: analysisResult, variants },
-      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString() // Cache for 30 days
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString()
     }, { onConflict: "cache_key" });
 
     return new Response(JSON.stringify({ 

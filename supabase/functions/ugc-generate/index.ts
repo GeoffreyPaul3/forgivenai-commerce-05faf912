@@ -2160,7 +2160,7 @@ Deno.serve(async (req) => {
             console.log(`[generate-avatar] Generated baseline portrait: ${vtonPersonImage}`);
           }
           
-          if (isComposite && variantImages.length > 0) {
+          if (body.generateCompositeVideo === true && isComposite && variantImages.length > 0) {
             console.log(`[generate-avatar] Composite product detected with ${variantImages.length} variants. Processing multi-VTON loop...`);
             const generatedUrls = [];
             for (let i = 0; i < variantImages.length; i++) {
@@ -2247,8 +2247,8 @@ Deno.serve(async (req) => {
       if (!referenceImage) throw new Error("Influencer identity or photo is required.");
 
       // --- COMPOSITE/GRID PRODUCT DETECTION ---
-      // If the product is a grid (e.g., 5 items in one photo), generate one clip per variant and concatenate
       const gridVariants: string[] | null = (
+        body.generateCompositeVideo === true &&
         body.product?.is_composite === true &&
         Array.isArray(body.product?.variant_images) &&
         body.product.variant_images.length > 1

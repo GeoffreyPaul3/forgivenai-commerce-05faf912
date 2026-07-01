@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Play } from "lucide-react";
+import { Loader2, Sparkles, CheckCircle2, AlertTriangle } from "lucide-react";
 
 export function VariationSelector({ 
   product, 
@@ -19,7 +17,6 @@ export function VariationSelector({
   const [variations, setVariations] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
     if (!product || !product.images?.[0]) {
@@ -66,7 +63,7 @@ export function VariationSelector({
     return () => { isMounted = false; };
   }, [product?.id, product?.images?.[0]]);
 
-  const toggleSelection = (index: number, v: any) => {
+  const toggleSelection = (index: number) => {
     const newSet = new Set(selectedIds);
     if (newSet.has(index)) newSet.delete(index);
     else newSet.add(index);
@@ -76,10 +73,10 @@ export function VariationSelector({
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-border bg-muted/20 p-6 flex flex-col items-center justify-center animate-pulse mt-4">
-        <Loader2 className="w-6 h-6 animate-spin text-primary mb-3" />
+      <div className="rounded-xl border border-border bg-muted/20 p-5 flex flex-col items-center justify-center mt-4 gap-2">
+        <Loader2 className="w-5 h-5 animate-spin text-primary" />
         <p className="text-sm font-semibold font-heading text-foreground">Analyzing Product Image</p>
-        <p className="text-xs text-muted-foreground">Detecting garments and colors via Qwen Vision...</p>
+        <p className="text-xs text-muted-foreground">Detecting garments and colours via Qwen Vision...</p>
       </div>
     );
   }
@@ -87,48 +84,81 @@ export function VariationSelector({
   if (variations.length <= 1) return null;
 
   return (
-    <div className="rounded-xl border border-primary/20 bg-card p-4 space-y-4 mt-4">
-      <div className="flex items-center gap-2">
-        <Sparkles className="w-5 h-5 text-primary" />
-        <h3 className="font-heading text-base font-semibold">Multiple Variations Detected</h3>
+    <div className="rounded-xl border border-primary/20 bg-card p-4 space-y-3 mt-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary shrink-0" />
+          <h3 className="font-heading text-sm font-semibold">Multiple Variations Detected</h3>
+        </div>
+        <Badge variant="outline" className="text-[10px] shrink-0">
+          {selectedIds.size}/{variations.length} selected
+        </Badge>
       </div>
+
       <p className="text-xs text-muted-foreground font-body">
-        The AI detected {variations.length} garments in this image. Select which ones to generate.
+        The AI detected {variations.length} colour variants. Select which ones to generate.
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+
+      {/* Variation Grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
         {variations.map((v, i) => {
-          const conf = v.details?.confidence || 0;
-          const isLowConf = conf > 0 && conf < 90;
+          const conf = v.details?.confidence;
+          const isLowConf = conf !== undefined && conf < 90;
           const isSelected = selectedIds.has(i);
+          const colorName = v.details?.primaryColor || v.details?.name || `Colour ${i + 1}`;
+
           return (
-            <div 
-              key={i} 
-              className={`relative rounded-lg border-2 p-2 flex items-start gap-3 transition-colors cursor-pointer ${isSelected ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/50"}`}
-              onClick={() => toggleSelection(i, v)}
+            <button
+              key={i}
+              type="button"
+              onClick={() => toggleSelection(i)}
+              className={`group relative flex flex-col rounded-xl border-2 overflow-hidden transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                isSelected
+                  ? "border-primary shadow-md shadow-primary/10"
+                  : "border-border hover:border-primary/40"
+              }`}
             >
-              <div className="absolute top-2 right-2">
-                <input type="checkbox" checked={isSelected} readOnly className="w-4 h-4 rounded border-primary text-primary focus:ring-primary pointer-events-none" />
+              {/* Image */}
+              <div className="relative w-full aspect-square bg-muted overflow-hidden">
+                <img
+                  src={v.url}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  alt={colorName}
+                />
+                {/* Selection overlay */}
+                <div className={`absolute inset-0 transition-colors ${isSelected ? "bg-primary/10" : "bg-transparent"}`} />
+                {/* Checkmark */}
+                <div className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                  isSelected
+                    ? "bg-primary text-primary-foreground scale-100"
+                    : "bg-background/70 border border-border scale-90 opacity-0 group-hover:opacity-100"
+                }`}>
+                  <CheckCircle2 className="w-3 h-3" />
+                </div>
               </div>
-              <img src={v.url} className="w-16 h-16 rounded-md object-cover border border-border" alt="" />
-              <div className="flex-1 min-w-0 pr-6">
-                <p className="text-xs font-bold font-heading truncate">{v.details?.name || v.details?.description || `Variation ${i+1}`}</p>
-                <p className="text-[10px] text-muted-foreground truncate">{v.details?.primaryColor || v.details?.color} {v.details?.garmentType}</p>
+
+              {/* Label area */}
+              <div className="px-1.5 py-1.5 bg-card flex flex-col justify-center min-h-[44px]">
+                <p className="text-[10px] font-bold font-heading text-foreground leading-tight line-clamp-1 text-left mb-0.5">
+                  {colorName}
+                </p>
                 {isLowConf ? (
-                  <Badge variant="destructive" className="mt-1 text-[9px] py-0">✗ Manual Selection</Badge>
+                  <div className="flex items-center gap-0.5 text-amber-600 w-full overflow-hidden">
+                    <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                    <span className="text-[9px] font-semibold truncate">Manual check</span>
+                  </div>
                 ) : (
-                  <Badge variant="outline" className="mt-1 text-[9px] py-0 border-emerald-500/30 text-emerald-600">✓ {conf ? `${conf}% ` : ""}Locked</Badge>
+                  <div className="flex items-center gap-0.5 text-emerald-600 w-full overflow-hidden">
+                    <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
+                    <span className="text-[9px] font-semibold truncate">{conf ? `${conf}% ` : ""}Locked</span>
+                  </div>
                 )}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
-      {generateAction && (
-        <Button onClick={generateAction} disabled={isGenerating || selectedIds.size === 0} className="w-full gap-2 mt-4">
-          {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          Generate Selected ({selectedIds.size})
-        </Button>
-      )}
     </div>
   );
 }
