@@ -92,53 +92,78 @@ serve(async (req) => {
     }
 
     // Call Qwen VL to analyze the image
-    const prompt = `You are an expert enterprise fashion catalog segmenter with pixel-level color accuracy.
+    const prompt = `You are an expert fashion catalog segmenter specializing in deduplication.
 
-CRITICAL RULES — READ CAREFULLY:
-1. COLOR = VARIATION: Every distinct physical color of a garment is a SEPARATE variation entry. If you see Red, Blue, and Green versions of the same dress, that is 3 separate entries — NOT 1.
-2. FRONT/BACK DEDUPLICATION: ONLY collapse a Front view and Back view into ONE entry if they show the EXACT SAME garment in the EXACT SAME color. Different colors are ALWAYS different entries even if they look like front/back layout.
-3. PRECISE COLORS: Use specific, accurate color names (e.g. "Cobalt Blue", "Ivory White", "Olive Green", "Dusty Rose"). Do NOT say "Multicolor" unless the garment itself has multiple colors woven into it.
-4. BOUNDING BOX: Tightly wrap each individual garment item. Do not use the full image as one box.
-5. GRID AWARENESS: If the image shows a 2x2, 3x3, or 4x2 product grid with one garment per cell, each cell is a separate variation.
-6. Return ONLY a valid JSON object. No markdown, no extra text.
+THE MOST IMPORTANT RULE:
+A catalog image that shows the FRONT and BACK of the same garment in the SAME COLOR = ONE (1) entry, not two.
+COUNT colors, not views. 3 colors = 3 entries. Period.
 
-EXAMPLE: An image showing a blazer in Red, White, and Black = 3 separate garment entries.
-EXAMPLE: An image showing a shirt from the Front and Back in the same Navy Blue color = 1 entry (Front view chosen).
+STEP 1 — COUNT THE DISTINCT COLORS:
+Look at the image and count how many DIFFERENT colors of the garment are shown.
+Ignore whether they are shown from the front, back, or both.
 
-For each distinct garment/colour variation provide:
+STEP 2 — CREATE ONE ENTRY PER COLOR:
+For each color, create exactly ONE entry. Choose the best front-facing view bounding box.
+
+STEP 3 — NAME COLORS PRECISELY:
+Use exact color names. Examples: "Olive Green", "Burgundy Wine", "Ivory White", "Jet Black", "Dusty Rose", "Cobalt Blue", "Camel Brown".
+Never say "Multicolor" unless the garment has a print/pattern that is inherently multicolored.
+
+EXAMPLES:
+- Image shows Olive Green dress (front) + Olive Green dress (back) + Black dress (front) + Black dress (back) = 2 entries: Olive Green, Black
+- Image shows Red blazer + Blue blazer + White blazer (all front-facing, grid layout) = 3 entries: Red, Blue, White  
+- Image shows a single garment = 1 entry
+
+Return ONLY a valid JSON object, no markdown, no explanation.
+
 {
-  "layout_type": "grid | single | collage | front_and_back",
-  "total_color_variants": 3,
+  "layout_type": "single | grid | collage | front_and_back",
+  "distinct_color_count": 3,
   "garments": [
     {
       "variationId": 1,
-      "name": "Red Tweed 2PC Skirt Suit",
-      "primaryColor": "Cherry Red",
+      "name": "Olive Green 2-Piece Set",
+      "primaryColor": "Olive Green",
       "secondaryColor": null,
-      "garmentType": "Women's Two-Piece Skirt Suit",
-      "fit": "Slim Fit",
+      "garmentType": "Two-Piece Set",
+      "fit": "Regular",
       "sleeve": "Long Sleeve",
-      "neckline": "Notch Lapel",
-      "pattern": "Tweed",
-      "season": "Winter",
+      "neckline": "V-Neck",
+      "pattern": "Solid",
+      "season": "All-Season",
       "confidence": 97,
       "view": "Front",
-      "box_2d": [0, 0, 1000, 330]
+      "box_2d": [0, 0, 1000, 333]
     },
     {
       "variationId": 2,
-      "name": "Blue Tweed 2PC Skirt Suit",
-      "primaryColor": "Cobalt Blue",
+      "name": "Black 2-Piece Set",
+      "primaryColor": "Jet Black",
       "secondaryColor": null,
-      "garmentType": "Women's Two-Piece Skirt Suit",
-      "fit": "Slim Fit",
+      "garmentType": "Two-Piece Set",
+      "fit": "Regular",
       "sleeve": "Long Sleeve",
-      "neckline": "Notch Lapel",
-      "pattern": "Tweed",
-      "season": "Winter",
+      "neckline": "V-Neck",
+      "pattern": "Solid",
+      "season": "All-Season",
       "confidence": 97,
       "view": "Front",
-      "box_2d": [0, 333, 1000, 666]
+      "box_2d": [0, 334, 1000, 666]
+    },
+    {
+      "variationId": 3,
+      "name": "Burgundy 2-Piece Set",
+      "primaryColor": "Burgundy Wine",
+      "secondaryColor": null,
+      "garmentType": "Two-Piece Set",
+      "fit": "Regular",
+      "sleeve": "Long Sleeve",
+      "neckline": "V-Neck",
+      "pattern": "Solid",
+      "season": "All-Season",
+      "confidence": 97,
+      "view": "Front",
+      "box_2d": [0, 667, 1000, 1000]
     }
   ]
 }`;
@@ -182,8 +207,33 @@ For each distinct garment/colour variation provide:
       const width = baseImage.width;
       const height = baseImage.height;
 
-      const garments = analysisResult.garments || [];
-      console.log(`Extracting ${garments.length} garments via ImageScript crops...`);
+      // ── Server-Side Color Deduplication ──────────────────────────────────────────
+      // Safety net: Qwen sometimes returns front+back pairs as separate entries with the
+      // same primaryColor. We collapse these to one entry per unique color, keeping
+      // the highest-confidence one. This guarantees 3 colors = 3 entries always.
+      const rawGarments: any[] = analysisResult.garments || [];
+      const colorMap = new Map<string, any>();
+      for (const g of rawGarments) {
+        const colorKey = (g.primaryColor || "unknown").toLowerCase().trim();
+        const existing = colorMap.get(colorKey);
+        // Keep the one with the higher confidence, or prefer "Front" view
+        if (!existing) {
+          colorMap.set(colorKey, g);
+        } else {
+          const existingConf = existing.confidence || 0;
+          const newConf = g.confidence || 0;
+          const existingIsFront = (existing.view || "").toLowerCase().includes("front");
+          const newIsFront = (g.view || "").toLowerCase().includes("front");
+          if ((!existingIsFront && newIsFront) || (existingIsFront === newIsFront && newConf > existingConf)) {
+            colorMap.set(colorKey, g);
+          }
+        }
+      }
+      const garments = Array.from(colorMap.values());
+      console.log(`Qwen returned ${rawGarments.length} garments → deduplicated to ${garments.length} unique colors.`);
+      // Update analysisResult so the stored metadata reflects deduplicated result
+      analysisResult.garments = garments;
+      // ─────────────────────────────────────────────────────────────────────────────
 
       for (let i = 0; i < garments.length; i++) {
         const g = garments[i];
