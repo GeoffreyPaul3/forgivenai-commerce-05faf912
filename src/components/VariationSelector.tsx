@@ -34,7 +34,7 @@ export function VariationSelector({
       setLoading(true);
       try {
         const { data, error } = await supabase.functions.invoke("decompose-image", {
-          body: { imageUrl: product.images[0], productId: product.id }
+          body: { imageUrl: product.images[0], productId: product.id, forceRegenerate: true }
         });
         
         if (error) throw error;

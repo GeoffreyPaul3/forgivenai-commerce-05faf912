@@ -92,34 +92,53 @@ serve(async (req) => {
     }
 
     // Call Qwen VL to analyze the image
-    const prompt = `You are an expert enterprise fashion catalog segmenter. 
-Analyze the image and accurately detect the layout and EVERY INDIVIDUAL garment.
-ADAPTIVE GRID DETECTION: The image could be a single product, a 3x3 grid, a 4x2 collage, or contain Front/Back views.
-VIEW CLASSIFICATION: You MUST classify the view. If you see the Front and Back of the SAME garment, treat them as the SAME product but choose the BEST Front view for the bounding box. Only separate items if they are distinct colour variants or different garments entirely.
-Return ONLY a valid JSON object. Do not include markdown blocks.
+    const prompt = `You are an expert enterprise fashion catalog segmenter with pixel-level color accuracy.
 
-For each distinct garment/colour variation, provide:
-1. Precise 2D bounding box as [ymin, xmin, ymax, xmax] (normalized 0-1000).
-2. Rich structured metadata exactly matching this schema.
+CRITICAL RULES — READ CAREFULLY:
+1. COLOR = VARIATION: Every distinct physical color of a garment is a SEPARATE variation entry. If you see Red, Blue, and Green versions of the same dress, that is 3 separate entries — NOT 1.
+2. FRONT/BACK DEDUPLICATION: ONLY collapse a Front view and Back view into ONE entry if they show the EXACT SAME garment in the EXACT SAME color. Different colors are ALWAYS different entries even if they look like front/back layout.
+3. PRECISE COLORS: Use specific, accurate color names (e.g. "Cobalt Blue", "Ivory White", "Olive Green", "Dusty Rose"). Do NOT say "Multicolor" unless the garment itself has multiple colors woven into it.
+4. BOUNDING BOX: Tightly wrap each individual garment item. Do not use the full image as one box.
+5. GRID AWARENESS: If the image shows a 2x2, 3x3, or 4x2 product grid with one garment per cell, each cell is a separate variation.
+6. Return ONLY a valid JSON object. No markdown, no extra text.
 
-Format:
+EXAMPLE: An image showing a blazer in Red, White, and Black = 3 separate garment entries.
+EXAMPLE: An image showing a shirt from the Front and Back in the same Navy Blue color = 1 entry (Front view chosen).
+
+For each distinct garment/colour variation provide:
 {
   "layout_type": "grid | single | collage | front_and_back",
+  "total_color_variants": 3,
   "garments": [
     {
       "variationId": 1,
-      "name": "Blue Tweed 2PC Skirt Suit",
-      "primaryColor": "Blue",
-      "secondaryColor": "White",
+      "name": "Red Tweed 2PC Skirt Suit",
+      "primaryColor": "Cherry Red",
+      "secondaryColor": null,
       "garmentType": "Women's Two-Piece Skirt Suit",
       "fit": "Slim Fit",
       "sleeve": "Long Sleeve",
       "neckline": "Notch Lapel",
       "pattern": "Tweed",
       "season": "Winter",
-      "confidence": 98,
+      "confidence": 97,
       "view": "Front",
-      "box_2d": [100, 100, 900, 450]
+      "box_2d": [0, 0, 1000, 330]
+    },
+    {
+      "variationId": 2,
+      "name": "Blue Tweed 2PC Skirt Suit",
+      "primaryColor": "Cobalt Blue",
+      "secondaryColor": null,
+      "garmentType": "Women's Two-Piece Skirt Suit",
+      "fit": "Slim Fit",
+      "sleeve": "Long Sleeve",
+      "neckline": "Notch Lapel",
+      "pattern": "Tweed",
+      "season": "Winter",
+      "confidence": 97,
+      "view": "Front",
+      "box_2d": [0, 333, 1000, 666]
     }
   ]
 }`;
