@@ -928,7 +928,7 @@ function UGCStudio() {
           action: "generate-ugc-video",
           productImageUrl: variant.url,
           product: {
-            id: selectedProd.id,
+            id: `live_${selectedProd.id}`,
             name: selectedProd.name,
             category: selectedProd.category,
             images: Array.isArray(selectedProd.images) ? selectedProd.images.filter(Boolean) : [],
@@ -1729,6 +1729,20 @@ function InfluencerManager() {
     }
   });
 
+  const deleteVisual = useMutation({
+    mutationFn: async (visualId: string) => {
+      const { error } = await supabase.from("content").delete().eq("id", visualId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchVisuals();
+      toast({ title: "Visual deleted", description: "The campaign image has been removed." });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Delete failed", description: error.message });
+    }
+  });
+
   const selectedProd = allProducts?.find((p: any) => p.id === selectedProduct);
   const generateCampaignVisual = async () => {
     if (!selectedInfluencer || !selectedProduct) {
@@ -1764,7 +1778,8 @@ function InfluencerManager() {
         const variantUrl = variant.url;
         
         // Pass the variant image specifically for this generation
-        const modifiedProd = { ...selectedProd, images: [variantUrl] };
+        // Prefix ID with live_ to bypass inventory cache in ugc-generate and enforce variant image
+        const modifiedProd = { ...selectedProd, id: `live_${selectedProd.id}`, images: [variantUrl] };
 
         const { data, error } = await supabase.functions.invoke("ugc-generate", {
           body: {
@@ -2286,6 +2301,16 @@ function InfluencerManager() {
                     title="Download"
                    >
                     <Download className="w-4 h-4" />
+                   </Button>
+                   <Button 
+                    size="icon" 
+                    variant="secondary" 
+                    className="h-8 w-8 rounded-full bg-destructive/90 hover:bg-destructive text-white"
+                    onClick={(e) => { e.stopPropagation(); deleteVisual.mutate(visual.id); }}
+                    disabled={deleteVisual.isPending}
+                    title="Delete Visual"
+                   >
+                    {deleteVisual.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                    </Button>
                 </div>
               </div>
