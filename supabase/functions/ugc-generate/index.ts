@@ -1028,6 +1028,7 @@ async function runSpecializedObjectVTON(
     `Task: Generate a single professional fashion catalog photograph showing Image 1's person wearing Image 2's product EXACTLY as it appears.`,
     ``,
     `PERSON FIDELITY — NON-NEGOTIABLE:`,
+    `- FULL BODY SHOT: MUST be a full-length head-to-toe shot showing the complete outfit including legs and shoes. DO NOT crop the image at the waist or knees.`,
     `- Preserve the EXACT face, facial features, skin tone, ethnicity, hair, and body proportions from Image 1.`,
     `- Do NOT generate a different person or change the model's appearance. MUST BE A REAL HUMAN, NOT A MANNEQUIN.`,
     ``,
@@ -1855,7 +1856,7 @@ async function runUnifiedVTON(
           const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
 
           const wanPrompt = [
-            `Professional high-resolution fashion catalog photograph.`,
+            `Professional high-resolution fashion catalog photograph. FULL BODY SHOT: MUST be a full-length head-to-toe shot showing the complete outfit including legs and shoes. DO NOT crop the image at the waist or knees.`,
             `MODEL: ${targetGender} ${targetEthnicity} — the face, skin tone, and body must be IDENTICAL to the target person reference image. Do NOT generate a different person. MUST BE A REAL HUMAN, NOT A MANNEQUIN.`,
             `PRODUCT IDENTITY — ABSOLUTE SOURCE OF TRUTH: The product reference image is the ONLY valid source for the garment. Reproduce it with 100% pixel fidelity.`,
             `  Detected product details: ${garmentDetails}`,
@@ -2150,9 +2151,9 @@ Deno.serve(async (req) => {
             const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
             
             if (body.isUGC) {
-              baselinePrompt = `Authentic smartphone selfie. Lifestyle photography. ${modelDesc} ${identityDesc} ${styleDesc} ENVIRONMENT AND BRANDING: ${luxurySetting} ${anatomyPrompt} CRITICAL: Natural skin texture, realistic casual lighting, unedited look, raw lifestyle feel, wearing casual undergarment or plain white t-shirt.`;
+              baselinePrompt = `Authentic smartphone selfie. FULL BODY SHOT: MUST be a full-length head-to-toe shot showing the complete outfit including legs and shoes. DO NOT crop the image at the waist or knees. Lifestyle photography. ${modelDesc} ${identityDesc} ${styleDesc} ENVIRONMENT AND BRANDING: ${luxurySetting} ${anatomyPrompt} CRITICAL: Natural skin texture, realistic casual lighting, unedited look, raw lifestyle feel, wearing casual undergarment or plain white t-shirt.`;
             } else {
-              baselinePrompt = `High-end luxury fashion portrait. ${modelDesc} ${identityDesc} ${styleDesc} ENVIRONMENT AND BRANDING: ${luxurySetting} ${anatomyPrompt} Wearing simple plain undergarment or white t-shirt.`;
+              baselinePrompt = `High-end luxury fashion portrait. FULL BODY SHOT: MUST be a full-length head-to-toe shot showing the complete outfit including legs and shoes. DO NOT crop the image at the waist or knees. ${modelDesc} ${identityDesc} ${styleDesc} ENVIRONMENT AND BRANDING: ${luxurySetting} ${anatomyPrompt} Wearing simple plain undergarment or white t-shirt.`;
             }
             // Generate a premium baseline model portrait
             const baselineUrl = await callImageAI(QWEN_API_KEY, baselinePrompt, []);
