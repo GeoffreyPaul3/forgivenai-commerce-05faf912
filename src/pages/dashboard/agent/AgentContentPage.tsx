@@ -232,7 +232,7 @@ export default function AgentContentPage() {
                   className="group flex flex-col bg-card border border-border rounded-3xl overflow-hidden hover:shadow-2xl hover:border-primary/20 transition-all duration-300"
                 >
                   {/* Media Preview Section */}
-                  <div className="aspect-[4/5] bg-muted relative overflow-hidden">
+                  <div className={`${item.type === 'ugc' || item.type === 'video' ? 'aspect-[4/5]' : ''} bg-muted relative overflow-hidden`}>
                     {item.media_url ? (
                       item.type === 'ugc' || item.type === 'video' ? (
                         <div className="w-full h-full relative group/video">
@@ -252,7 +252,7 @@ export default function AgentContentPage() {
                         <img 
                           src={item.media_url} 
                           alt={item.title || ""} 
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                          className="w-full h-auto object-contain transition-transform duration-700 group-hover:scale-105" 
                         />
                       )
                     ) : (

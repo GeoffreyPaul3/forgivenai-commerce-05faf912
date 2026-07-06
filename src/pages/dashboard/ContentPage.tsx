@@ -2271,8 +2271,8 @@ function InfluencerManager() {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {generatedVisuals?.slice((galleryPage - 1) * GALLERY_PAGE_SIZE, galleryPage * GALLERY_PAGE_SIZE).map((visual: any) => (
-              <div key={visual.id} className="group relative aspect-[3/4] rounded-xl overflow-hidden border border-border bg-muted cursor-pointer hover:shadow-xl transition-all">
-                <img src={visual.media_url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+              <div key={visual.id} className="group relative rounded-xl overflow-hidden border border-border bg-muted cursor-pointer hover:shadow-xl transition-all">
+                <img src={visual.media_url} alt="" className="w-full h-auto object-contain group-hover:scale-105 transition-transform duration-500" />
                 <div className="absolute inset-0 bg-charcoal/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                    <Button 
                     size="icon" 
