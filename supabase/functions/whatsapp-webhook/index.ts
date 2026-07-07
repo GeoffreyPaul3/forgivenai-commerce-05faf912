@@ -436,7 +436,22 @@ serve(async (req) => {
             const custEmail     = orderData.customer_email || customer?.email || "";
             const custAddress   = orderData.address || "";
             const custPhone     = orderData.phone || customerPhone;
-            const custCourier   = orderData.courier || "Unspecified";
+            
+            // Fix: If courier is empty or unspecified, default to Impala (as requested by user)
+            let custCourier = orderData.courier || "Impala Courier";
+            if (custCourier.toLowerCase() === "unspecified" || custCourier.toLowerCase() === "auto") {
+              custCourier = "Impala Courier";
+            }
+
+            // Fix: Extract city from address if delivery_city is missing
+            let deliveryCity = orderData.delivery_city || "";
+            if (!deliveryCity) {
+              const addressLow = custAddress.toLowerCase();
+              if (addressLow.includes("blantyre")) deliveryCity = "Blantyre";
+              else if (addressLow.includes("mzuzu")) deliveryCity = "Mzuzu";
+              else if (addressLow.includes("zomba")) deliveryCity = "Zomba";
+              else deliveryCity = "Lilongwe"; // Default
+            }
 
             if (productName && price > 0) {
               console.log(`⚡ Processing order for ${productName} — MWK ${price}`);
@@ -495,8 +510,8 @@ serve(async (req) => {
 
               // Delivery Orchestrator Initialization
               if (custCourier) {
-                let providerCode = 'SMART_DELIVERIES';
-                if (custCourier.toLowerCase().includes("impala")) providerCode = 'IMPALA_COURIER';
+                // User requested to STRICTLY use Impala Courier for now and ignore Smart Deliveries
+                let providerCode = 'IMPALA_COURIER';
 
                 const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', providerCode).single();
                 if (provider) {
@@ -505,7 +520,7 @@ serve(async (req) => {
                     courier_provider_id: provider.id,
                     receiver_name: custName || 'Customer',
                     receiver_phone: custPhone,
-                    receiver_city: orderData.delivery_city || 'Lilongwe',
+                    receiver_city: deliveryCity,
                     receiver_address: custAddress || 'Not specified',
                     delivery_type: orderData.delivery_type === 'door_to_door' ? 'door_to_door' : 'office_collection',
                     delivery_fee: 0,
@@ -686,15 +701,25 @@ ORDER CAPTURE PROCESS:
 2. If they want to order, you MUST collect the following details BEFORE confirming:
    - Full Name
    - Email Address
-   - Delivery Address (e.g., Kanjedza, Blantyre or Area 47, Lilongwe)
+   - Delivery Address (e.g., Kanjedza, Blantyre or Area 47, Lilongwe) - MUST be an actual location, not empty.
    - Preferred Contact Number
-   - Preferred Courier Service (e.g., Smart Deliveries, Impala Courier, or "AUTO" for the best available option).
-     * If they choose a specific courier, you MUST also ask if they want Door-to-Door or Office Collection AND verify their city.
    - Size (if the product has size options)
    - Colour (if the product has colour options)
+   * Note: Our official delivery partner is Impala Courier. You do not need to ask the customer to choose a courier. Just assume Impala Courier for all deliveries.
+
+⛔ CRITICAL DELIVERY GATE — ABSOLUTE RULE, ZERO EXCEPTIONS:
+You are STRICTLY FORBIDDEN from generating ###PENDING_ORDER### or ###ORDER_JSON### if ANY of the following are missing:
+  • address — must be an actual location (e.g. "Area 47, Lilongwe" or "Kanjedza, Blantyre"). NEVER leave it empty.
+  • phone — must be a real contact number
+If the customer says "YES" or "confirm" before providing both, you MUST reply:
+"Before I generate your payment link, I need a few delivery details first:
+1. 📍 Delivery address?
+2. 📞 Contact number?"
+NEVER generate the order until address and phone are present.
+
 3. When you have all details and are ready to show the order summary, you MUST include this hidden machine-readable block FIRST (it will be stripped before sending to the customer — do NOT mention it):
 ###PENDING_ORDER###
-{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"AUTO","delivery_city":"Lilongwe","delivery_type":"door_to_door"}
+{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Impala Courier","delivery_city":"Actual City Name","delivery_type":"door_to_door"}
 ###END_PENDING_ORDER###
 
    Then present the human-readable summary:
@@ -707,12 +732,12 @@ ORDER CAPTURE PROCESS:
    *Email:* X
    *Address:* X
    *Phone:* X
-   *Courier:* X
+   *Courier:* Impala Courier
    Ask: "Reply **YES** to confirm your order details and generate your secure payment link."
 
 4. CRITICAL: ONLY AFTER the customer replies with "YES" or explicit confirmation of the summary, respond with EXACTLY this JSON block:
 ###ORDER_JSON###
-{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"AUTO","delivery_city":"Lilongwe","delivery_type":"door_to_door"}
+{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Impala Courier","delivery_city":"Actual City Name","delivery_type":"door_to_door"}
 ###END_ORDER_JSON###
 
 Followed by ONLY: "Perfect! I'm generating your secure payment link right now... 🚀"

@@ -1638,7 +1638,8 @@ function InfluencerManager() {
   // Influencer creation state
   const [newInfluencer, setNewInfluencer] = useState({ 
     name: "", gender: "female", ethnicity: "african", face_embedding: "", body_type: "tall_editorial",
-    style_profile: "High-End Editorial", pose_style: "Dynamic Fashion"
+    style_profile: "High-End Editorial", pose_style: "Dynamic Fashion",
+    complexion: "", hair: "", makeup: ""
   });
   const [identityPhoto, setIdentityPhoto] = useState<File | null>(null);
   const [generatingIdentity, setGeneratingIdentity] = useState(false);
@@ -1872,6 +1873,9 @@ function InfluencerManager() {
           action: "generate-avatar", 
           gender: newInfluencer.gender, 
           ethnicity: newInfluencer.ethnicity,
+          complexion: newInfluencer.complexion,
+          hair: newInfluencer.hair,
+          makeup: newInfluencer.makeup,
           setting: "studio-portrait",
           avatarImageBase64: base64Photo,
           useExactPhoto: !!base64Photo
@@ -1882,8 +1886,18 @@ function InfluencerManager() {
 
       // 2. Save identity
       const { error: insError } = await supabase.from("influencers").insert({
-        ...newInfluencer,
+        name: newInfluencer.name,
+        gender: newInfluencer.gender,
+        ethnicity: newInfluencer.ethnicity,
         avatar_url: imgData.imageUrl,
+        metadata: {
+          body_type: newInfluencer.body_type,
+          style_profile: newInfluencer.style_profile,
+          pose_style: newInfluencer.pose_style,
+          complexion: newInfluencer.complexion,
+          hair: newInfluencer.hair,
+          makeup: newInfluencer.makeup
+        }
       } as any);
 
       if (insError) throw insError;
@@ -2402,6 +2416,36 @@ function InfluencerManager() {
                     <SelectItem value="plus_size">Plus Size</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Complexion</label>
+                <Input 
+                  placeholder="e.g. Deep melanin" 
+                  value={newInfluencer.complexion} 
+                  onChange={e => setNewInfluencer(f => ({ ...f, complexion: e.target.value }))}
+                  className="rounded-xl bg-muted/20 text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Hair</label>
+                <Input 
+                  placeholder="e.g. Short curly afro" 
+                  value={newInfluencer.hair} 
+                  onChange={e => setNewInfluencer(f => ({ ...f, hair: e.target.value }))}
+                  className="rounded-xl bg-muted/20 text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Makeup</label>
+                <Input 
+                  placeholder="e.g. Natural glow" 
+                  value={newInfluencer.makeup} 
+                  onChange={e => setNewInfluencer(f => ({ ...f, makeup: e.target.value }))}
+                  className="rounded-xl bg-muted/20 text-xs h-9"
+                />
               </div>
             </div>
 

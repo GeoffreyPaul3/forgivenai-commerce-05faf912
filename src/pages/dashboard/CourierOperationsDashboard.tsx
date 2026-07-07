@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Package, Truck, RefreshCw, MoreHorizontal, CreditCard, ExternalLink, ShieldAlert } from "lucide-react";
@@ -14,8 +15,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious,
+} from "@/components/ui/pagination";
 
 const CourierOperationsDashboard = () => {
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
   const { data: deliveries, isLoading, refetch } = useQuery({
     queryKey: ['delivery_orders'],
     queryFn: async () => {
@@ -96,6 +102,9 @@ const CourierOperationsDashboard = () => {
     return <div className="p-8">Loading courier operations...</div>;
   }
 
+  const totalPages = Math.ceil((deliveries?.length || 0) / PAGE_SIZE);
+  const paginatedDeliveries = deliveries?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -138,6 +147,7 @@ const CourierOperationsDashboard = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Order ID</TableHead>
+              <TableHead>Date</TableHead>
               <TableHead>Courier</TableHead>
               <TableHead>Receiver</TableHead>
               <TableHead>City</TableHead>
@@ -148,9 +158,10 @@ const CourierOperationsDashboard = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {deliveries?.map((d: any) => (
+            {paginatedDeliveries?.map((d: any) => (
               <TableRow key={d.id}>
                 <TableCell className="font-mono text-xs">{d.order_id.slice(0, 8)}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{new Date(d.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className={d.courier_providers?.code === 'IMPALA_COURIER' ? 'text-amber-600 border-amber-200 bg-amber-50' : 'text-blue-600 border-blue-200 bg-blue-50'}>
                     {d.courier_providers?.name || 'Unknown'}
@@ -216,6 +227,50 @@ const CourierOperationsDashboard = () => {
           </TableBody>
         </Table>
       </div>
+
+      {totalPages > 1 && (
+        <Pagination className="mt-6">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious 
+                href="#" 
+                onClick={e => { e.preventDefault(); setPage(p => Math.max(1, p - 1)); }} 
+                className={page === 1 ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }).map((_, i) => {
+              const p = i + 1;
+              if (
+                p === 1 || 
+                p === totalPages || 
+                (p >= page - 1 && p <= page + 1)
+              ) {
+                return (
+                  <PaginationItem key={p}>
+                    <PaginationLink href="#" isActive={p === page} onClick={e => { e.preventDefault(); setPage(p); }}>
+                      {p}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              } else if (p === page - 2 || p === page + 2) {
+                return (
+                  <PaginationItem key={`ellipsis-${p}`}>
+                    <span className="px-2 text-muted-foreground">...</span>
+                  </PaginationItem>
+                );
+              }
+              return null;
+            })}
+            <PaginationItem>
+              <PaginationNext 
+                href="#" 
+                onClick={e => { e.preventDefault(); setPage(p => Math.min(totalPages, p + 1)); }} 
+                className={page === totalPages ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 };

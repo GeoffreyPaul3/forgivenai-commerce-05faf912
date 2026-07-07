@@ -53,7 +53,15 @@ serve(async (req) => {
 
         const status = result.status ?? "unknown";
         if (status === "paid" || status === "success") {
-          return htmlResponse("Payment Confirmed! 🎉", "Thank you for your order! Your payment has been received and we're already getting it ready for you.", "success", txRef, result.data);
+          // Immediately redirect to WhatsApp — confirmation message already sent by webhook.
+          // This avoids showing raw HTML on the Supabase URL and the garbled emoji encoding issue.
+          return new Response(null, {
+            status: 302,
+            headers: {
+              ...corsHeaders,
+              "Location": `https://wa.me/265997128899?text=${encodeURIComponent("Hi! My payment just went through ✅ — order reference: " + txRef)}`,
+            }
+          });
         } else if (status === "pending") {
           return htmlResponse("Payment Pending", "Your payment is still being processed. You'll receive a WhatsApp message once it clears — usually within a few minutes.", "pending", txRef);
         } else {
@@ -298,6 +306,10 @@ async function verifyAndSyncPayment({
   if (existingOrder) {
     const wasPaid = existingOrder.status === "paid";
     
+    if (wasPaid) {
+      paymentStatus = "paid";
+    }
+
     const updates: any = {
       status: paymentStatus === "paid" ? "paid" : existingOrder.status,
     };

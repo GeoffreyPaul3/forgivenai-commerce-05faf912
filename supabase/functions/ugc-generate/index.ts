@@ -1835,7 +1835,7 @@ async function runUnifiedVTON(
             keys.falKey,
             personImageUrl,
             segmentedGarmentUrl,
-            `${garmentDetails} — worn by a REAL HUMAN ${targetGender} ${targetEthnicity} model. DO NOT generate a mannequin. Preserve exact sleeve length. seed: ${seed}`
+            `${garmentDetails} — worn by a REAL HUMAN ${targetGender} ${targetEthnicity} model. DO NOT generate a mannequin. Preserve exact sleeve length. The clothes and accessories must fit the model PERFECTLY, with immaculate tailoring and realistic draping, no weird stretching. seed: ${seed}`
           );
         }
       },
@@ -1868,6 +1868,7 @@ async function runUnifiedVTON(
             `  - DO NOT substitute a generic or similar-looking product. Only the EXACT reference product is acceptable.`,
             `  - DO NOT change the garment's neckline, sleeve length, color, cut, pattern, print, logo, or fabric texture.`,
             `  - DO NOT change the model's face, skin tone or ethnicity.`,
+            `  - PERFECT FIT REQUIRED: The clothes and accessories MUST fit the model PERFECTLY with immaculate tailoring and realistic draping. No weird stretching, no oversized/undersized clipping.`,
             `  - If you cannot reproduce the EXACT product, output a blank result rather than a wrong product.`,
             strictnessPromptModifier,
             anatomyPrompt,
