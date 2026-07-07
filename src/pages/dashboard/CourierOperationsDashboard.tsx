@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Truck, RefreshCw, MoreHorizontal, CreditCard, ExternalLink } from "lucide-react";
+import { Package, Truck, RefreshCw, MoreHorizontal, CreditCard, ExternalLink, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { syncParcelStatus } from "@/integrations/smart-deliveries/smartDeliveriesService";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +23,7 @@ const CourierOperationsDashboard = () => {
         .from('delivery_orders')
         .select(`
           *,
-          courier_providers(name),
+          courier_providers(name, code),
           orders(status, total),
           delivery_service_payments(status, transaction_reference)
         `)
@@ -37,31 +36,36 @@ const CourierOperationsDashboard = () => {
 
   const handleSync = async () => {
     try {
-      toast.info("Syncing tracking events...");
-      const res = await syncParcelStatus();
-      if (res.synced > 0) {
-        toast.success(`Successfully synced ${res.synced} deliveries!`);
+      toast.info("Syncing tracking events via Orchestrator...");
+      const { data, error } = await supabase.functions.invoke('sync-tracking-statuses');
+      if (error) throw error;
+      
+      if (data?.success) {
+        toast.success(data.message || "Successfully synced deliveries!");
         refetch();
       } else {
-        toast.info("All deliveries are up to date.");
+        toast.info("No updates found.");
       }
     } catch (e: any) {
       toast.error("Failed to sync: " + e.message);
     }
   };
 
-  const handleRetryDispatch = async (deliveryOrderId: string) => {
+  const handleRetryDispatch = async (deliveryOrderId: string, providerCode: string) => {
     try {
-      toast.loading("Retrying dispatch to Smart Deliveries...", { id: `dispatch-${deliveryOrderId}` });
+      toast.loading("Retrying dispatch...", { id: `dispatch-${deliveryOrderId}` });
       
-      const { data, error } = await supabase.functions.invoke('smart-deliveries-create-parcel', {
-        body: { deliveryOrderId }
+      const { data, error } = await supabase.functions.invoke('logistics-orchestrator', {
+        body: { 
+          action: 'create-shipment', 
+          payload: { deliveryOrderId, provider: providerCode }
+        }
       });
       
       if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (data?.error) throw new Error(data.error);
 
-      toast.success("Dispatch successful! Waybill generated.", { id: `dispatch-${deliveryOrderId}` });
+      toast.success("Dispatch successful! Shipment created.", { id: `dispatch-${deliveryOrderId}` });
       refetch();
     } catch (e: any) {
       console.error(e);
@@ -96,23 +100,23 @@ const CourierOperationsDashboard = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold font-heading">Courier Operations</h2>
-          <p className="text-muted-foreground">Manage and track Smart Deliveries.</p>
+          <h2 className="text-2xl font-bold font-heading">Logistics Operations</h2>
+          <p className="text-muted-foreground">Manage and track Multi-Courier shipments globally.</p>
         </div>
         <Button onClick={handleSync} variant="outline" className="gap-2">
-          <RefreshCw className="w-4 h-4" /> Sync All
+          <RefreshCw className="w-4 h-4" /> Force Sync Tracking
         </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground font-body">Active Deliveries</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground font-body">Active Shipments</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold font-heading text-primary flex items-center gap-2">
               <Truck className="w-6 h-6" /> 
-              {deliveries?.filter(d => !['delivered', 'returned'].includes(d.parcel_status || '')).length || 0}
+              {deliveries?.filter(d => !['Delivered', 'Returned', 'Failed', 'Cancelled'].includes(d.parcel_status || '')).length || 0}
             </p>
           </CardContent>
         </Card>
@@ -134,27 +138,33 @@ const CourierOperationsDashboard = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Order ID</TableHead>
+              <TableHead>Courier</TableHead>
               <TableHead>Receiver</TableHead>
               <TableHead>City</TableHead>
-              <TableHead>Waybill</TableHead>
+              <TableHead>Tracking</TableHead>
               <TableHead>Fee (MWK)</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {deliveries?.map((d) => (
+            {deliveries?.map((d: any) => (
               <TableRow key={d.id}>
                 <TableCell className="font-mono text-xs">{d.order_id.slice(0, 8)}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className={d.courier_providers?.code === 'IMPALA_COURIER' ? 'text-amber-600 border-amber-200 bg-amber-50' : 'text-blue-600 border-blue-200 bg-blue-50'}>
+                    {d.courier_providers?.name || 'Unknown'}
+                  </Badge>
+                </TableCell>
                 <TableCell>
                   <p className="font-medium">{d.receiver_name}</p>
                   <p className="text-xs text-muted-foreground">{d.receiver_phone}</p>
                 </TableCell>
                 <TableCell>{d.receiver_city}</TableCell>
-                <TableCell className="font-mono text-xs">{d.waybill_number || 'N/A'}</TableCell>
+                <TableCell className="font-mono text-xs">{d.tracking_number || d.waybill_number || 'Pending'}</TableCell>
                 <TableCell>{d.delivery_fee?.toLocaleString()}</TableCell>
                 <TableCell>
-                  <Badge variant={d.parcel_status === 'delivered' ? 'default' : 'secondary'}>
+                  <Badge variant={d.parcel_status === 'Delivered' ? 'default' : (d.parcel_status === 'Failed' ? 'destructive' : 'secondary')}>
                     {d.parcel_status?.replace('_', ' ') || 'Pending'}
                   </Badge>
                 </TableCell>
@@ -168,15 +178,15 @@ const CourierOperationsDashboard = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => window.open(`/tracking/${d.order_id}`, '_blank')}>
+                      <DropdownMenuItem onClick={() => window.open(`/tracking/${d.order_id}`, '_blank')} disabled={!d.tracking_number && !d.waybill_number}>
                         <ExternalLink className="mr-2 h-4 w-4" />
                         View Tracking
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      {(!d.smart_delivery_uuid || d.smart_delivery_uuid === 'UUID-UNKNOWN') && (
-                        <DropdownMenuItem onClick={() => handleRetryDispatch(d.id)} className="text-blue-600 focus:text-blue-600 font-medium">
+                      {(!d.tracking_number && !d.waybill_number) && (
+                        <DropdownMenuItem onClick={() => handleRetryDispatch(d.id, d.courier_providers?.code)} className="text-blue-600 focus:text-blue-600 font-medium">
                           <RefreshCw className="mr-2 h-4 w-4" />
-                          Dispatch to Smart Deliveries
+                          Dispatch to Courier
                         </DropdownMenuItem>
                       )}
                       {d.delivery_service_payments && d.delivery_service_payments.length > 0 && d.delivery_service_payments.some((p: any) => p.status === 'paid') ? (
@@ -198,7 +208,7 @@ const CourierOperationsDashboard = () => {
             ))}
             {deliveries?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   No delivery orders found.
                 </TableCell>
               </TableRow>

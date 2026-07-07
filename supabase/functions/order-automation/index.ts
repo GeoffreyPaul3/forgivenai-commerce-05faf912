@@ -117,7 +117,7 @@ serve(async (req) => {
       const status = record.status;
       const config = statusConfig[status];
       
-      // Smart Deliveries Automation
+      // Logistics Orchestrator Automation (Event-Based)
       if (status === 'paid') {
         try {
           const { data: deliveryOrder } = await supabase
@@ -126,22 +126,29 @@ serve(async (req) => {
             .eq('order_id', record.id)
             .maybeSingle();
 
-          if (deliveryOrder && deliveryOrder.courier_providers?.code === 'SMART_DELIVERIES') {
-            console.log(`Order ${record.id} paid. Invoking smart-deliveries-create-parcel...`);
+          if (deliveryOrder && deliveryOrder.courier_providers?.code) {
+            console.log(`Order ${record.id} paid. Emitting ShipmentRequested to logistics-orchestrator...`);
             
-            // Invoke edge function instead of direct HTTP, bypassing local anon keys
-            const { data, error } = await supabase.functions.invoke('smart-deliveries-create-parcel', {
-              body: { deliveryOrderId: deliveryOrder.id }
+            // Invoke edge function delegating to Orchestrator
+            const { data, error } = await supabase.functions.invoke('logistics-orchestrator', {
+              body: { 
+                action: 'create-shipment', 
+                payload: {
+                  orderId: record.id,
+                  deliveryOrderId: deliveryOrder.id,
+                  provider: deliveryOrder.courier_providers.code
+                }
+              }
             });
             
             if (error) {
-              console.error("Smart Delivery parcel creation failed via Edge Function:", error);
+              console.error("Logistics Orchestrator shipment creation failed:", error);
             } else {
-              console.log("Smart Delivery parcel created:", data);
+              console.log("Logistics Orchestrator response:", data);
             }
           }
         } catch (deliverySyncError) {
-          console.error("Error triggering Smart Deliveries sync:", deliverySyncError);
+          console.error("Error triggering Logistics Orchestrator sync:", deliverySyncError);
         }
       }
 

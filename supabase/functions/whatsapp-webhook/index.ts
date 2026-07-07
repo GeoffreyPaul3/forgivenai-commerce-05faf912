@@ -493,14 +493,13 @@ serve(async (req) => {
               if (orderError || !newOrder) throw new Error(`Order creation failed: ${orderError?.message}`);
               console.log(`✅ Order created (YES intercept): ${newOrder.id}`);
 
-              // Smart Deliveries Integration
-              const isSmartDelivery = custCourier && custCourier.toLowerCase().includes("smart");
-              if (isSmartDelivery) {
-                const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', 'SMART_DELIVERIES').single();
-                if (provider) {
-                  let deliveryFee = 2500;
-                  if (orderData.delivery_type === "door_to_door") deliveryFee += 1500;
+              // Delivery Orchestrator Initialization
+              if (custCourier) {
+                let providerCode = 'SMART_DELIVERIES';
+                if (custCourier.toLowerCase().includes("impala")) providerCode = 'IMPALA_COURIER';
 
+                const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', providerCode).single();
+                if (provider) {
                   const { error: insertError } = await supabase.from('delivery_orders').insert({
                     order_id: newOrder.id,
                     courier_provider_id: provider.id,
@@ -509,14 +508,14 @@ serve(async (req) => {
                     receiver_city: orderData.delivery_city || 'Lilongwe',
                     receiver_address: custAddress || 'Not specified',
                     delivery_type: orderData.delivery_type === 'door_to_door' ? 'door_to_door' : 'office_collection',
-                    delivery_fee: deliveryFee,
+                    delivery_fee: 0,
                     parcel_status: 'pending'
                   });
                   
                   if (insertError) {
                     console.error("Failed to insert delivery_order (YES intercept):", insertError);
                   } else {
-                    console.log(`✅ Smart Deliveries sequence initialized (YES intercept) for order ${newOrder.id}`);
+                    console.log(`✅ Delivery sequence initialized (YES intercept) for order ${newOrder.id} with ${providerCode}`);
                   }
                 }
               }
@@ -689,13 +688,13 @@ ORDER CAPTURE PROCESS:
    - Email Address
    - Delivery Address (e.g., Kanjedza, Blantyre or Area 47, Lilongwe)
    - Preferred Contact Number
-   - Preferred Courier Service. You MUST present "Smart Deliveries" as our preferred and highly recommended courier partner (e.g., "We highly recommend Smart Deliveries for fast and reliable shipping! We also support CTS, Speed, etc. Which do you prefer?").
-     * If they choose Smart Deliveries, you MUST also ask if they want Door-to-Door or Office Collection AND verify their city. Smart Deliveries ONLY operates in Lilongwe, Blantyre, Mzuzu, and Zomba.
+   - Preferred Courier Service (e.g., Smart Deliveries, Impala Courier, or "AUTO" for the best available option).
+     * If they choose a specific courier, you MUST also ask if they want Door-to-Door or Office Collection AND verify their city.
    - Size (if the product has size options)
    - Colour (if the product has colour options)
 3. When you have all details and are ready to show the order summary, you MUST include this hidden machine-readable block FIRST (it will be stripped before sending to the customer — do NOT mention it):
 ###PENDING_ORDER###
-{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Smart Deliveries","delivery_city":"Lilongwe","delivery_type":"door_to_door"}
+{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"AUTO","delivery_city":"Lilongwe","delivery_type":"door_to_door"}
 ###END_PENDING_ORDER###
 
    Then present the human-readable summary:
@@ -713,7 +712,7 @@ ORDER CAPTURE PROCESS:
 
 4. CRITICAL: ONLY AFTER the customer replies with "YES" or explicit confirmation of the summary, respond with EXACTLY this JSON block:
 ###ORDER_JSON###
-{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Smart Deliveries","delivery_city":"Lilongwe","delivery_type":"door_to_door"}
+{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"AUTO","delivery_city":"Lilongwe","delivery_type":"door_to_door"}
 ###END_ORDER_JSON###
 
 Followed by ONLY: "Perfect! I'm generating your secure payment link right now... 🚀"
@@ -765,6 +764,11 @@ ${productList}`;
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const product = products?.find(p => p.name.toLowerCase() === orderData.product_name.toLowerCase());
 
+        // Default to AUTO if the AI forgot or user didn't specify
+        if (!orderData.courier || orderData.courier.toLowerCase() === 'unspecified') {
+          orderData.courier = 'AUTO';
+        }
+
         // Update customer name
         if (orderData.customer_name) {
           await supabase.from("conversations").update({ customer_name: orderData.customer_name, pending_order: null }).eq("id", convo.id);
@@ -784,14 +788,16 @@ ${productList}`;
         let finalStatus = "pending";
         let deliveryFee = 0;
         const isSmartDelivery = orderData.courier && orderData.courier.toLowerCase().includes("smart");
+        const isImpala = orderData.courier && orderData.courier.toLowerCase().includes("impala");
+        const isAuto = orderData.courier && orderData.courier.toUpperCase() === "AUTO";
 
-        if (isSmartDelivery) {
-          finalStatus = "pending"; // Customer pays product only; we cover delivery
-          deliveryFee = 2500; // Base rate
-          if (orderData.delivery_type === "door_to_door") {
-            deliveryFee += 1500; // Door-to-door surcharge
-          }
-          // We DO NOT add deliveryFee to finalOrderTotal since Forgiven SC covers it!
+        // Let the logistics orchestrator handle this post-payment.
+        // For WhatsApp orders, we currently cover the delivery fee as part of the total order.
+        if (isSmartDelivery || isImpala || isAuto || orderData.courier) {
+          finalStatus = "pending"; 
+          // Note: The logistics-orchestrator will calculate final courier fees internally.
+          // For now, we DO NOT add deliveryFee to finalOrderTotal since Forgiven SC covers it for WhatsApp sales.
+          deliveryFee = 0; 
         }
 
         // Create order record (order-level attribution model)
@@ -839,8 +845,12 @@ ${productList}`;
 
         console.log(`✅ Order created: ${newOrder.id} for ${orderData.product_name} — MWK ${newOrder.total}`);
 
-        if (isSmartDelivery) {
-          const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', 'SMART_DELIVERIES').single();
+        if (orderData.courier) {
+          let providerCode = 'SMART_DELIVERIES'; // Default
+          if (orderData.courier.toLowerCase().includes("impala")) providerCode = 'IMPALA_COURIER';
+          // (AUTO defaults to SMART_DELIVERIES for the DB FK, Orchestrator can override later)
+
+          const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', providerCode).single();
           if (provider) {
             const { error: insertError } = await supabase.from('delivery_orders').insert({
               order_id: newOrder.id,
@@ -857,7 +867,7 @@ ${productList}`;
             if (insertError) {
               console.error("Failed to insert delivery_order:", insertError);
             } else {
-              console.log(`✅ Smart Deliveries sequence initialized for order ${newOrder.id}`);
+              console.log(`✅ Delivery sequence initialized for order ${newOrder.id} with provider ${providerCode}`);
             }
           }
         }

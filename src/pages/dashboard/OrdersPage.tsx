@@ -192,10 +192,9 @@ const OrdersPage = () => {
 
   const createOrder = useMutation({
     mutationFn: async (orderPayload: any) => {
-      const { delivery_provider, delivery_city, delivery_type, delivery_address, ...order } = orderPayload;
+      const { delivery_provider, delivery_city, delivery_type, delivery_address, logistics_quote, ...order } = orderPayload;
       
       // For agent-created orders, inject order-level attribution fields
-      // so commission is correctly attributed under the per-order model.
       const enrichedOrder = profile?.role === "agent" && agentId
         ? {
             ...order,
@@ -208,25 +207,20 @@ const OrdersPage = () => {
         : order;
 
       // Ensure status is correctly set for delivery
-      if (delivery_provider === 'smart_deliveries') {
+      if (delivery_provider !== 'none') {
         enrichedOrder.status = 'awaiting_delivery_payment';
       }
 
       const { data: newOrder, error: orderError } = await supabase.from("orders").insert(enrichedOrder).select().single();
       if (orderError) throw orderError;
 
-      if (delivery_provider === 'smart_deliveries') {
-        // Fetch provider ID
-        const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', 'SMART_DELIVERIES').single();
+      if (delivery_provider !== 'none' && logistics_quote) {
+        // Record the shipment intention. Actual shipment creation to courier API
+        // will be handled by order-automation via logistics-orchestrator once paid.
+        const providerCode = logistics_quote.selectedProviderCode;
+        const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', providerCode).single();
+        
         if (provider) {
-          // Get quote
-          const { getDeliveryQuote } = await import('@/integrations/smart-deliveries/deliveryFeeEngine');
-          const quote = await getDeliveryQuote({
-            city: delivery_city,
-            deliveryType: delivery_type,
-            itemsCount: 1
-          });
-
           await supabase.from('delivery_orders').insert({
             order_id: newOrder.id,
             courier_provider_id: provider.id,
@@ -235,8 +229,9 @@ const OrdersPage = () => {
             receiver_phone: enrichedOrder.customer_phone || '',
             receiver_city: delivery_city,
             receiver_address: delivery_address || '',
-            delivery_fee: quote.fee,
-            parcel_status: 'pending'
+            delivery_fee: logistics_quote.quote.amount,
+            parcel_status: 'pending',
+            idempotency_key: `${newOrder.id}-${providerCode}`
           });
         }
       }
@@ -580,6 +575,28 @@ function AddOrderForm({ onSave }: { onSave: (o: any) => void }) {
     delivery_type: "office_collection",
     delivery_address: ""
   });
+  
+  const [quote, setQuote] = useState<any>(null);
+  const [loadingQuote, setLoadingQuote] = useState(false);
+
+  const fetchQuote = async () => {
+    if (!form.delivery_city || form.delivery_provider === 'none') return;
+    setLoadingQuote(true);
+    try {
+      const { LogisticsService } = await import('@/integrations/logistics/LogisticsService');
+      const res = await LogisticsService.getLiveQuote({
+        receiverCity: form.delivery_city,
+        senderCity: 'Blantyre', // Default origin
+        itemsCount: 1
+      }, form.delivery_provider);
+      setQuote(res);
+    } catch (e: any) {
+      console.error(e);
+      setQuote(null);
+    } finally {
+      setLoadingQuote(false);
+    }
+  };
 
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
@@ -601,17 +618,19 @@ function AddOrderForm({ onSave }: { onSave: (o: any) => void }) {
 
       <div className="space-y-3 border-t border-border pt-4">
         <h3 className="font-heading font-medium text-sm">Delivery Options</h3>
-        <Select value={form.delivery_provider} onValueChange={v => setForm(f => ({ ...f, delivery_provider: v }))}>
+        <Select value={form.delivery_provider} onValueChange={v => { setForm(f => ({ ...f, delivery_provider: v })); setQuote(null); }}>
           <SelectTrigger><SelectValue placeholder="Delivery Provider" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No Delivery / Customer Pickup</SelectItem>
-            <SelectItem value="smart_deliveries">Smart Deliveries (Lilongwe, Blantyre, Mzuzu, Zomba)</SelectItem>
+            <SelectItem value="AUTO">🤖 Auto-Select Best Courier</SelectItem>
+            <SelectItem value="SMART_DELIVERIES">Smart Deliveries</SelectItem>
+            <SelectItem value="IMPALA_COURIER">Impala Courier</SelectItem>
           </SelectContent>
         </Select>
 
-        {form.delivery_provider === 'smart_deliveries' && (
+        {form.delivery_provider !== 'none' && (
           <div className="space-y-3 bg-muted/50 p-3 rounded-lg border border-border">
-            <Select value={form.delivery_city} onValueChange={v => setForm(f => ({ ...f, delivery_city: v }))}>
+            <Select value={form.delivery_city} onValueChange={v => { setForm(f => ({ ...f, delivery_city: v })); setQuote(null); }}>
               <SelectTrigger><SelectValue placeholder="Select City" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Lilongwe">Lilongwe</SelectItem>
@@ -636,6 +655,33 @@ function AddOrderForm({ onSave }: { onSave: (o: any) => void }) {
                 onChange={e => setForm(f => ({ ...f, delivery_address: e.target.value }))} 
               />
             )}
+
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="w-full text-xs" 
+              onClick={fetchQuote} 
+              disabled={!form.delivery_city || loadingQuote}
+            >
+              {loadingQuote ? 'Calculating...' : 'Get Live Quote'}
+            </Button>
+
+            {quote && (
+              <div className="p-3 bg-primary/10 rounded-xl mt-2 flex flex-col gap-1 text-sm border border-primary/20">
+                <div className="flex justify-between items-center font-bold">
+                  <span>Selected Courier:</span>
+                  <span className="text-primary">{quote.providerName}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Estimated Fee:</span>
+                  <span>{quote.quote?.currency} {quote.quote?.amount?.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-muted-foreground mt-1">
+                  <span>ETA: {quote.quote?.estimatedDays} Days</span>
+                  <span>Score: {quote.score}</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -643,11 +689,15 @@ function AddOrderForm({ onSave }: { onSave: (o: any) => void }) {
       <Button 
         className="w-full" 
         onClick={() => {
-          if (form.delivery_provider === 'smart_deliveries' && !form.delivery_city) {
-            alert("Please select a city for Smart Deliveries.");
+          if (form.delivery_provider !== 'none' && !form.delivery_city) {
+            alert("Please select a city for delivery.");
             return;
           }
-          onSave({ ...form, total: parseFloat(form.total) || 0 });
+          if (form.delivery_provider !== 'none' && !quote) {
+            alert("Please fetch a delivery quote first.");
+            return;
+          }
+          onSave({ ...form, total: parseFloat(form.total) || 0, logistics_quote: quote });
         }}
       >
         Create Order
