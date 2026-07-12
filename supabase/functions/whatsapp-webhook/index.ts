@@ -28,6 +28,7 @@ function getSupabase() {
 
 const QWEN_API_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions";
 const QWEN_MODEL = "qwen-plus";
+const QWEN_VISION_MODEL = "qwen-vl-plus";
 
 async function callAI(apiKey: string, systemPrompt: string, history: any[], userMessage: string): Promise<string> {
   const res = await fetch(QWEN_API_URL, {
@@ -51,6 +52,67 @@ async function callAI(apiKey: string, systemPrompt: string, history: any[], user
   }
   const data = await res.json();
   return data.choices?.[0]?.message?.content || "Sorry, I couldn't process that.";
+}
+
+// ── Vision AI: Download Twilio-authenticated media and return as base64 string ──
+async function fetchTwilioMedia(url: string, accountSid: string, authToken: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: { Authorization: "Basic " + btoa(`${accountSid}:${authToken}`) },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch Twilio media: ${res.status}`);
+  const buffer = await res.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+// ── Vision AI: Identify product in a customer screenshot and match to catalogue ──
+async function callVisionAI(
+  apiKey: string,
+  imageBase64: string,
+  mediaType: string,
+  productList: string,
+  history: any[]
+): Promise<string> {
+  const res = await fetch(QWEN_API_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: QWEN_VISION_MODEL,
+      messages: [
+        ...history,
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: `data:${mediaType};base64,${imageBase64}` },
+            },
+            {
+              type: "text",
+              text: `You are a product recognition assistant for Forgiven Shopping Centre, Malawi's premium fashion & lifestyle brand.\n\nA customer has sent a screenshot of a product they saw on our social media (Instagram, Facebook, or TikTok).\n\nYOUR TASK:\n1. Look carefully at the image and identify the product(s) shown.\n2. Compare to our active catalogue below and find the best match.\n3. Reply in a friendly WhatsApp message — premium, warm, with natural emojis.\n\nIF WE CARRY IT (exact match or very similar):\n- Confirm we have it or something very similar.\n- State the exact product name, price in MWK, and available sizes/colours.\n- Invite them to place an order.\n\nIF WE DO NOT CARRY IT:\n- Say so politely.\n- Suggest the closest alternative from our catalogue.\n\nKeep the reply concise and natural for WhatsApp. Always mention prices in MWK.\n\nOUR ACTIVE CATALOGUE:\n${productList}`,
+            },
+          ],
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 1024,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(`[Vision] Qwen-VL error ${res.status}:`, errText);
+    throw new Error(`Vision AI error: ${res.status}`);
+  }
+  const data = await res.json();
+  return (
+    data.choices?.[0]?.message?.content ||
+    "I couldn't read that image clearly. Could you describe what you're looking for? 😊"
+  );
 }
 
 async function validateTwilioRequest(req: Request, bodyText: string): Promise<boolean> {
@@ -288,6 +350,12 @@ serve(async (req) => {
       const body = formData.get("Body") || "";
       const customerPhone = from.replace("whatsapp:", "");
 
+      // ── Incoming Media Detection (customer screenshots from social media) ──
+      const numMedia = parseInt(formData.get("NumMedia") || "0");
+      const incomingMediaUrl = numMedia > 0 ? formData.get("MediaUrl0") || "" : "";
+      const incomingMediaType = numMedia > 0 ? formData.get("MediaContentType0") || "" : "";
+      const hasIncomingImage = numMedia > 0 && incomingMediaType.startsWith("image/");
+
       // ── Customer Identification ──
       let { data: customer } = await supabase
         .from("customers")
@@ -378,6 +446,37 @@ serve(async (req) => {
         role: m.role === "customer" ? "user" : "assistant",
         content: m.content,
       }));
+
+      // ── Screenshot / Image Vision Intercept ──
+      // When a customer sends a photo (e.g. a screenshot from our Instagram/Facebook/TikTok),
+      // we use Qwen-VL (vision model) to identify the product and check our catalogue.
+      // This runs AFTER products and history are fetched so the AI has full context.
+      if (hasIncomingImage) {
+        const visionApiKey = Deno.env.get("QWEN_API_KEY");
+        let handledByVision = false;
+
+        if (visionApiKey && incomingMediaUrl) {
+          try {
+            console.log(`[Vision] Image received from ${customerPhone}. Type: ${incomingMediaType}`);
+            const imageBase64 = await fetchTwilioMedia(incomingMediaUrl, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+            const visionReply = await callVisionAI(visionApiKey, imageBase64, incomingMediaType, productList, history);
+            await sendWhatsApp(from, visionReply, undefined, TEMPLATES.GENERAL_RESPONSE);
+            await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: visionReply });
+            console.log(`[Vision] ✅ Vision reply sent to ${customerPhone}`);
+            handledByVision = true;
+          } catch (visionErr) {
+            console.error("[Vision] Vision AI failed:", visionErr);
+          }
+        }
+
+        if (!handledByVision) {
+          const fallback = "I received your image but had trouble reading it. Could you describe what you're looking for? 😊";
+          await sendWhatsApp(from, fallback, undefined, TEMPLATES.GENERAL_RESPONSE);
+          await supabase.from("messages").insert({ conversation_id: convo.id, role: "ai", content: fallback });
+        }
+
+        return new Response("<Response></Response>", { headers: { ...corsHeaders, "Content-Type": "text/xml" } });
+      }
 
       // ── YES Confirmation Intercept ──
       // If the customer is confirming an order, bypass the AI entirely.
