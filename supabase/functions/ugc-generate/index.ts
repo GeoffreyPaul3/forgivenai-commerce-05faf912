@@ -174,54 +174,155 @@ async function applyBrandWatermark(supabaseClient: any, imageUrl: string): Promi
 }
 
 // --- ENTERPRISE BRAND STUDIO SYSTEM ---
-function buildEnterpriseBrandPrompt(sceneType: string, isVideo: boolean = false): string {
-  let sceneDescription = "";
-  const sceneLower = (sceneType || "").toLowerCase();
-  
-  if (sceneLower.includes("boutique") || sceneLower.includes("store")) {
-    sceneDescription = "SCENE: Luxury fashion store, premium displays, designer retail environment, FSC branded architecture.";
-  } else if (sceneLower.includes("runway")) {
-    sceneDescription = "SCENE: Fashion week runway, Forgiven Shopping Centre branding, professional fashion lighting, luxury audience atmosphere.";
-  } else if (sceneLower.includes("met gala") || sceneLower.includes("red carpet")) {
-    sceneDescription = "SCENE: Luxury red carpet, architectural lighting, premium event photography, brand identity integrated naturally.";
-  } else if (sceneLower.includes("lifestyle") || sceneLower.includes("hotel") || sceneLower.includes("penthouse")) {
-    sceneDescription = "SCENE: Five-star hotel, luxury penthouse, designer interiors, Forgiven branding subtly integrated.";
-  } else if (sceneLower.includes("outdoor") || sceneLower.includes("street")) {
-    sceneDescription = "SCENE: Luxury shopping district, premium storefront, elegant FSC signage, designer architecture.";
-  } else {
-    sceneDescription = "SCENE: Luxury FSC Studio, editorial photography.";
-  }
+interface StudioProfile {
+  id: string;
+  name: string;
+  environmentPrompt: string;
+  lightingPrompt: string;
+  compositionPrompt: string;
+  cameraPrompt: string;
+  brandingPrompt: string;
+  negativePrompt: string;
+  qualityRequirements: string[];
+}
 
-  const basePrompt = `
-BRANDING & ENVIRONMENT (CRITICAL):
-You must render this image inside the "Forgiven Shopping Centre Signature Studio" ecosystem. 
-The aesthetic must feel like a Gucci Campaign Studio, Dolce & Gabbana Runway, Prada Editorial Set, Louis Vuitton Boutique, Met Gala Red Carpet, or Vogue Fashion Shoot.
+const StudioProfileRegistry: Record<string, StudioProfile> = {
+  studio: {
+    id: "studio",
+    name: "FSC Signature Studio",
+    environmentPrompt: "Cream stone architectural wall. Large rounded signature arch with thick magenta LED outline. Black vertical architectural side panels. Built-in shelving with brass decorative elements. Indoor green plants in brass planters. Premium polished cream marble floor with seamless reflections. Large circular cream podium.",
+    lightingPrompt: "Warm premium lighting (3000K-3500K). Luxury retail lighting with soft shadows, soft fill, and warm wall sconces.",
+    compositionPrompt: "Models positioned slightly off-center (left or right). Never centered directly over the logo. The product remains the hero. Premium e-commerce framing and luxury retail composition.",
+    cameraPrompt: "High-end fashion campaign, luxury commercial photography, premium retail advertising. Consistent framing and perspective.",
+    brandingPrompt: "Centered on the back wall inside the arch is the official brand logo: Three overlapping shopping bag icons (a large magenta bag in front containing a white 'F', a medium blue bag behind it to the left, and a small lime green bag behind the blue one), positioned above the bold magenta word 'Forgiven' and smaller thin black text 'Shopping Centre' aligned to the right. Magenta, royal blue, and lime green accents integrated into lighting and decor.",
+    negativePrompt: "wooden floors, warehouse interiors, office spaces, hotel lobbies, exposed brick, industrial lofts, blue lighting, RGB lighting, neon environments, cluttered backgrounds, outdoor scenery, random architectural arches, futuristic interiors, dark cinematic environments, incorrect logo placement, missing podium, missing arch, missing LED.",
+    qualityRequirements: [
+      "Signature arch with magenta LED outline",
+      "Cream stone wall",
+      "Premium cream marble floor",
+      "Circular cream podium",
+      "Black architectural side panels",
+      "Warm premium lighting (3000K-3500K)",
+      "Forgiven Shopping Centre logo (three overlapping bags)",
+      "Premium luxury retail styling and off-center composition"
+    ]
+  },
+  luxury_lobby: {
+    id: "luxury_lobby",
+    name: "Luxury Lobby Studio",
+    environmentPrompt: "Luxury hotel reception, marble architecture, premium ambient atmosphere. Designer interiors.",
+    lightingPrompt: "Premium ambient lighting, warm and inviting luxury hospitality lighting.",
+    compositionPrompt: "Fashion magazine editorial composition, model slightly off-center.",
+    cameraPrompt: "High-end fashion campaign, luxury hotel editorial photography.",
+    brandingPrompt: "Forgiven Shopping Centre branding subtly integrated into the environment.",
+    negativePrompt: "cheap motels, generic office spaces, cluttered lobbies, poor lighting.",
+    qualityRequirements: ["Luxury marble reception or hotel styling", "Premium ambient lighting", "Subtle Forgiven branding"]
+  },
+  modern_office: {
+    id: "modern_office",
+    name: "Modern Office Studio",
+    environmentPrompt: "Executive modern office, premium corporate architecture, corporate luxury.",
+    lightingPrompt: "Clean, bright, luxury corporate lighting with natural sunlight through glass.",
+    compositionPrompt: "Professional high-end corporate lifestyle framing.",
+    cameraPrompt: "Luxury lifestyle commercial photography.",
+    brandingPrompt: "Forgiven Shopping Centre branding visible as an office art piece or subtle signage.",
+    negativePrompt: "cubicles, messy desks, harsh fluorescent lighting, cheap office furniture.",
+    qualityRequirements: ["Executive office environment", "Premium corporate architecture", "Subtle Forgiven branding"]
+  },
+  city_street: {
+    id: "city_street",
+    name: "Parisian Street Studio",
+    environmentPrompt: "Luxury Parisian shopping district, clean elegant streets, premium storefronts.",
+    lightingPrompt: "Natural daylight, soft overcast or golden hour outdoor lighting.",
+    compositionPrompt: "Street style fashion editorial composition.",
+    cameraPrompt: "High-end street style editorial photography.",
+    brandingPrompt: "Forgiven Shopping Centre logo visible on a premium storefront sign.",
+    negativePrompt: "dirty streets, traffic, modern skyscrapers, cluttered background.",
+    qualityRequirements: ["Luxury Parisian shopping street", "Clean street environment", "Forgiven branding on a storefront"]
+  },
+  high_fashion_runway: {
+    id: "high_fashion_runway",
+    name: "Luxury Fashion Runway",
+    environmentPrompt: "Luxury fashion week runway stage, premium audience atmosphere.",
+    lightingPrompt: "Dramatic professional fashion runway lighting, spotlights.",
+    compositionPrompt: "Model walking down runway, centered or slightly off-center dynamic pose.",
+    cameraPrompt: "Professional fashion week runway photography.",
+    brandingPrompt: "Forgiven Shopping Centre logo displayed on the runway backdrop.",
+    negativePrompt: "empty rooms, casual environments, poor lighting, outdoor scenery.",
+    qualityRequirements: ["Fashion runway stage", "Dramatic runway lighting", "Forgiven logo on runway backdrop"]
+  },
+  minimal_loft: {
+    id: "minimal_loft",
+    name: "Minimal Loft Studio",
+    environmentPrompt: "Scandinavian luxury minimal loft, soft concrete, premium minimal furniture.",
+    lightingPrompt: "Soft diffused natural window lighting, bright minimal aesthetic.",
+    compositionPrompt: "Clean, minimal fashion editorial framing.",
+    cameraPrompt: "High-end interior and fashion editorial photography.",
+    brandingPrompt: "Forgiven Shopping Centre logo subtly integrated into modern art or minimal signage.",
+    negativePrompt: "clutter, dark rooms, maximalist decor, outdoor scenery.",
+    qualityRequirements: ["Minimal loft environment", "Soft concrete or minimalist decor", "Subtle Forgiven branding"]
+  },
+  sunset_beach: {
+    id: "sunset_beach",
+    name: "Sunset Editorial Studio",
+    environmentPrompt: "Luxury editorial sunset beach, pristine sand, premium resort aesthetic.",
+    lightingPrompt: "Golden hour sunset lighting, warm natural light, soft shadows.",
+    compositionPrompt: "Luxury resort fashion editorial composition.",
+    cameraPrompt: "High-end beach resort commercial photography.",
+    brandingPrompt: "Forgiven branding subtly integrated (e.g., luxury beach towel, resort signage).",
+    negativePrompt: "crowded beaches, overcast weather, cheap resort aesthetic, urban elements.",
+    qualityRequirements: ["Sunset beach environment", "Golden hour lighting", "Subtle Forgiven branding"]
+  },
+  forgiven_storefront: {
+    id: "forgiven_storefront",
+    name: "Forgiven Shopping Centre Exterior",
+    environmentPrompt: "Premium storefront exterior, grand luxury entrance to the Forgiven Shopping Centre.",
+    lightingPrompt: "Bright luxury retail exterior lighting.",
+    compositionPrompt: "Model positioned confidently in front of the luxury mall entrance.",
+    cameraPrompt: "High-end architectural and fashion retail photography.",
+    brandingPrompt: "Large, prominent Forgiven Shopping Centre architectural signage.",
+    negativePrompt: "indoors, generic strip malls, cheap architecture, messy streets.",
+    qualityRequirements: ["Premium storefront entrance", "Large Forgiven Shopping Centre signage"]
+  }
+};
+
+function getStudioProfile(sceneType: string): StudioProfile {
+  return StudioProfileRegistry[sceneType] || StudioProfileRegistry["studio"];
+}
+
+function buildEnterpriseBrandPrompt(sceneType: string, isVideo: boolean = false): { prompt: string, profile: StudioProfile } {
+  const profile = getStudioProfile(sceneType);
+  
+  let basePrompt = `BRANDING & ENVIRONMENT (CRITICAL):
+You must render this image inside the "${profile.name}" ecosystem.
 It must feel Luxury, Premium, Editorial, Fashion-forward, Global, and Trustworthy.
 Do NOT make it look Cheap, Generic, AI-looking, Stock-photo-looking, or Cartoonish.
 
 MANDATORY VISUAL ELEMENTS:
-- Large illuminated architectural luxury arch with magenta LED accent lighting along its inner curve.
-- Centered on the back wall inside the arch is the official brand logo: Three overlapping shopping bag icons (a large magenta bag in front containing a white 'F', a medium blue bag behind it to the left, and a small lime green bag behind the blue one), positioned above the bold magenta word "Forgiven" and smaller thin black text "Shopping Centre" aligned to the right.
-- Cream stone walls and Luxury marble flooring
-- Warm premium lighting and Brushed gold accents
-- Premium display shelves and Luxury fashion platform
-- Luxury boutique atmosphere
+${profile.environmentPrompt}
 
-BRAND COLOR SYSTEM:
-Incorporate the following colors naturally into the lighting accents, wall details, display structures, luxury decor, runway lighting, and background architecture: Magenta (#B0208D), Royal Blue (#1D3F8C), Lime Green (#8BC34A), White (#FFFFFF), Black (#111111).
-NEVER apply these colors directly to the product or garment. The product must remain untouched and the hero of the image.
+BRANDING RULES:
+${profile.brandingPrompt}
+NEVER apply brand colors directly to the product or garment. The product must remain untouched and the hero of the image.
 
-MODEL POSITIONING:
-Always keep the model slightly off-center in the composition. Never block the primary logo wall. Ensure the Forgiven logo visibility in the background. Maintain fashion magazine composition rules.
+LIGHTING:
+${profile.lightingPrompt}
 
-${sceneDescription}
+COMPOSITION:
+${profile.compositionPrompt}
+
+CAMERA STYLE:
+${profile.cameraPrompt}
+
+NEGATIVE PROMPT (DO NOT INCLUDE IN IMAGE):
+${profile.negativePrompt}
 `;
 
   if (isVideo) {
-    return basePrompt + "\nVIDEO SPECIFICS: Maintain realistic movement, natural camera motion, luxury lighting, and a visible brand presence throughout the video. It must look like high-end Vogue, Harper's Bazaar, or Elle editorial standards.";
+    basePrompt += "\nVIDEO SPECIFICS: Maintain realistic movement, natural camera motion, luxury lighting, and a visible brand presence throughout the video. It must look like high-end Vogue, Harper's Bazaar, or Elle editorial standards.";
   }
 
-  return basePrompt;
+  return { prompt: basePrompt, profile };
 }
 // --------------------------------
 
@@ -1185,7 +1286,8 @@ async function detectGarmentColor(apiKey: string, imageUrl: string): Promise<str
 async function verifyProductFidelity(
   apiKey: string,
   productImages: string[],
-  generatedImageUrl: string
+  generatedImageUrl: string,
+  qualityRequirements: string[]
 ): Promise<{ pass: boolean; score: number; reasoning: string }> {
   console.log("🔍 Running Rigorous 10-Point Visual Identity Audit via Qwen VL...");
   
@@ -1210,7 +1312,7 @@ async function verifyProductFidelity(
     `8. Accessories: Are buttons, zippers, buckles, pockets, and straps identical in count, color, and size?`,
     `9. Neckline: Is the collar shape, depth, and wings 100% correct? (For non-apparel like shoes/bags, score 10/10 if not applicable)`,
     `10. Sleeves: Are sleeve lengths, cuff structures, and shoulder seams matching? (For non-apparel like shoes/bags, score 10/10 if not applicable)`,
-    `11. Brand Presence: Is the model placed slightly off-center in a premium luxury environment with "Forgiven Shopping Centre" or "FSC" branding visible?`,
+    `11. Brand Presence: Does the image contain the following required elements: ${qualityRequirements.join(', ')}?`,
     ``,
     `Return ONLY a valid JSON object. Do NOT include markdown blocks or any other characters outside the JSON.`,
     `The JSON must follow this exact format:`,
@@ -1294,7 +1396,8 @@ async function verifyProductFidelity(
 async function verifyVideoFidelity(
   apiKey: string,
   productImages: string[],
-  videoUrl: string
+  videoUrl: string,
+  qualityRequirements: string[]
 ): Promise<{ pass: boolean; reasoning: string }> {
   console.log("🔍 Running Qwen VL Video Consistency and Texture Drift Audit...");
   const primaryProductUrl = productImages[0] || "";
@@ -1306,7 +1409,7 @@ async function verifyVideoFidelity(
     `2. Warping & Mutations: Does the shape, neckline, buttons, or straps of the garment distort or change in count/geometry during motion?`,
     `3. Color Shifts: Do the fabric colors fade, change shades, or shift under moving light?`,
     `4. Product Matching: Does the garment in the video remain 100% identical to the reference product image throughout?`,
-    `5. Brand Environment: Does the video take place in a luxury environment with "Forgiven Shopping Centre" branding?`,
+    `5. Brand Environment: Does the video contain the following required elements: ${qualityRequirements.join(', ')}?`,
     ``,
     `Return ONLY a valid JSON object. Do NOT include markdown blocks or any other characters outside the JSON.`,
     `The JSON must follow this exact format:`,
@@ -1731,6 +1834,7 @@ async function runUnifiedVTON(
   const colorMatch = garmentDetails.match(/Color: ([^,]+)/);
   const garmentColor = colorMatch ? colorMatch[1].trim() : "original";
   console.log(`[Unified VTON] AI-detected details: ${garmentDetails}`);
+  const enterprisePromptObj = buildEnterpriseBrandPrompt(scene || "studio");
 
   // 2. Identify if non-apparel (specialized routing required)
   const lowerCat = category.toLowerCase();
@@ -1784,7 +1888,7 @@ async function runUnifiedVTON(
             continue;
           }
 
-          const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl);
+          const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl, enterprisePromptObj.profile.qualityRequirements);
 
         if (audit.pass) {
           console.log(`[Unified VTON] ✅ Specialized fidelity audit PASSED on attempt ${attempt} (Score: ${audit.score}%)`);
@@ -1872,7 +1976,7 @@ async function runUnifiedVTON(
             `  - If you cannot reproduce the EXACT product, output a blank result rather than a wrong product.`,
             strictnessPromptModifier,
             anatomyPrompt,
-            buildEnterpriseBrandPrompt(scene || "opulent fashion studio"),
+            buildEnterpriseBrandPrompt(scene || "studio").prompt,
             hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ``,
             makeup ? `MAKEUP: ${makeup}.` : ``,
             `Photorealistic render. The generated image MUST be indistinguishable from a high-end luxury catalog photo.`
@@ -1932,7 +2036,7 @@ async function runUnifiedVTON(
             continue;
           }
 
-          const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl);
+          const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl, enterprisePromptObj.profile.qualityRequirements);
 
           if (audit.pass) {
             console.log(`[Unified VTON] ✅ Apparel fidelity check PASSED for: ${engine.name} (Score: ${audit.score}%)`);
@@ -2376,7 +2480,7 @@ Deno.serve(async (req) => {
 
       // --- STAGE 4: CONSISTENCY VERIFICATION ---
       console.log("Stage 4: Consistency Verification...");
-      const verificationOk = await verifyVideoFidelity(QWEN_API_KEY, productImages, videoUrl);
+      const verificationOk = await verifyVideoFidelity(QWEN_API_KEY, productImages, videoUrl, enterprisePrompt.profile.qualityRequirements);
       if (!verificationOk.pass) {
         throw new Error(
           `Video product fidelity check FAILED: The generated video motion modified the garment's appearance or colors. ` +
