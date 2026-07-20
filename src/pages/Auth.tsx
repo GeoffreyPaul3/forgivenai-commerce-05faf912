@@ -132,18 +132,10 @@ export default function AuthPage() {
         });
         if (error) throw error;
 
-        const isAdmin = role === 'admin';
-        if (isAdmin) {
-          toast({
-            title: "Admin account created!",
-            description: "Your administrator account is active. Please sign in.",
-          });
-          setMode("login");
-          setEmail(email);
-        } else {
-          // Non-admin accounts need approval — show the waiting screen immediately
-          setPendingApproval(true);
-        }
+        // All new signups — regardless of role — must wait for admin approval.
+        // The DB trigger (handle_new_user) sets status='pending' for all roles,
+        // so we just show the pending screen immediately.
+        setPendingApproval(true);
 
       } else if (mode === "forgot") {
         // redirectTo must exactly match one of the URLs whitelisted in:
