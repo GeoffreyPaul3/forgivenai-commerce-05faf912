@@ -91,6 +91,32 @@ const ConversationsPage = () => {
     agent: <User className="w-3 h-3" />,
   };
 
+  const formatConvoDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfYesterday = new Date(startOfToday.getTime() - 86400000);
+    const startOf7DaysAgo = new Date(startOfToday.getTime() - 6 * 86400000);
+
+    const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    if (date >= startOfToday) {
+      return { primary: timeStr, secondary: "Today" };
+    } else if (date >= startOfYesterday) {
+      return { primary: "Yesterday", secondary: timeStr };
+    } else if (date >= startOf7DaysAgo) {
+      return {
+        primary: date.toLocaleDateString([], { weekday: "short" }),
+        secondary: timeStr,
+      };
+    } else {
+      return {
+        primary: date.toLocaleDateString([], { day: "2-digit", month: "short" }),
+        secondary: timeStr,
+      };
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -141,9 +167,15 @@ const ConversationsPage = () => {
                         </div>
                       </div>
                     </div>
-                    {c.last_message_at && (
-                      <span className="text-[10px] text-muted-foreground shrink-0">{new Date(c.last_message_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                    )}
+                    {c.last_message_at && (() => {
+                      const { primary, secondary } = formatConvoDate(c.last_message_at);
+                      return (
+                        <div className="flex flex-col items-end gap-0.5 shrink-0">
+                          <span className="text-[10px] font-semibold text-muted-foreground">{primary}</span>
+                          <span className="text-[9px] text-muted-foreground/70">{secondary}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ))

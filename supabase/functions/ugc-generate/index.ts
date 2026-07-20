@@ -2454,7 +2454,8 @@ Deno.serve(async (req) => {
 
       } else {
         // ── Single-Product Path (original, unchanged) ──
-        console.log("Stage 2: Creating Luxury VTON Master Frame...");
+        let enterprisePrompt = buildEnterpriseBrandPrompt(setting || body.scene || "studio", true);
+      console.log("Stage 2: Creating Luxury VTON Master Frame...");
         const masterFrameUrl = await runUnifiedVTON(
           { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
           referenceImage,
@@ -2474,7 +2475,7 @@ Deno.serve(async (req) => {
 
         // --- STAGE 3: REAL MOTION GENERATION ---
         console.log("Stage 3: Generating Real AI Video Motion...");
-        const enterprisePrompt = buildEnterpriseBrandPrompt(setting || body.scene || "studio", true);
+        enterprisePrompt = buildEnterpriseBrandPrompt(setting || body.scene || "studio", true);
         const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${productDescription || productName}. ${enterprisePrompt}`;
         
         try {
@@ -2630,11 +2631,17 @@ Deno.serve(async (req) => {
 
     if (action === "generate-script") {
       const { productName, productCategory, productPrice, currency } = body;
-      const prompt = `You are a world-class UGC (User Generated Content) script writer for fashion brands. 
-Create a catchy, authentic, and high-converting 15-30s TikTok/Reels script for this product:
+      const prompt = `You are an elite TikTok/Reels UGC creator and direct-response copywriter for a premium fashion brand.
+Your goal is to write a highly dynamic, viral, and high-converting 15-30s video script for this product:
 Product: "${productName}"
 Category: ${productCategory}
 Price: ${currency} ${productPrice}
+
+SCRIPT WRITING RULES:
+1. THE HOOK (0-3s): Must be a pattern-interrupt. Use bold statements, relatable pain points, or shocking visuals to stop the scroll immediately.
+2. THE BODY (3-15s): Fast pacing. Focus on emotional desire, styling versatility, or an exclusive 'secret' vibe. Use natural, conversational Gen-Z/Millennial creator language (not corporate marketing speak). 
+3. THE CTA (15-20s): Create urgency or FOMO (e.g., "selling out fast", "link in bio before it's gone"). Tell them exactly what to do.
+4. PACING: Keep scenes short (2-4 seconds max). Visuals must be highly dynamic (zooms, quick cuts, text pop-ups).
 
 Return ONLY a valid JSON object. DO NOT include any other text, explanations, or markdown code blocks outside the JSON.
 The JSON must follow this EXACT schema:
@@ -2645,13 +2652,13 @@ The JSON must follow this EXACT schema:
     {
       "scene": 1,
       "duration": "3s",
-      "direction": "Detailed visual direction for the creator",
-      "dialogue": "Exact words the creator says",
-      "text_overlay": "On-screen text overlay"
+      "direction": "Detailed visual direction for the camera/creator (e.g., 'Fast zoom in on face', 'Quick transition stepping into the shoes')",
+      "dialogue": "The exact, natural-sounding words the creator speaks",
+      "text_overlay": "Punchy on-screen text overlay (max 5 words)"
     }
   ],
   "cta": "Strong final call to action",
-  "hashtags": ["fashion", "ugc", "style"]
+  "hashtags": ["#fashion", "#musthave", "#style"]
 }
 Ensure there are 4-6 scenes in total.`;
 
