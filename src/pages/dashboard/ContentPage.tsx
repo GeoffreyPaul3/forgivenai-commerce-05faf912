@@ -32,7 +32,7 @@ import {
   Sparkles, Loader2, Video, FileText, Share2, Pencil, Trash2, Eye, Download,
   User, Wand2, Play, Upload, X, MoreHorizontal, Image, RefreshCw, ChevronRight,
   Clapperboard, Film, Layers, Volume2, CheckCircle2, ShoppingBag, Star, Zap, Plus,
-  Search, Filter, Store, Package, SlidersHorizontal,
+  Search, Filter, Store, Package, SlidersHorizontal, Columns2, ScanEye,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import type { Tables } from "@/integrations/supabase/types";
@@ -1634,6 +1634,9 @@ function InfluencerManager() {
   const [deleteInfluencer, setDeleteInfluencer] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [savingEdit, setSavingEdit] = useState(false);
+  // Product comparison state
+  const [compareVisual, setCompareVisual] = useState<any>(null);
+  const [heroCompareMode, setHeroCompareMode] = useState(false);
   
   // Influencer creation state
   const [newInfluencer, setNewInfluencer] = useState({ 
@@ -1801,6 +1804,8 @@ function InfluencerManager() {
 
         // Save to content gallery
         const variantTitleSuffix = variantsToGenerate.length > 1 ? ` (Variant ${i + 1})` : "";
+        // Store the original product image URL for comparison purposes
+        const originalProductUrl = variantUrl || selectedProd?.images?.[0] || null;
         const { error: insertError } = await supabase.from("content").insert({
           type: "ai_visual",
           title: `${selectedInfluencer.name} x ${selectedProd.name} Campaign${variantTitleSuffix}`,
@@ -1812,7 +1817,8 @@ function InfluencerManager() {
             style: styleMode,
             scene: sceneType,
             campaign_ready: true,
-            is_variant: variantsToGenerate.length > 1
+            is_variant: variantsToGenerate.length > 1,
+            original_product_url: originalProductUrl
           } as any
         });
 
@@ -1821,6 +1827,8 @@ function InfluencerManager() {
 
       if (lastData?.fidelityScore !== undefined) setCampaignFidelityScore(lastData.fidelityScore);
       await refetchVisuals();
+      // Reset hero compare mode after new generation so user sees the fresh result
+      setHeroCompareMode(false);
       const scoreLabel = lastData?.fidelityScore != null ? ` · Fidelity ${Math.round(lastData.fidelityScore * 100)}%` : "";
       const variantLabel = variantsToGenerate.length > 1 ? ` ${variantsToGenerate.length} variants generated.` : "";
       toast({ title: "Campaign visual generated! 📸", description: `Garment & identity preserved${scoreLabel}.${variantLabel}` });
@@ -1835,6 +1843,17 @@ function InfluencerManager() {
       setGenerating(false);
       setGenerationStep(0);
     }
+  };
+
+  // Helper: resolve original product image for a visual record
+  const getOriginalProductUrl = (visual: any): string | null => {
+    // First try what we stored at generation time
+    if (visual?.metadata?.original_product_url) return visual.metadata.original_product_url;
+    // Fallback: look up from allProducts by product_id
+    const productId = visual?.product_id || visual?.metadata?.product_id;
+    if (!productId) return null;
+    const prod = allProducts?.find((p: any) => p.id === productId);
+    return prod?.images?.[0] || null;
   };
 
   const handleDownload = async (url: string, title: string) => {
@@ -2194,7 +2213,41 @@ function InfluencerManager() {
         <div className={`rounded-2xl border-2 border-primary/20 bg-card overflow-hidden shadow-xl relative ${generatedVisuals?.[0] ? 'min-h-[400px]' : 'min-h-[600px]'} flex items-center justify-center bg-[url('/grid-bg.png')] bg-repeat`}>
           {generatedVisuals?.[0] ? (
             <div className="w-full h-full group">
-              <img src={generatedVisuals[0].media_url} alt="Campaign Shot" className="w-full h-full object-contain" />
+              {/* ── HERO: COMPARE MODE (side-by-side split) ── */}
+              {heroCompareMode && getOriginalProductUrl(generatedVisuals[0]) ? (
+                <div className="w-full h-full flex">
+                  {/* Left: Original Product */}
+                  <div className="flex-1 relative flex flex-col">
+                    <div className="absolute top-3 left-3 z-10">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-black/70 backdrop-blur-md border border-white/20 text-white shadow-sm">
+                        <ShoppingBag className="w-3 h-3" /> Original Product
+                      </span>
+                    </div>
+                    <img
+                      src={getOriginalProductUrl(generatedVisuals[0])!}
+                      alt="Original product photo"
+                      className="w-full h-full object-contain bg-white/5"
+                    />
+                  </div>
+                  {/* Divider */}
+                  <div className="w-px bg-white/30 shadow-[0_0_8px_rgba(255,255,255,0.4)] flex-shrink-0" />
+                  {/* Right: AI Generated */}
+                  <div className="flex-1 relative flex flex-col">
+                    <div className="absolute top-3 right-3 z-10">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-primary/80 backdrop-blur-md border border-primary/30 text-white shadow-sm">
+                        <Sparkles className="w-3 h-3" /> AI Generated
+                      </span>
+                    </div>
+                    <img
+                      src={generatedVisuals[0].media_url}
+                      alt="AI campaign shot"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <img src={generatedVisuals[0].media_url} alt="Campaign Shot" className="w-full h-full object-contain" />
+              )}
               <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-charcoal to-transparent">
                 <div className="flex items-end justify-between">
                   <div className="space-y-1">
@@ -2203,6 +2256,23 @@ function InfluencerManager() {
                     <p className="text-white/60 text-sm font-body">{generatedVisuals[0].body}</p>
                   </div>
                   <div className="flex gap-2">
+                    {/* Compare to Original toggle button */}
+                    {getOriginalProductUrl(generatedVisuals[0]) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`rounded-full border-white/20 text-white gap-1.5 text-[11px] font-bold transition-all ${
+                          heroCompareMode
+                            ? "bg-primary/70 border-primary/50 hover:bg-primary/80"
+                            : "bg-white/10 hover:bg-white/20"
+                        }`}
+                        onClick={() => setHeroCompareMode(v => !v)}
+                        title={heroCompareMode ? "Exit compare mode" : "Compare to original product photo"}
+                      >
+                        <Columns2 className="w-3.5 h-3.5" />
+                        {heroCompareMode ? "Exit Compare" : "Compare to Original"}
+                      </Button>
+                    )}
                     <Button 
                       variant="outline" 
                       size="icon" 
@@ -2261,7 +2331,7 @@ function InfluencerManager() {
           </div>
 
           {/* Trust Badges — bottom-right corner */}
-          {generatedVisuals?.[0] && (
+          {generatedVisuals?.[0] && !heroCompareMode && (
             <div className="absolute top-6 right-6 flex flex-col gap-1.5">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-background/80 backdrop-blur-md border border-emerald-500/30 text-emerald-700 shadow-sm">
                 <CheckCircle2 className="w-3 h-3" /> Identity Locked
@@ -2287,7 +2357,19 @@ function InfluencerManager() {
             {generatedVisuals?.slice((galleryPage - 1) * GALLERY_PAGE_SIZE, galleryPage * GALLERY_PAGE_SIZE).map((visual: any) => (
               <div key={visual.id} className="group relative rounded-xl overflow-hidden border border-border bg-muted cursor-pointer hover:shadow-xl transition-all">
                 <img src={visual.media_url} alt="" className="w-full h-auto object-contain group-hover:scale-105 transition-transform duration-500" />
-                <div className="absolute inset-0 bg-charcoal/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <div className="absolute inset-0 bg-charcoal/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 flex-wrap p-2">
+                   {/* Compare to original product button */}
+                   {getOriginalProductUrl(visual) && (
+                     <Button
+                       size="icon"
+                       variant="secondary"
+                       className="h-8 w-8 rounded-full bg-primary/90 hover:bg-primary text-white"
+                       onClick={(e) => { e.stopPropagation(); setCompareVisual(visual); }}
+                       title="Compare to original product photo"
+                     >
+                       <Columns2 className="w-4 h-4" />
+                     </Button>
+                   )}
                    <Button 
                     size="icon" 
                     variant="secondary" 
@@ -2338,6 +2420,84 @@ function InfluencerManager() {
               ))
             )}
           </div>
+
+          {/* ── PRODUCT COMPARISON MODAL ── */}
+          {compareVisual && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md"
+              onClick={() => setCompareVisual(null)}
+            >
+              <div
+                className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden"
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Modal header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <ScanEye className="w-5 h-5 text-primary" />
+                    <h3 className="font-heading text-base font-bold">Product Authenticity Check</h3>
+                    <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-700 bg-emerald-500/10">Real Product Verification</Badge>
+                  </div>
+                  <button
+                    onClick={() => setCompareVisual(null)}
+                    className="text-muted-foreground hover:text-foreground transition-colors rounded-lg p-1 hover:bg-muted"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Split comparison panels */}
+                <div className="grid grid-cols-2 divide-x divide-border">
+                  {/* Left: Original product photo */}
+                  <div className="relative p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Original Product Photo</span>
+                    </div>
+                    <div className="rounded-xl overflow-hidden border border-border bg-white/5 aspect-square flex items-center justify-center">
+                      <img
+                        src={getOriginalProductUrl(compareVisual)!}
+                        alt="Original product"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-body text-center">The source product image used during AI generation</p>
+                  </div>
+
+                  {/* Right: AI generated campaign shot */}
+                  <div className="relative p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                      <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">AI Campaign Shot</span>
+                    </div>
+                    <div className="rounded-xl overflow-hidden border border-border bg-muted aspect-square flex items-center justify-center">
+                      <img
+                        src={compareVisual.media_url}
+                        alt="AI generated campaign"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-body text-center">The AI-generated visual — verify the model is wearing your real product</p>
+                  </div>
+                </div>
+
+                {/* Footer guidance */}
+                <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground font-body">
+                    <span className="font-bold text-foreground">Tip:</span> Verify garment color, texture, logos, and design details match between both images before publishing.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="rounded-xl gap-1.5 text-xs" onClick={() => handleView(compareVisual.media_url)}>
+                      <Eye className="w-3.5 h-3.5" /> Full Size
+                    </Button>
+                    <Button size="sm" className="rounded-xl gap-1.5 text-xs" onClick={() => setCompareVisual(null)}>
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Looks Good
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {generatedVisuals && generatedVisuals.length > GALLERY_PAGE_SIZE && (
             <div className="pt-4">
