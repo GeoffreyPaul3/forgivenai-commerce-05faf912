@@ -411,26 +411,71 @@ async function mixAudioLayers(apiKey: string, audioUrls: string[]) {
   return audioUrls[0];
 }
 
-async function mergeAudioVideo(apiKey: string, videoUrl: string, audioUrl: string) {
-  console.log("Merging audio and video via Fal.ai FFmpeg...");
-  const res = await fetch("https://queue.fal.run/fal-ai/ffmpeg-api/merge-audio-video", {
-    method: "POST",
-    headers: { "Authorization": `Key ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ video_url: videoUrl, audio_url: audioUrl }),
-  });
-  if (!res.ok) return videoUrl;
-  const { request_id } = await res.json();
-  let attempts = 0;
-  while (attempts < 30) {
-    attempts++;
-    const statusRes = await fetch(`https://queue.fal.run/fal-ai/ffmpeg-api/merge-audio-video/requests/${request_id}`, {
-      headers: { "Authorization": `Key ${apiKey}` }
-    });
-    const data = await statusRes.json();
-    if (data.status === "COMPLETED") return data.response.video.url;
-    await new Promise(r => setTimeout(r, 2000));
+async function mergeAudioVideo(falKey: string, videoUrl: string, audioUrl: string) {
+  console.log("[AudioMerge] Merging audio into video via Fal.ai FFmpeg API (explicit mux command)...");
+  console.log(`[AudioMerge] Video: ${videoUrl.substring(0, 80)}...`);
+  console.log(`[AudioMerge] Audio: ${audioUrl.substring(0, 80)}...`);
+  
+  if (!falKey) {
+    console.warn("[AudioMerge] FAL_KEY not set, returning silent video.");
+    return videoUrl;
   }
-  return videoUrl;
+
+  try {
+    // Use Fal.ai FFmpeg with an explicit mux command: take video stream + audio stream, output MP4
+    const ffmpegCommand = `-i input0 -i input1 -c:v copy -c:a aac -b:a 192k -map 0:v:0 -map 1:a:0 -shortest output.mp4`;
+    const res = await fetch("https://queue.fal.run/fal-ai/ffmpeg-api", {
+      method: "POST",
+      headers: { "Authorization": `Key ${falKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        inputs: [{ url: videoUrl }, { url: audioUrl }],
+        ffmpeg_command: ffmpegCommand,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.warn(`[AudioMerge] Fal.ai submission failed (${res.status}): ${errText}`);
+      return videoUrl;
+    }
+
+    const submitted = await res.json();
+    const requestId = submitted.request_id;
+    if (!requestId) {
+      console.warn("[AudioMerge] No request_id from Fal.ai");
+      return videoUrl;
+    }
+
+    let attempts = 0;
+    while (attempts < 40) {
+      attempts++;
+      await new Promise(r => setTimeout(r, 4000));
+      const statusRes = await fetch(`https://queue.fal.run/fal-ai/ffmpeg-api/requests/${requestId}`, {
+        headers: { "Authorization": `Key ${falKey}` }
+      });
+      if (!statusRes.ok) continue;
+      const data = await statusRes.json();
+      console.log(`[AudioMerge] FFmpeg poll (${attempts}): ${data.status}`);
+      if (data.status === "COMPLETED") {
+        const mergedUrl = data.response?.output?.url || data.response?.video?.url || data.response?.file?.url;
+        if (mergedUrl) {
+          console.log(`[AudioMerge] ✅ Successfully merged audio+video: ${mergedUrl.substring(0, 80)}`);
+          return mergedUrl;
+        }
+        console.warn("[AudioMerge] FFmpeg COMPLETED but no output URL found. Response:", JSON.stringify(data.response).substring(0, 300));
+        return videoUrl;
+      }
+      if (data.status === "FAILED") {
+        console.warn("[AudioMerge] FFmpeg task FAILED:", JSON.stringify(data).substring(0, 300));
+        return videoUrl;
+      }
+    }
+    console.warn("[AudioMerge] FFmpeg polling timed out after 160s.");
+    return videoUrl;
+  } catch (e) {
+    console.error("[AudioMerge] Unexpected error:", e);
+    return videoUrl;
+  }
 }
 
 async function concatenateVideoClips(apiKey: string, videoUrls: string[]): Promise<string> {
@@ -936,8 +981,21 @@ async function generateTrueMotionVideo(apiKey: string, imageUrl: string, prompt:
 }
 
 async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string) {
-  console.log("Calling Alibaba Wanx Video-v1...");
-  // Note: DashScope International endpoint for video synthesis
+  console.log("Calling Alibaba Wanx Video (wan2.1-i2v-plus) - Fashion Catwalk Engine...");
+  const fashionMotionPrompt = `HIGH-ENERGY FASHION CATWALK & UGC PERFORMANCE:
+
+The model confidently strides toward the camera on a runway — heel-to-toe catwalk walk, hips swaying rhythmically, shoulders back, chin up. She then:
+- Performs a full 360-degree catwalk spin showing every angle of the garment
+- Touches and shows off the fabric, collar, and sleeves with her hands
+- Gives a direct, charismatic smile and wink to camera (breaking the fourth wall like a real creator)
+- Does a slight hair-flip and adjusts outfit naturally
+- Natural lip movement as if speaking to the audience about the product
+
+Product context: ${prompt}
+
+Filming style: Vertical 9:16 portrait iPhone footage, slight handheld shake, fast dynamic cuts, closeup on garment details, cinematic rack-focus, warm golden-hour lifestyle lighting.
+Negative: static pose, slideshow, still, robotic movement, distorted face, morphing clothes, blurry.`;
+  
   const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis", {
     method: "POST",
     headers: { ...aiHeaders(apiKey), "X-DashScope-Async": "enable" },
@@ -945,11 +1003,11 @@ async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string) {
       model: "wan2.1-i2v-turbo",
       input: { 
         img_url: imageUrl,
-        prompt: `DYNAMIC UGC PERFORMANCE: ${prompt}. The model walks toward the camera with a joyful expression, performing a natural twirl, sways their hips, and adjusts their hair. Highly realistic 4k lifestyle video, handheld phone footage feel, fluid human motion.`
+        prompt: fashionMotionPrompt
       },
       parameters: { 
         duration: 5,
-        size: "1280*720",
+        size: "720*1280",
       }
     }),
   });
@@ -1771,15 +1829,30 @@ async function persistMedia(supabaseClient: any, mediaUrl: string, folder: strin
   }
 }
 
-async function callTTS(apiKey: string, text: string, voice = "sambert-camila-v1") {
-  const url = "https://dashscope-intl.aliyuncs.com/api/v1/services/audio/tts/generation-sync";
+async function callTTS(apiKey: string, text: string, voice = "loongstella") {
+  // Use CosyVoice via OpenAI-compatible speech endpoint (international)
+  const url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/audio/speech";
+  console.log(`[TTS] Calling CosyVoice TTS. Voice: ${voice}. Text length: ${text.length}`);
   const res = await fetch(url, {
     method: "POST",
-    headers: { ...aiHeaders(apiKey), "X-DashScope-Data-Type": "audio" },
-    body: JSON.stringify({ model: voice, input: { text }, parameters: { format: "mp3", sample_rate: 16000 } }),
+    headers: { ...aiHeaders(apiKey), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "cosyvoice-v1",
+      input: text,
+      voice: voice,
+      response_format: "mp3",
+    }),
   });
-  if (!res.ok) throw new Error(`TTS failed: ${res.status}`);
-  return await res.blob();
+  console.log(`[TTS] CosyVoice response status: ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(`[TTS] CosyVoice failed (${res.status}): ${errText}`);
+    throw new Error(`TTS failed: ${res.status} - ${errText}`);
+  }
+  const audioBuffer = await res.arrayBuffer();
+  console.log(`[TTS] CosyVoice returned ${audioBuffer.byteLength} bytes of audio.`);
+  if (audioBuffer.byteLength < 1000) throw new Error(`TTS returned suspiciously small audio: ${audioBuffer.byteLength} bytes`);
+  return new Blob([audioBuffer], { type: "audio/mpeg" });
 }
 
 async function persistAudio(supabaseClient: any, audioBlob: Blob, folder: string) {
@@ -2391,6 +2464,7 @@ Deno.serve(async (req) => {
       // --- STAGE 2: VTON MASTER FRAME(S) ---
       let persistedMasterUrl: string;
       let videoUrl: string | undefined;
+      const enterprisePrompt = buildEnterpriseBrandPrompt(setting || body.scene || "studio", true);
 
       if (gridVariants) {
         // ── Multi-Product Grid Path ──
@@ -2454,7 +2528,6 @@ Deno.serve(async (req) => {
 
       } else {
         // ── Single-Product Path (original, unchanged) ──
-        let enterprisePrompt = buildEnterpriseBrandPrompt(setting || body.scene || "studio", true);
       console.log("Stage 2: Creating Luxury VTON Master Frame...");
         const masterFrameUrl = await runUnifiedVTON(
           { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
@@ -2475,8 +2548,7 @@ Deno.serve(async (req) => {
 
         // --- STAGE 3: REAL MOTION GENERATION ---
         console.log("Stage 3: Generating Real AI Video Motion...");
-        enterprisePrompt = buildEnterpriseBrandPrompt(setting || body.scene || "studio", true);
-        const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${productDescription || productName}. ${enterprisePrompt}`;
+        const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${productDescription || productName}. ${enterprisePrompt.prompt}`;
         
         try {
           if (FAL_KEY) {
@@ -2536,15 +2608,28 @@ Deno.serve(async (req) => {
         }
 
         // Layer 2: Ambient
-        const ambientUrl = await generateAmbientAudio(FAL_KEY, body.setting || "natural lifestyle street");
-        if (ambientUrl) audioLayers.push(ambientUrl);
+        try {
+          const ambientUrl = await generateAmbientAudio(FAL_KEY, body.setting || "natural lifestyle street");
+          if (ambientUrl) audioLayers.push(ambientUrl);
+        } catch (e) {
+          console.warn("Ambient audio failed, proceeding without it", e);
+        }
 
         // Layer 3: Trend Music
-        const musicUrl = await generateTikTokMusic(FAL_KEY, musicPrompt || "fashion influencer vibe");
-        if (musicUrl) audioLayers.push(musicUrl);
+        try {
+          const musicUrl = await generateTikTokMusic(FAL_KEY, musicPrompt || "fashion influencer vibe");
+          if (musicUrl) audioLayers.push(musicUrl);
+        } catch (e) {
+          console.warn("Music generation failed, proceeding without it", e);
+        }
 
         if (audioLayers.length > 1) {
-          finalAudioUrl = await mixAudioLayers(FAL_KEY, audioLayers);
+          try {
+            finalAudioUrl = await mixAudioLayers(FAL_KEY, audioLayers);
+          } catch (e) {
+            console.warn("Audio mix failed, falling back to voice layer", e);
+            finalAudioUrl = audioLayers[0];
+          }
         } else if (audioLayers.length === 1) {
           finalAudioUrl = audioLayers[0];
         }
