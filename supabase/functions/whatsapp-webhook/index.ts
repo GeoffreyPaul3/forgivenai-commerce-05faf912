@@ -574,7 +574,7 @@ serve(async (req) => {
               const { data: newOrder, error: orderError } = await supabase.from("orders").insert({
                 customer_phone: customerPhone,
                 customer_name:  custName,
-                customer_email: custEmail,
+                customer_email: custEmail !== "email@example.com" ? custEmail : null,
                 items: [{ 
                   product_id: product?.id || null, 
                   name: productName, 
@@ -592,7 +592,7 @@ serve(async (req) => {
                 attribution_source:    agentId ? (attributionSource ?? "whatsapp") : "direct",
                 attribution_timestamp: orderAttributionTs,
                 order_source_type:     "whatsapp",
-                notes: `Delivery Address: ${custAddress} | Contact: ${custPhone} | Courier: ${custCourier}`,
+                notes: `Delivery Address: ${custAddress || 'Not specified'} | Contact: ${custPhone || 'Not specified'} | Courier: ${custCourier}`,
                 courier_name: custCourier,
                 status: "pending",
               }).select().single();
@@ -823,7 +823,7 @@ NEVER generate the order until address and phone are present.
 
 3. When you have all details and are ready to show the order summary, you MUST include this hidden machine-readable block FIRST (it will be stripped before sending to the customer — do NOT mention it):
 ###PENDING_ORDER###
-{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Full Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Impala Courier","delivery_city":"Actual City Name","delivery_type":"door_to_door"}
+{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Full Name","customer_email":"email@example.com","address":"123 Example Street, Area 47","phone":"+265991234567","courier":"Impala Courier","delivery_city":"Lilongwe","delivery_type":"door_to_door"}
 ###END_PENDING_ORDER###
 
    Then present the human-readable summary:
@@ -842,7 +842,7 @@ NEVER generate the order until address and phone are present.
 
 4. CRITICAL: ONLY AFTER the customer replies with "YES" or explicit confirmation of the summary, respond with EXACTLY this JSON block:
 ###ORDER_JSON###
-{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Name","customer_email":"email@example.com","address":"Delivery Address","phone":"Contact Number","courier":"Impala Courier","delivery_city":"Actual City Name","delivery_type":"door_to_door"}
+{"product_name":"exact product name","quantity":1,"price":25000,"size":"XL","color":"Blue","customer_name":"Name","customer_email":"email@example.com","address":"123 Example Street, Area 47","phone":"+265991234567","courier":"Impala Courier","delivery_city":"Lilongwe","delivery_type":"door_to_door"}
 ###END_ORDER_JSON###
 
 Followed by ONLY: "Perfect! I'm generating your secure payment link right now... 🚀"
@@ -888,7 +888,7 @@ ${productList}`;
       // ── Phase 2: Detect ###ORDER_JSON### (AI confirmation of YES) ──
       const orderJsonMatch = aiResponse.match(/###ORDER_JSON###\s*([\s\S]*?)\s*###END_ORDER_JSON###/);
 
-      // ── Helper: create order + send payment link ──
+    // ── Helper: create order + send payment link ──
       const processOrderAndSendPayment = async (orderData: any, cleanText: string) => {
         const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -899,8 +899,31 @@ ${productList}`;
           orderData.courier = 'AUTO';
         }
 
+        // Clean up literal placeholder text from AI if present
+        if (orderData.address === "Delivery Address" || orderData.address === "123 Example Street, Area 47") {
+          orderData.address = "";
+        }
+        if (orderData.delivery_city === "Actual City Name" || orderData.delivery_city === "Lilongwe (or Actual City)") {
+          orderData.delivery_city = "";
+        }
+        if (orderData.phone === "Contact Number" || orderData.phone === "+265XXXXXXXXX") {
+          orderData.phone = customerPhone;
+        }
+
+        // Extract city from address if delivery_city is missing
+        let finalCity = orderData.delivery_city || "";
+        if (!finalCity && orderData.address) {
+          const addrLow = orderData.address.toLowerCase();
+          if (addrLow.includes("blantyre")) finalCity = "Blantyre";
+          else if (addrLow.includes("mzuzu")) finalCity = "Mzuzu";
+          else if (addrLow.includes("zomba")) finalCity = "Zomba";
+          else finalCity = "Lilongwe";
+        } else if (!finalCity) {
+          finalCity = "Lilongwe"; 
+        }
+
         // Update customer name
-        if (orderData.customer_name) {
+        if (orderData.customer_name && orderData.customer_name !== "Full Name" && orderData.customer_name !== "Name") {
           await supabase.from("conversations").update({ customer_name: orderData.customer_name, pending_order: null }).eq("id", convo.id);
           await supabase.from("customers").update({ name: orderData.customer_name }).eq("phone", customerPhone);
         } else {
@@ -921,22 +944,22 @@ ${productList}`;
         const isImpala = orderData.courier && orderData.courier.toLowerCase().includes("impala");
         const isAuto = orderData.courier && orderData.courier.toUpperCase() === "AUTO";
 
-        // Let the logistics orchestrator handle this post-payment.
-        // For WhatsApp orders, we currently cover the delivery fee as part of the total order.
         if (isSmartDelivery || isImpala || isAuto || orderData.courier) {
           finalStatus = "pending"; 
-          // Note: The logistics-orchestrator will calculate final courier fees internally.
-          // For now, we DO NOT add deliveryFee to finalOrderTotal since Forgiven SC covers it for WhatsApp sales.
           deliveryFee = 0; 
         }
 
         // Create order record (order-level attribution model)
         const isFirstOrder = customer ? (customer.total_orders === 0) : true;
         const orderAttributionTs = agentId ? new Date().toISOString() : null;
+        
+        const finalAddress = orderData.address || "Not specified";
+        const finalPhone = orderData.phone || customerPhone || "Not specified";
+        
         const { data: newOrder, error: orderError } = await supabase.from("orders").insert({
           customer_phone: customerPhone,
           customer_name: orderData.customer_name,
-          customer_email: orderData.customer_email,
+          customer_email: orderData.customer_email !== "email@example.com" ? orderData.customer_email : null,
           items: [{ 
             product_id: product?.id || null, 
             name: orderData.product_name, 
@@ -954,14 +977,12 @@ ${productList}`;
           attribution_source:    agentId ? (attributionSource ?? "whatsapp") : "direct",
           attribution_timestamp: orderAttributionTs,
           order_source_type:     "whatsapp",
-          notes: `Delivery Address: ${orderData.address} | Contact: ${orderData.phone} | Courier: ${orderData.courier || 'Unspecified'}`,
+          notes: `Delivery Address: ${finalAddress} | Contact: ${finalPhone} | Courier: ${orderData.courier || 'Unspecified'}`,
           courier_name: orderData.courier || 'Unspecified',
           status: finalStatus,
         }).select().single();
 
         // Clear conversation agent_id after order is placed.
-        // This ensures the next independent purchase by this customer
-        // is treated as a direct FSC sale unless a new referral is active.
         if (newOrder) {
           await supabase.from("conversations").update({ agent_id: null }).eq("id", convo.id);
         }
@@ -978,7 +999,6 @@ ${productList}`;
         if (orderData.courier) {
           let providerCode = 'SMART_DELIVERIES'; // Default
           if (orderData.courier.toLowerCase().includes("impala")) providerCode = 'IMPALA_COURIER';
-          // (AUTO defaults to SMART_DELIVERIES for the DB FK, Orchestrator can override later)
 
           const { data: provider } = await supabase.from('courier_providers').select('id').eq('code', providerCode).single();
           if (provider) {
@@ -986,9 +1006,9 @@ ${productList}`;
               order_id: newOrder.id,
               courier_provider_id: provider.id,
               receiver_name: orderData.customer_name || 'Customer',
-              receiver_phone: customerPhone,
-              receiver_city: orderData.delivery_city || 'Lilongwe',
-              receiver_address: orderData.address || 'Not specified',
+              receiver_phone: finalPhone,
+              receiver_city: finalCity,
+              receiver_address: finalAddress,
               delivery_type: orderData.delivery_type === 'door_to_door' ? 'door_to_door' : 'office_collection',
               delivery_fee: deliveryFee,
               parcel_status: 'pending'

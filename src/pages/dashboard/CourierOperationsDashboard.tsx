@@ -30,7 +30,7 @@ const CourierOperationsDashboard = () => {
         .select(`
           *,
           courier_providers(name, code),
-          orders(status, total),
+          orders(status, total, notes),
           delivery_service_payments(status, transaction_reference)
         `)
         .order('created_at', { ascending: false });
@@ -39,6 +39,32 @@ const CourierOperationsDashboard = () => {
       return data;
     }
   });
+
+  const getRealLocation = (d: any) => {
+    let city = d.receiver_city;
+    let address = d.receiver_address;
+    
+    if (d.orders?.notes) {
+      const match = d.orders.notes.match(/Delivery Address:\s*(.*?)\s*\|/i);
+      if (match && match[1] && match[1].trim() !== '') {
+        address = match[1].trim();
+        const addrLow = address.toLowerCase();
+        if (addrLow.includes("blantyre")) city = "Blantyre";
+        else if (addrLow.includes("mzuzu")) city = "Mzuzu";
+        else if (addrLow.includes("zomba")) city = "Zomba";
+        else if (addrLow.includes("lilongwe")) city = "Lilongwe";
+      } else if (!address || address === 'Not specified' || address.trim() === '') {
+        address = "Not specified";
+        city = "Not specified";
+      }
+    }
+    
+    if (city === 'Lilongwe' && (!address || address === 'Not specified' || address === '')) {
+      city = "Not specified";
+    }
+    
+    return { city, address };
+  };
 
   const handleSync = async () => {
     try {
@@ -171,7 +197,10 @@ const CourierOperationsDashboard = () => {
                   <p className="font-medium">{d.receiver_name}</p>
                   <p className="text-xs text-muted-foreground">{d.receiver_phone}</p>
                 </TableCell>
-                <TableCell>{d.receiver_city}</TableCell>
+                <TableCell>
+                  <p className="font-medium">{getRealLocation(d).city}</p>
+                  <p className="text-xs text-muted-foreground truncate max-w-[150px]">{getRealLocation(d).address}</p>
+                </TableCell>
                 <TableCell className="font-mono text-xs">{d.tracking_number || d.waybill_number || 'Pending'}</TableCell>
                 <TableCell>{d.delivery_fee?.toLocaleString()}</TableCell>
                 <TableCell>

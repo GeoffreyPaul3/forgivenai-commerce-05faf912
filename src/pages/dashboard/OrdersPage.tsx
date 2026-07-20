@@ -370,7 +370,32 @@ const OrdersPage = () => {
                       <Clock className="w-3 h-3" /> Customer Info
                     </p>
                     <p className="font-black text-sm">{selectedOrder.customer_name}</p>
-                    <p className="text-xs text-muted-foreground font-body mt-0.5">{selectedOrder.customer_phone}</p>
+                    <p className="text-xs text-muted-foreground font-body mt-0.5 mb-2">{selectedOrder.customer_phone}</p>
+                    {(() => {
+                      let address = "";
+                      let city = "";
+                      if (selectedOrder.notes) {
+                        const match = selectedOrder.notes.match(/Delivery Address:\s*(.*?)\s*\|/i);
+                        if (match && match[1] && match[1].trim() !== '') {
+                          address = match[1].trim();
+                          const addrLow = address.toLowerCase();
+                          if (addrLow.includes("blantyre")) city = "Blantyre";
+                          else if (addrLow.includes("mzuzu")) city = "Mzuzu";
+                          else if (addrLow.includes("zomba")) city = "Zomba";
+                          else if (addrLow.includes("lilongwe")) city = "Lilongwe";
+                        }
+                      }
+                      if (!address || address === 'Not specified') {
+                        return null;
+                      }
+                      return (
+                        <div className="mt-2 pt-2 border-t border-border/30">
+                          <p className="text-[9px] font-black uppercase text-primary/70 mb-0.5">Delivery Address</p>
+                          <p className="text-xs font-medium text-foreground">{address}</p>
+                          {city && <p className="text-[10px] text-muted-foreground">{city}</p>}
+                        </div>
+                      );
+                    })()}
                     {(selectedOrder as any).courier_name && (
                       <div className="mt-3 pt-3 border-t border-border/50">
                         <p className="text-[9px] font-black uppercase text-primary/70 mb-1">Preferred Courier</p>
