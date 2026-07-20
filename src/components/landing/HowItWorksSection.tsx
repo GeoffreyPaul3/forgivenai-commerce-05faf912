@@ -29,7 +29,7 @@ const HowItWorksSection = () => {
             viewport={{ once: true }}
             className="text-gold font-bold uppercase tracking-[0.3em] text-[10px] mb-4"
           >
-            Our Methodology
+            Command Protocol
           </motion.p>
           <motion.h2
             initial={{ opacity: 0, y: 20 }}

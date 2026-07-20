@@ -25,16 +25,7 @@ const Navbar = () => {
         </Link>
 
         <div className="hidden lg:flex items-center gap-10">
-          {["Capabilities", "UGC", "Methodology"].map((item) => (
-            <a
-              key={item}
-              href={`#${item.toLowerCase()}`}
-              className="text-cream/50 hover:text-gold text-xs font-bold uppercase tracking-widest transition-all duration-300 relative group"
-            >
-              {item}
-              <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-gold transition-all duration-300 group-hover:w-full" />
-            </a>
-          ))}
+          {/* Nav links removed to maintain exclusivity and hide platform details */}
         </div>
 
         <div className="flex items-center gap-3 sm:gap-6 shrink-0">

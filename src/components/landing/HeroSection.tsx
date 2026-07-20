@@ -10,13 +10,6 @@ const HeroSection = () => {
   const y1 = useTransform(scrollY, [0, 500], [0, 200]);
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
 
-  const scrollToCapabilities = () => {
-    const element = document.getElementById("capabilities");
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
-    }
-  };
-
   return (
     <section 
       ref={containerRef}
@@ -71,7 +64,7 @@ const HeroSection = () => {
           >
             <ShoppingBasket className="w-3.5 h-3.5 text-gold" />
             <span className="text-gold-light text-[9px] font-black tracking-[0.4em] uppercase">
-              Unified Retail Ecosystem
+              Central Command Centre
             </span>
           </motion.div>
 
@@ -81,8 +74,8 @@ const HeroSection = () => {
             transition={{ duration: 1.2, delay: 0.2, ease: [0.23, 1, 0.32, 1] }}
             className="font-heading text-5xl md:text-7xl lg:text-[7rem] font-bold text-white mb-6 tracking-tighter leading-[0.9]"
           >
-            The Future of <br />
-            <span className="text-gradient-gold italic pr-4">Retail</span>
+            Your Retail <br />
+            <span className="text-gradient-gold italic pr-4">Command Centre</span>
           </motion.h1>
 
           <motion.p
@@ -91,7 +84,7 @@ const HeroSection = () => {
             transition={{ duration: 1, delay: 0.6 }}
             className="text-cream/60 text-base md:text-xl max-w-2xl mx-auto mb-10 font-body font-extralight tracking-wide leading-relaxed"
           >
-            Scale your brand with an elegant, all-in-one platform built for ambitious fashion and lifestyle businesses. Expand your reach and streamline operations effortlessly.
+            Control your entire brand from a single, powerful command centre built for ambitious fashion and lifestyle businesses. Monitor, manage, and scale operations effortlessly.
           </motion.p>
 
           <motion.div
@@ -111,15 +104,6 @@ const HeroSection = () => {
                 </span>
               </Button>
             </Link>
-            <button 
-              onClick={scrollToCapabilities}
-              className="flex items-center gap-4 text-gold hover:text-gold-light transition-all duration-500 group"
-            >
-              <div className="w-14 h-14 rounded-full border border-gold/30 flex items-center justify-center group-hover:bg-gold/10 transition-colors">
-                <Play className="w-5 h-5 fill-current" />
-              </div>
-              <span className="font-bold text-sm tracking-[0.2em] uppercase">Explore Platform</span>
-            </button>
           </motion.div>
         </div>
       </motion.div>
@@ -133,7 +117,7 @@ const HeroSection = () => {
       >
         <div className="flex flex-col gap-4">
           <div className="w-[1px] h-32 bg-gradient-to-t from-gold/50 to-transparent" />
-          <span className="text-[10px] text-gold/40 tracking-[0.5em] uppercase vertical-text">Bespoke Solutions</span>
+          <span className="text-[10px] text-gold/40 tracking-[0.5em] uppercase vertical-text">Command & Control</span>
         </div>
         
         <div className="flex flex-col items-end gap-4 text-right">

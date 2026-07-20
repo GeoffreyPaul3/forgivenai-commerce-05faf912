@@ -63,7 +63,7 @@ const FeaturesSection = () => {
           >
             <h2 className="font-heading text-5xl md:text-6xl font-bold text-maroon-dark leading-[1.1]">
               Engineered for <br />
-              <span className="italic">Sustainable Growth</span>
+              <span className="italic">Total Control</span>
             </h2>
           </motion.div>
           <motion.p 

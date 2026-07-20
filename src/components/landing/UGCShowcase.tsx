@@ -41,14 +41,14 @@ const UGCShowcase = () => {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gold/20 bg-gold/5 text-gold text-xs font-bold uppercase tracking-widest mb-6">
               <Sparkles className="h-3 w-3" />
-              UGC Studio
+              Media Command
             </div>
             <h2 className="font-heading text-5xl md:text-6xl font-bold text-white mb-6">
-              Cinematic <span className="text-gradient-gold">UGC</span>
+              Visual <span className="text-gradient-gold">Command Centre</span>
             </h2>
             <p className="text-cream/60 text-lg font-body">
-              Eliminate production overhead. Our fal.ai and Veo 3.1 powered studio 
-              transforms product data into viral social content in seconds.
+              Deploy marketing assets directly from your command centre. 
+              Transform product data into high-converting social content instantly.
             </p>
           </motion.div>
 
@@ -64,7 +64,7 @@ const UGCShowcase = () => {
             </div>
             <div className="h-12 w-[1px] bg-gold/20" />
             <div className="text-center">
-              <div className="text-4xl font-bold text-gold">fal.ai</div>
+              <div className="text-4xl font-bold text-gold">AI Video</div>
               <div className="text-xs text-cream/40 uppercase tracking-widest mt-1">Native Integration</div>
             </div>
           </motion.div>
