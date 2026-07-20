@@ -16,7 +16,7 @@ const ConversationsPage = () => {
   const [search, setSearch] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: isProfileLoading } = useQuery({
     queryKey: ["user-profile"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -26,11 +26,13 @@ const ConversationsPage = () => {
     }
   });
 
+  const isAdmin = !isProfileLoading && profile?.role === "admin";
+
   const { data: conversations, isLoading } = useQuery({
     queryKey: ["conversations", profile?.role],
-    enabled: !!profile,
+    // Wait until profile is fully loaded AND confirmed as admin before running
+    enabled: isAdmin,
     queryFn: async () => {
-      if (profile?.role !== "admin") return []; // Restrict to admins for now
       const { data, error } = await supabase.from("conversations").select("*").order("last_message_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -140,7 +142,10 @@ const ConversationsPage = () => {
             </div>
           </div>
           <div className="flex-1 divide-y divide-border overflow-y-auto">
-            {profile?.role !== "admin" ? (
+            {isProfileLoading ? (
+              // Profile is still loading — never show lock screen prematurely
+              [1, 2, 3].map(i => <div key={i} className="h-16 animate-pulse bg-muted" />)
+            ) : !isAdmin ? (
               <div className="p-6 text-center text-muted-foreground text-sm">
                 <ShieldCheck className="w-6 h-6 mx-auto mb-2 opacity-40" />
                 Access restricted to administrators.
