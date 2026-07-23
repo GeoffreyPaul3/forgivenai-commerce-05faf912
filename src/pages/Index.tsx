@@ -1,25 +1,19 @@
-import Navbar from "@/components/landing/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
-import CTASection from "@/components/landing/CTASection";
-import Footer from "@/components/landing/Footer";
 
 import { useEffect } from "react";
 
 const Index = () => {
   useEffect(() => {
-    document.title = "Forgiven Shopping Centre — Elevate Your Retail Business";
+    document.title = "Forgiven Shopping Centre";
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
-      metaDescription.setAttribute("content", "The premier commerce solution for modern brands. Streamline your retail operations, empower your sales network, and grow your business with our unified platform.");
+      metaDescription.setAttribute("content", "Forgiven Shopping Centre — Command Centre.");
     }
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
+    <div className="h-screen overflow-hidden bg-black">
       <HeroSection />
-      <CTASection />
-      <Footer />
     </div>
   );
 };

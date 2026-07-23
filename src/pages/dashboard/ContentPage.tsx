@@ -1624,7 +1624,7 @@ function InfluencerManager() {
   const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
   const [styleMode, setStyleMode] = useState("luxury_campaign");
-  const [sceneType, setSceneType] = useState("studio");
+  const [sceneType, setSceneType] = useState("fsc_signature");
   const [generating, setGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
@@ -2158,19 +2158,18 @@ function InfluencerManager() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="studio">Studio (White/Neutral)</SelectItem>
-                  <SelectItem value="luxury_lobby">Luxury Lobby</SelectItem>
-                  <SelectItem value="modern_office">Modern Office</SelectItem>
-                  <SelectItem value="city_street">Parisian Street</SelectItem>
-                  <SelectItem value="high_fashion_runway">Runway Stage</SelectItem>
-                  <SelectItem value="minimal_loft">Minimal Loft</SelectItem>
-                  <SelectItem value="sunset_beach">Sunset Beach Editorial</SelectItem>
-                  <SelectItem value="forgiven_storefront">
+                  <SelectItem value="fsc_signature">
                     <div className="flex items-center gap-2">
                       <img src="/forgiven.png" alt="Forgiven Logo" className="w-4 h-4 object-contain" />
-                      Forgiven Shopping Centre
+                      <span>FSC Signature Studio (Default)</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="luxury_white">Luxury White Studio</SelectItem>
+                  <SelectItem value="lifestyle_home">Lifestyle Home</SelectItem>
+                  <SelectItem value="outdoor_fashion">Outdoor Fashion</SelectItem>
+                  <SelectItem value="christmas_studio">Christmas Studio</SelectItem>
+                  <SelectItem value="black_friday_studio">Black Friday Studio</SelectItem>
+                  <SelectItem value="minimal_product_studio">Minimal Product Studio</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2192,15 +2191,15 @@ function InfluencerManager() {
           {generating && (
             <div className="space-y-3 pt-2">
               <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                <span>{generationStep === 1 ? "Identity Lock" : generationStep === 2 ? "Product Sync" : generationStep === 3 ? "Styling Outfit" : "Final Render"}</span>
+                <span>{generationStep === 1 ? "Model DNA & Vector Lock" : generationStep === 2 ? "Product Sync & Material Physics" : generationStep === 3 ? "Photography Simulation" : "Quality Audit & Brand Composite"}</span>
                 <span>{generationStep * 25}%</span>
               </div>
               <Progress value={generationStep * 25} className="h-1.5" />
               <p className="text-[9px] text-muted-foreground animate-pulse text-center italic font-body">
-                {generationStep === 1 && "Verifying influencer facial embedding..."}
-                {generationStep === 2 && `Applying ${selectedProd?.name} textures to model...`}
-                {generationStep === 3 && `Styling ${styleMode.replace("_", " ")} campaign look...`}
-                {generationStep === 4 && "Final high-end cinematography pass..."}
+                {generationStep === 1 && "Verifying model identity feature vectors & ethnicity integrity..."}
+                {generationStep === 2 && `Extracting Product DNA & locking ${selectedProd?.name || "garment"} fabric physics...`}
+                {generationStep === 3 && `Simulating commercial studio photoshoot in ${sceneType.replace("_", " ")}...`}
+                {generationStep === 4 && "Running 9 specialized quality validators & compositing official brand logo..."}
               </p>
             </div>
           )}

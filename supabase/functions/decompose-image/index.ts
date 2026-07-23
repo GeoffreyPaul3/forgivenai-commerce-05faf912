@@ -269,13 +269,6 @@ Return ONLY valid JSON, no markdown, no explanation:
       for (let i = 0; i < sections.length; i++) {
         const section = sections[i];
         const itemMeta = detectedItems[i] || { name: `Color ${i + 1}`, garmentType: "Garment", confidence: 90 };
-        const colorFamily = getColorFamily(itemMeta.name);
-
-        // Skip if we already have a crop for this color family
-        if (seenColorFamilies.has(colorFamily)) {
-          console.log(`Skipping duplicate color family: ${colorFamily} (original color: ${itemMeta.name})`);
-          continue;
-        }
 
         let croppedUrl = imageUrl;
 
@@ -283,6 +276,16 @@ Return ONLY valid JSON, no markdown, no explanation:
           try {
             const clone = baseImage.clone();
             const cropped = clone.crop(section.x, section.y, section.w, section.h);
+            
+            // Ensure minimum 256x256 resolution for AI model requirements (e.g., Wan API requires >= 240x240)
+            if (cropped.width < 256 || cropped.height < 256) {
+              const scale = Math.max(256 / cropped.width, 256 / cropped.height);
+              const targetW = Math.max(256, Math.round(cropped.width * scale));
+              const targetH = Math.max(256, Math.round(cropped.height * scale));
+              cropped.resize(targetW, targetH);
+              console.log(`[Decompose] Upscaled crop section ${i + 1} from ${section.w}x${section.h} to ${targetW}x${targetH} to satisfy minimum resolution requirements.`);
+            }
+
             const croppedBuffer = await cropped.encode(1); // PNG
 
             const fileName = `decomposed/${crypto.randomUUID()}.png`;
@@ -308,8 +311,6 @@ Return ONLY valid JSON, no markdown, no explanation:
             console.warn(`BG removal failed for crop ${i + 1}, using clean crop:`, e);
           }
         }
-
-        seenColorFamilies.add(colorFamily);
 
         variants.push({
           url: croppedUrl,
