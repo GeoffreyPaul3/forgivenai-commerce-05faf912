@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import logo from "@/assets/forgiven.png";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import AgentOnboardingGate from "@/pages/dashboard/agent/onboarding/AgentOnboardingGate";
 
 const agentMenuItems = [
   { title: "Dashboard",        url: "/dashboard",                     icon: LayoutDashboard },
@@ -105,6 +107,7 @@ export default function AgentLayout({ children, title }: { children: React.React
     : user?.email?.[0]?.toUpperCase() || "A";
 
   return (
+    <AgentOnboardingGate>
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AgentSidebar />
@@ -150,11 +153,14 @@ export default function AgentLayout({ children, title }: { children: React.React
               </DropdownMenuContent>
             </DropdownMenu>
           </header>
-          <main className="flex-1 p-6 overflow-y-auto">
+          <ScrollArea className="flex-1 h-[calc(100vh-3.5rem)]">
+          <main className="p-6">
             {children}
           </main>
+          </ScrollArea>
         </div>
       </div>
     </SidebarProvider>
+    </AgentOnboardingGate>
   );
 }

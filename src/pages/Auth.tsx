@@ -37,20 +37,22 @@ export default function AuthPage() {
     const initial = detectInitialAuthMode();
     return initial === "reset";
   });
+  const appMode = getAppMode();
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<'admin' | 'vendor' | 'agent'>('vendor');
+  const [role, setRole] = useState<'admin' | 'vendor' | 'agent'>(
+    appMode === "admin" ? "admin" : appMode === "agent" ? "agent" : "vendor"
+  );
   const [phone, setPhone] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const appMode = getAppMode();
 
   const isPortal = appMode === "vendor" || appMode === "agent";
 

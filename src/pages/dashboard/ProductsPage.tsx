@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, Plus, Sparkles, Pencil, Trash2, ExternalLink, Loader2, Image as ImageIcon, Package, TrendingUp, X, ImageOff, Layers, Zap } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { motion } from "framer-motion";
+import PricingIntelligenceCard from "@/components/dashboard/pricing/PricingIntelligenceCard";
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -997,12 +998,10 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
                     />
                   </div>
                 </div>
-                <div className="bg-primary/10 p-4 rounded-2xl flex gap-3 items-start border border-primary/20 shadow-inner">
-                   <TrendingUp className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                   <p className="text-[10px] text-primary/80 leading-relaxed font-bold">
-                     FSC PRICING ENGINE ACTIVE: Selling price is automatically optimized for a 30% gross margin.
-                   </p>
-                </div>
+                <PricingIntelligenceCard
+                  vendorCost={form.vendor_cost ? parseFloat(form.vendor_cost) : 0}
+                  operationsCost={operationsCost}
+                />
               </div>
             </div>
 

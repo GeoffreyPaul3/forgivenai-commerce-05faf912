@@ -613,42 +613,7 @@ export default function PortalAuthLayout({
                   </button>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Portals</div>
-                  
-                  <Link 
-                    to="/" 
-                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-neutral-50 font-semibold"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Store className="w-5 h-5 text-maroon" />
-                    <span>Main Shop Website</span>
-                  </Link>
-
-                  <button 
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      window.location.href = getRedirectUrl("agent");
-                    }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl hover:bg-neutral-50 font-semibold text-left ${isAgent ? 'bg-purple-50 text-purple-900' : ''}`}
-                  >
-                    <Users className="w-5 h-5 text-maroon" />
-                    <span>Sales Agent Portal</span>
-                  </button>
-
-                  <button 
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      window.location.href = getRedirectUrl("vendor");
-                    }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl hover:bg-neutral-50 font-semibold text-left ${!isAgent ? 'bg-blue-50 text-blue-900' : ''}`}
-                  >
-                    <Store className="w-5 h-5 text-maroon" />
-                    <span>Vendor Portal</span>
-                  </button>
-                </div>
-
-                <div className="space-y-4 pt-2 border-t border-neutral-100">
+                <div className="space-y-4 pt-2">
                   <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Account Access</div>
                   
                   <button 

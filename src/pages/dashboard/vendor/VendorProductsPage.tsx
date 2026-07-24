@@ -17,6 +17,7 @@ import {
   Package, Search, ShoppingBag, Plus, Pencil, Trash2, Check, X, AlertCircle, ImageOff, TrendingUp, Sparkles, Loader2
 } from "lucide-react";
 import { useVendorProfile } from "./VendorDashboard";
+import PricingIntelligenceCard from "@/components/dashboard/pricing/PricingIntelligenceCard";
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -809,40 +810,39 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
               </div>
             </div>
 
-            {/* Column 2: Vendor Costing */}
-            <div className="space-y-6">
-              <div className="p-6 rounded-[2rem] bg-primary/5 border border-primary/10 space-y-6 shadow-sm">
+            {/* Column 2: Pricing Intelligence */}
+            <div className="space-y-4">
+              {/* Vendor Cost Input — untouched logic */}
+              <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-primary uppercase tracking-widest px-1 inline-flex items-center gap-2">
-                    <Package className="w-3.5 h-3.5" /> Pricing Configuration
-                  </label>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase px-1">Your Supply Cost (MWK) *</label>
-                    <Input 
-                      type="text" 
-                      placeholder="0" 
-                      value={form.vendor_cost} 
-                      onChange={e => {
-                        const rawValue = e.target.value.replace(/\D/g, "");
-                        if (!rawValue) {
-                          setForm(f => ({ ...f, vendor_cost: "", price: "" }));
-                          return;
-                        }
-                        const costNum = parseInt(rawValue, 10);
-                        const formattedCost = costNum.toLocaleString("en-US");
-                        const suggestedNum = Math.ceil((costNum + operationsCost) / 0.55);
-                        const formattedSuggested = suggestedNum.toLocaleString("en-US");
-                        setForm(f => ({ ...f, vendor_cost: formattedCost, price: formattedSuggested }));
-                      }} 
-                      className="h-12 rounded-xl bg-background border-border/50 font-mono font-bold" 
-                    />
-                  </div>
-
+                  <label className="text-[10px] font-black text-muted-foreground uppercase px-1">Your Supply Cost (MWK) *</label>
+                  <Input 
+                    type="text" 
+                    placeholder="0" 
+                    value={form.vendor_cost} 
+                    onChange={e => {
+                      const rawValue = e.target.value.replace(/\D/g, "");
+                      if (!rawValue) {
+                        setForm(f => ({ ...f, vendor_cost: "", price: "" }));
+                        return;
+                      }
+                      const costNum = parseInt(rawValue, 10);
+                      const formattedCost = costNum.toLocaleString("en-US");
+                      const suggestedNum = Math.ceil((costNum + operationsCost) / 0.55);
+                      const formattedSuggested = suggestedNum.toLocaleString("en-US");
+                      setForm(f => ({ ...f, vendor_cost: formattedCost, price: formattedSuggested }));
+                    }} 
+                    className="h-12 rounded-xl bg-background border-border/50 font-mono font-bold" 
+                  />
                 </div>
               </div>
+
+              {/* Live Pricing Intelligence Dashboard */}
+              <PricingIntelligenceCard
+                vendorCost={form.vendor_cost ? parseInt(form.vendor_cost.replace(/,/g, ""), 10) : 0}
+                operationsCost={operationsCost}
+                currency="MWK"
+              />
             </div>
 
             {/* Column 3: Inventory & Variants */}
