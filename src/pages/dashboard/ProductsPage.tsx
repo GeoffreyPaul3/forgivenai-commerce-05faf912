@@ -981,7 +981,7 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
                       value={form.vendor_cost} 
                       onChange={e => {
                         const cost = e.target.value;
-                        const suggested = cost ? Math.ceil((parseFloat(cost) + operationsCost) / 0.55) : "";
+                        const suggested = cost ? Math.ceil((parseFloat(cost) + operationsCost) / 0.80) : "";
                         setForm(f => ({ ...f, vendor_cost: cost, price: suggested.toString() }));
                       }} 
                       className="h-12 rounded-xl bg-background border-border/50 font-mono font-bold" 

@@ -53,8 +53,8 @@ export interface PricingMetrics {
 
 /**
  * usePricingEngine — pure reactive pricing calculation hook.
- * The pricing formula (ceil((cost + ops) / 0.55)) is unchanged from
- * the existing VendorProductsPage business logic and is NOT modified here.
+ * The pricing formula (ceil((cost + ops) / 0.80)) is synchronized with
+ * the VendorProductsPage business logic.
  */
 export function usePricingEngine(
   vendorCost: number,
@@ -64,8 +64,8 @@ export function usePricingEngine(
     const isValid = vendorCost > 0;
     const totalCost = vendorCost + operationsCost;
 
-    // ── Core formula (unchanged) ─────────────────────────────────────────────
-    const sellingPrice = isValid ? Math.ceil(totalCost / 0.55) : 0;
+    // ── Core formula ─────────────────────────────────────────────────────────
+    const sellingPrice = isValid ? Math.ceil(totalCost / 0.80) : 0;
     const grossProfit = sellingPrice - totalCost;
     const grossMarginPct =
       sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
@@ -85,9 +85,9 @@ export function usePricingEngine(
 
     // ── Confidence Score (0–100, weighted composite) ─────────────────────────
     // margin weight 40% | discount resilience 20% | cost ratio 20% | markup 20%
-    const marginScore = Math.min(100, (grossMarginPct / 45) * 100) * 0.4;
+    const marginScore = Math.min(100, (grossMarginPct / 20) * 100) * 0.4;
     const discountScore =
-      Math.min(100, (maxDiscountPct / 25) * 100) * 0.2;
+      Math.min(100, (maxDiscountPct / 15) * 100) * 0.2;
     const costRatioScore =
       Math.min(100, ((100 - vendorCostPct) / 50) * 100) * 0.2;
     const markupScore = Math.min(100, (markupPct / 80) * 100) * 0.2;
@@ -143,17 +143,17 @@ export function usePricingEngine(
       const vendorPctStr = vendorCostPct.toFixed(1);
       const maxDiscStr = maxDiscountPct.toFixed(0);
 
-      if (grossMarginPct >= 35) {
-        executiveInsight = `Excellent product. FSC retains ${profitStr} (${marginStr}%) per sale. A 15% promotional discount still holds a ${disc15Str}% margin — healthy range. You can discount up to ${maxDiscStr}% before hitting break-even. Supplier cost is ${vendorPctStr}% of revenue — well within range.`;
-      } else if (grossMarginPct >= 25) {
-        executiveInsight = `Solid pricing profile. FSC earns ${profitStr} (${marginStr}%) per sale. Limit discounts to 10% to protect profitability. Supplier cost is ${vendorPctStr}% of revenue. Consider negotiating bulk pricing to improve margins further.`;
+      if (grossMarginPct >= 20) {
+        executiveInsight = `Excellent product. FSC retains ${profitStr} (${marginStr}%) per sale. A 10% promotional discount still holds a healthy margin. You can discount up to ${maxDiscStr}% before hitting break-even. Supplier cost is ${vendorPctStr}% of revenue — well within range.`;
       } else if (grossMarginPct >= 15) {
-        executiveInsight = `Thin margin at ${marginStr}%. FSC earns ${profitStr} per sale, but any discount above 5% approaches break-even. Supplier cost (${vendorPctStr}% of revenue) is high — a 10% cost reduction would improve margin to approximately ${(
-          ((grossProfit + vendorCost * 0.1) / sellingPrice) *
+        executiveInsight = `Solid pricing profile. FSC earns ${profitStr} (${marginStr}%) per sale. Limit discounts to 5% to protect profitability. Supplier cost is ${vendorPctStr}% of revenue. Consider negotiating bulk pricing to improve margins further.`;
+      } else if (grossMarginPct >= 10) {
+        executiveInsight = `Thin margin at ${marginStr}%. FSC earns ${profitStr} per sale, but any discount approaches break-even. Supplier cost (${vendorPctStr}% of revenue) is high — a 5% cost reduction would improve margin to approximately ${(
+          ((grossProfit + vendorCost * 0.05) / sellingPrice) *
           100
         ).toFixed(1)}%.`;
       } else {
-        executiveInsight = `⚠️ Margin alert: only ${marginStr}% gross margin. FSC retains ${profitStr} per sale at current pricing. Discounting is not recommended. Strongly consider increasing the selling price or renegotiating supplier terms to achieve at least 25% gross margin.`;
+        executiveInsight = `⚠️ Margin alert: only ${marginStr}% gross margin. FSC retains ${profitStr} per sale at current pricing. Discounting is not recommended. Strongly consider increasing the selling price or renegotiating supplier terms to achieve at least 20% gross margin.`;
       }
     }
 

@@ -624,7 +624,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
       const finalImages = [...existingUrls, ...uploadedUrls].slice(0, 5);
 
       const cost = parseFloat(form.vendor_cost.replace(/,/g, ''));
-      const calculatedPrice = Math.ceil((cost + operationsCost) / 0.55);
+      const calculatedPrice = Math.ceil((cost + operationsCost) / 0.80);
       
       let metadata = (product?.metadata as any) || {};
       if (!product) {
@@ -828,7 +828,7 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
                       }
                       const costNum = parseInt(rawValue, 10);
                       const formattedCost = costNum.toLocaleString("en-US");
-                      const suggestedNum = Math.ceil((costNum + operationsCost) / 0.55);
+                      const suggestedNum = Math.ceil((costNum + operationsCost) / 0.80);
                       const formattedSuggested = suggestedNum.toLocaleString("en-US");
                       setForm(f => ({ ...f, vendor_cost: formattedCost, price: formattedSuggested }));
                     }} 
