@@ -79,9 +79,11 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     (appMode === "admin" && userRole !== "admin")
   );
 
+  console.log("[ProtectedRoute] appMode:", appMode, "| userRole:", userRole, "| profileStatus:", profileStatus, "| isUnauthorizedForPortal:", isUnauthorizedForPortal);
+
   if (isUnauthorizedForPortal && userRole) {
     const targetUrl = getRedirectUrl(userRole as AppMode);
-    console.log("ProtectedRoute: Unauthorized for portal. Redirecting to", targetUrl);
+    console.log("[ProtectedRoute] Unauthorized for portal. userRole:", userRole, "→ redirecting to:", targetUrl);
 
     if (targetUrl) {
       window.location.href = targetUrl;
@@ -93,6 +95,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
       );
     }
   }
+
 
   if (profileStatus === "pending" && userRole !== "admin") {
     return (

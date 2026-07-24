@@ -114,12 +114,18 @@ export default function AuthPage() {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
 
-        // Fetch user profile to check approval status
-        const { data: profile } = await supabase
+        // Fetch user profile to check approval status and role.
+        // If RLS blocks the read or the row doesn't exist yet, we fall back to
+        // the role stored in the JWT user_metadata (set at signup).
+        const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("role, status")
           .eq("id", data.user.id)
           .single();
+
+        console.log("[Auth] user.id:", data.user.id);
+        console.log("[Auth] profile row:", profile, "| profileError:", profileError?.message);
+        console.log("[Auth] JWT metadata role:", data.user.user_metadata?.role);
 
         // Block pending users — sign them out and show waiting screen
         if (profile?.status === "pending") {
@@ -133,22 +139,38 @@ export default function AuthPage() {
           throw new Error("Your account application has been declined. Please contact support.");
         }
 
-        const userRole = profile?.role;
+        // Resolve role: prefer DB profile, fall back to JWT metadata
+        const userRole: string | undefined =
+          profile?.role ?? data.user.user_metadata?.role;
+
+        console.log("[Auth] resolved userRole:", userRole, "| appMode:", getAppMode());
+        console.log("[Auth] will redirect to:", userRole ? getRedirectUrl(userRole as "vendor"|"agent"|"admin") : "UNKNOWN");
+
+
+        if (!userRole) {
+          // Cannot determine role — sign out to keep state clean
+          await supabase.auth.signOut();
+          throw new Error("We couldn't verify your account role. Please contact support.");
+        }
+
         toast({ title: "Access Granted", description: "Authentication successful. Welcome back." });
 
-        // Force redirect to correct portal if user is on the wrong one
-        if (userRole === "vendor" && appMode !== "vendor") {
+        // Always hard-redirect to the correct portal for this role
+        // regardless of which subdomain the user is currently on.
+        if (userRole === "vendor") {
           window.location.href = getRedirectUrl("vendor");
           return;
-        } else if (userRole === "agent" && appMode !== "agent") {
+        } else if (userRole === "agent") {
           window.location.href = getRedirectUrl("agent");
           return;
-        } else if (userRole === "admin" && appMode !== "admin") {
+        } else if (userRole === "admin") {
           window.location.href = getRedirectUrl("admin");
           return;
         }
 
-        navigate("/dashboard");
+        // Fallback — should never reach here given the check above
+        await supabase.auth.signOut();
+        throw new Error(`Unknown role "${userRole}". Please contact support.`);
 
       } else if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
