@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import AuthLayout from "@/components/layout/AuthLayout";
 import PortalAuthLayout from "@/components/layout/PortalAuthLayout";
-import { Mail, Lock, User, ArrowRight, Loader2, KeyRound, CheckCircle2, Store, Phone, Clock } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Loader2, KeyRound, CheckCircle2, Store, Phone, Clock, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAppMode, getRedirectUrl, type AppMode } from "@/lib/app-mode";
 
@@ -42,9 +42,38 @@ export default function AuthPage() {
   const [role, setRole] = useState<'admin' | 'vendor' | 'agent'>('vendor');
   const [phone, setPhone] = useState("");
   const [businessName, setBusinessName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const appMode = getAppMode();
+
+  const isPortal = appMode === "vendor" || appMode === "agent";
+
+  // Dynamic style tokens based on Light/Dark Card Theme
+  const labelClass = isPortal
+    ? "text-xs font-semibold text-neutral-700 block mb-1.5 pl-1"
+    : "text-[10px] uppercase font-bold text-gold/60 tracking-widest pl-1 block mb-1.5";
+  
+  const inputClass = isPortal
+    ? "bg-white border-neutral-200 text-neutral-900 placeholder:text-neutral-400 pl-10 h-12 focus-visible:ring-primary/20 focus-visible:border-primary focus:ring-primary/20 focus:border-primary rounded-xl focus:border-maroon transition-all"
+    : "bg-white/5 border-white/10 text-white pl-10 h-12 focus:border-gold/50";
+  
+  const iconClass = isPortal
+    ? "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400"
+    : "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20";
+  
+  const eyeIconClass = isPortal
+    ? "absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 hover:text-maroon transition-colors"
+    : "absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 hover:text-gold transition-colors";
+
+  const linkTextClass = isPortal
+    ? "text-neutral-500 hover:text-maroon font-medium transition-colors"
+    : "text-cream/40 hover:text-cream/60 transition-colors";
+
+  const forgotTextClass = isPortal
+    ? "text-xs text-maroon hover:text-maroon-light font-semibold transition-colors"
+    : "text-[10px] text-gold/60 hover:text-gold uppercase tracking-wider transition-colors";
 
   // Sync role with appMode
   useEffect(() => {
@@ -165,12 +194,12 @@ export default function AuthPage() {
 
   const headings: Record<AuthMode, { title: string; sub: string }> = {
     login: {
-      title: appMode === "admin" ? "Systems Access" : appMode === "agent" ? "Agents Portal Sign In" : "Vendors Portal Sign In",
-      sub: appMode === "admin" ? "Access the central commerce control hub." : "Manage your retail operations and performance."
+      title: appMode === "admin" ? "Systems Access" : appMode === "agent" ? "Welcome to Agent Portal" : "Welcome to Vendor Portal",
+      sub: appMode === "admin" ? "Access the central commerce control hub." : appMode === "agent" ? "Sign in to access your dashboard, track sales and grow your earnings." : "Sign in to manage your inventory, track orders and scale your business."
     },
     signup: {
-      title: appMode === "vendor" ? "Partner with Forgiven" : appMode === "agent" ? "Join the Commerce Network" : "Administrator Registration",
-      sub: appMode === "vendor" ? "Register as a certified vendor to access our distribution network." : appMode === "agent" ? "Become a certified agent and earn through premium retail." : "Initialize administrative credentials for the commerce ecosystem."
+      title: appMode === "vendor" ? "Partner with Forgiven" : appMode === "agent" ? "Join the Network" : "Administrator Registration",
+      sub: appMode === "vendor" ? "Register as a certified vendor to access our distribution network." : appMode === "agent" ? "Become a certified sales agent and earn commissions." : "Initialize administrative credentials for the commerce ecosystem."
     },
     forgot: { title: "Credential Recovery", sub: "Enter your registered email to receive a secure reset link." },
     reset: { title: "Update Credentials", sub: "Establish a new secure password for your account." },
@@ -178,7 +207,7 @@ export default function AuthPage() {
 
   const formContent = (
     <>
-      {/* Header — hidden on portal pages (PortalAuthLayout has its own headline) */}
+      {/* Header — hidden on portal pages (PortalAuthLayout has its own gorgeous headlines matching the card) */}
       {appMode === "admin" && (
         <div className="text-center mb-8">
           <h1 className="font-heading text-2xl font-bold text-white mb-2">
@@ -189,23 +218,35 @@ export default function AuthPage() {
       )}
 
       {/* Portal heading shown inside the form panel */}
-      {appMode !== "admin" && (
-        <div className="mb-8">
-          <h2 className="font-heading text-2xl font-bold text-white mb-1">{headings[mode].title}</h2>
-          <p className="text-cream/60 text-sm font-body">{headings[mode].sub}</p>
+      {isPortal && (
+        <div className="text-center mb-6">
+          <h2 className="font-heading text-2xl lg:text-3xl font-extrabold text-neutral-900 mb-2 leading-tight">
+            {mode === "login" ? (
+              <>
+                Welcome to <span className="text-maroon block mt-1">{appMode === "agent" ? "Agent Portal" : "Vendor Portal"}</span>
+              </>
+            ) : mode === "signup" ? (
+              <>
+                Join the <span className="text-maroon block mt-1">{appMode === "agent" ? "Agents Program" : "Vendors Network"}</span>
+              </>
+            ) : (
+              headings[mode].title
+            )}
+          </h2>
+          <p className="text-neutral-500 font-body text-sm leading-relaxed max-w-sm mx-auto">{headings[mode].sub}</p>
         </div>
       )}
 
       {resetSent ? (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-4">
           <div className="w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-8 h-8 text-gold" />
+            <CheckCircle2 className={`w-8 h-8 ${isPortal ? 'text-maroon' : 'text-gold'}`} />
           </div>
-          <p className="text-white font-body">Check your email for the reset link.</p>
-          <p className="text-cream/40 text-sm">Didn't receive it? Check spam or{" "}
-            <button onClick={() => setResetSent(false)} className="text-gold hover:text-gold-light font-bold">try again</button>
+          <p className={`${isPortal ? 'text-neutral-800' : 'text-white'} font-body`}>Check your email for the reset link.</p>
+          <p className={`${isPortal ? 'text-neutral-500' : 'text-cream/40'} text-sm`}>Didn't receive it? Check spam or{" "}
+            <button onClick={() => setResetSent(false)} className={`${isPortal ? 'text-maroon hover:text-maroon-light' : 'text-gold hover:text-gold-light'} font-bold`}>try again</button>
           </p>
-          <button onClick={() => { setMode("login"); setResetSent(false); }} className="text-cream/40 text-sm hover:text-cream/60 mt-2">
+          <button onClick={() => { setMode("login"); setResetSent(false); }} className={`${isPortal ? 'text-neutral-500 hover:text-maroon' : 'text-cream/40 hover:text-cream/60'} text-sm mt-2`}>
             ← Back to Sign In
           </button>
         </motion.div>
@@ -215,27 +256,27 @@ export default function AuthPage() {
             {mode === "signup" && (
               <motion.div key="signup-fields" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-gold/60 tracking-widest pl-1">
+                  <label className={labelClass}>
                     {appMode === "vendor" ? "Contact Person" : "Full Name"}
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                    <Input placeholder="John Doe" value={fullName} onChange={(e) => setFullName(e.target.value)} className="bg-white/5 border-white/10 text-white pl-10 h-12 focus:border-gold/50" required />
+                    <User className={iconClass} />
+                    <Input placeholder="John Doe" value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} required />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-gold/60 tracking-widest pl-1">Phone Number</label>
+                  <label className={labelClass}>Phone Number</label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                    <Input type="tel" placeholder="+265 99X XXX XXX" value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-white/5 border-white/10 text-white pl-10 h-12 focus:border-gold/50" required />
+                    <Phone className={iconClass} />
+                    <Input type="tel" placeholder="e.g. +265 997 128 899" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} required />
                   </div>
                 </div>
                 {appMode === 'vendor' && (
                   <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-gold/60 tracking-widest pl-1">Business Name</label>
+                    <label className={labelClass}>Business Name</label>
                     <div className="relative">
-                      <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                      <Input placeholder="My Awesome Shop" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="bg-white/5 border-white/10 text-white pl-10 h-12 focus:border-gold/50" required />
+                      <Store className={iconClass} />
+                      <Input placeholder="My Awesome Shop" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className={inputClass} required />
                     </div>
                   </div>
                 )}
@@ -243,10 +284,10 @@ export default function AuthPage() {
             )}
             {mode === "reset" && (
               <motion.div key="newpassword" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-gold/60 tracking-widest pl-1">New Password</label>
+                <label className={labelClass}>New Password</label>
                 <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                  <Input type="password" placeholder="Min. 6 characters" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="bg-white/5 border-white/10 text-white pl-10 h-12" required minLength={6} />
+                  <KeyRound className={iconClass} />
+                  <Input type="password" placeholder="Min. 6 characters" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputClass} required minLength={6} />
                 </div>
               </motion.div>
             )}
@@ -254,48 +295,82 @@ export default function AuthPage() {
 
           {mode !== "reset" && (
             <div className="space-y-1">
-              <label className="text-[10px] uppercase font-bold text-gold/60 tracking-widest pl-1">Email Address</label>
+              <label className={labelClass}>Email Address</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                <Input type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-white/5 border-white/10 text-white pl-10 h-12 focus:border-gold/50" required />
+                <Mail className={iconClass} />
+                <Input type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} required />
               </div>
             </div>
           )}
 
           {(mode === "login" || mode === "signup") && (
             <div className="space-y-1">
-              <div className="flex items-center justify-between pl-1">
-                <label className="text-[10px] uppercase font-bold text-gold/60 tracking-widest">Password</label>
-                {mode === "login" && (
-                  <button type="button" onClick={() => setMode("forgot")} className="text-[10px] text-gold/60 hover:text-gold uppercase">Forgot Password?</button>
-                )}
-              </div>
+              <label className={labelClass}>Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-white/5 border-white/10 text-white pl-10 h-12 focus:border-gold/50" required />
+                <Lock className={iconClass} />
+                <Input type={showPassword ? "text" : "password"} placeholder={isPortal ? "Enter your password" : "••••••••"} value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} required />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className={eyeIconClass}>
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
           )}
 
-          <Button type="submit" disabled={loading} className="w-full h-12 bg-gold hover:bg-gold-light text-maroon-dark font-bold rounded-xl mt-6 group shadow-lg shadow-gold/10 transition-all active:scale-95">
+          {/* Remember me & Forgot Password aligned row */}
+          {(mode === "login" || mode === "signup") && (
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className={`rounded border-neutral-300 h-4 w-4 focus:ring-offset-0 ${isPortal ? 'accent-maroon text-maroon border-neutral-300 focus:ring-maroon' : 'accent-gold text-gold border-white/20 focus:ring-gold'}`}
+                />
+                <span className={isPortal ? 'text-xs text-neutral-600 font-medium' : 'text-xs text-cream/60 font-body'}>
+                  Remember me
+                </span>
+              </label>
+              {mode === "login" && (
+                <button type="button" onClick={() => setMode("forgot")} className={forgotTextClass}>
+                  Forgot password?
+                </button>
+              )}
+            </div>
+          )}
+
+          <Button type="submit" disabled={loading} className={isPortal ? "w-full h-12 bg-maroon hover:bg-maroon-light text-white font-bold rounded-xl mt-6 group shadow-lg shadow-maroon/10 transition-all active:scale-95 flex items-center justify-center gap-2" : "w-full h-12 bg-gold hover:bg-gold-light text-maroon-dark font-bold rounded-xl mt-6 group shadow-lg shadow-gold/10 transition-all active:scale-95"}>
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
               <>
-                {mode === "login" && "Sign In"}
-                {mode === "signup" && "Create Account"}
-                {mode === "forgot" && "Send Reset Link"}
-                {mode === "reset" && "Update Password"}
-                {mode !== "forgot" && <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />}
+                <span>
+                  {mode === "login" && "Sign In"}
+                  {mode === "signup" && "Create Account"}
+                  {mode === "forgot" && "Send Reset Link"}
+                  {mode === "reset" && "Update Password"}
+                </span>
+                {mode !== "forgot" && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
               </>
             )}
           </Button>
 
           {(mode === "login" || mode === "signup") && (
-            <div className="mt-8 pt-6 border-t border-white/5 text-center">
-              <p className="text-cream/40 text-sm font-body">
+            <div className={`mt-6 pt-5 border-t ${isPortal ? 'border-neutral-100' : 'border-white/5'} text-center`}>
+              <p className="text-sm font-body">
                 {mode === "login" ? (
-                  <>{appMode === "admin" ? "New admin?" : "New to Forgiven?"}{" "}<button type="button" onClick={() => setMode("signup")} className="text-gold font-bold hover:text-gold-light ml-1">Create Account</button></>
+                  <>
+                    <span className={isPortal ? 'text-neutral-500' : 'text-cream/40'}>
+                      {appMode === "admin" ? "New admin?" : appMode === "agent" ? "New agent?" : "New vendor?"}
+                    </span>
+                    <button type="button" onClick={() => setMode("signup")} className={`font-bold ml-1.5 inline-flex items-center gap-1 group/link ${isPortal ? 'text-maroon hover:text-maroon-light' : 'text-gold hover:text-gold-light'}`}>
+                      Register now <ArrowRight className="w-3 h-3 group-hover/link:translate-x-0.5 transition-transform" />
+                    </button>
+                  </>
                 ) : (
-                  <>Already have an account?{" "}<button type="button" onClick={() => setMode("login")} className="text-gold font-bold hover:text-gold-light ml-1">Sign In</button></>
+                  <>
+                    <span className={isPortal ? 'text-neutral-500' : 'text-cream/40'}>Already have an account?</span>
+                    <button type="button" onClick={() => setMode("login")} className={`font-bold ml-1.5 inline-flex items-center gap-1 group/link ${isPortal ? 'text-maroon hover:text-maroon-light' : 'text-gold hover:text-gold-light'}`}>
+                      Sign In <ArrowRight className="w-3 h-3 group-hover/link:translate-x-0.5 transition-transform" />
+                    </button>
+                  </>
                 )}
               </p>
             </div>
@@ -303,7 +378,7 @@ export default function AuthPage() {
 
           {mode === "forgot" && (
             <div className="text-center mt-4">
-              <button type="button" onClick={() => setMode("login")} className="text-cream/40 text-sm hover:text-cream/60">← Back to Sign In</button>
+              <button type="button" onClick={() => setMode("login")} className={linkTextClass}>← Back to Sign In</button>
             </div>
           )}
         </form>
@@ -318,23 +393,23 @@ export default function AuthPage() {
       animate={{ opacity: 1, scale: 1 }}
       className="text-center space-y-6 py-4"
     >
-      <div className="w-20 h-20 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center mx-auto">
-        <Clock className="w-9 h-9 text-gold animate-pulse" />
+      <div className={`w-20 h-20 rounded-full border flex items-center justify-center mx-auto ${isPortal ? 'bg-maroon/5 border-maroon/10' : 'bg-gold/10 border-gold/20'}`}>
+        <Clock className={`w-9 h-9 animate-pulse ${isPortal ? 'text-maroon' : 'text-gold'}`} />
       </div>
       <div className="space-y-2">
-        <h2 className="font-heading text-xl font-bold text-white">Awaiting Approval</h2>
-        <p className="text-cream/60 text-sm font-body leading-relaxed max-w-xs mx-auto">
+        <h2 className={`font-heading text-xl font-bold ${isPortal ? 'text-neutral-900' : 'text-white'}`}>Awaiting Approval</h2>
+        <p className={`text-sm font-body leading-relaxed max-w-xs mx-auto ${isPortal ? 'text-neutral-500' : 'text-cream/60'}`}>
           Your account is under review. An administrator will approve your access shortly.
           You'll be able to sign in once approved.
         </p>
       </div>
-      <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-left space-y-1">
-        <p className="text-xs text-gold/80 font-bold uppercase tracking-wider">What happens next?</p>
-        <p className="text-xs text-cream/50 font-body">Our admin team reviews new accounts and approves access within 24 hours.</p>
+      <div className={`border rounded-xl px-4 py-3 text-left space-y-1 ${isPortal ? 'bg-neutral-50 border-neutral-100' : 'bg-white/5 border-white/10'}`}>
+        <p className={`text-xs font-bold uppercase tracking-wider ${isPortal ? 'text-maroon' : 'text-gold/80'}`}>What happens next?</p>
+        <p className={`text-xs font-body ${isPortal ? 'text-neutral-500' : 'text-cream/50'}`}>Our admin team reviews new accounts and approves access within 24 hours.</p>
       </div>
       <button
         onClick={() => { setPendingApproval(false); setMode("login"); }}
-        className="text-cream/40 text-sm hover:text-cream/60 transition-colors"
+        className={`text-sm transition-colors ${isPortal ? 'text-neutral-500 hover:text-maroon' : 'text-cream/40 hover:text-cream/60'}`}
       >
         ← Back to Sign In
       </button>

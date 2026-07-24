@@ -26,7 +26,7 @@ Return ONLY a valid JSON object in this format:
   "issues": ["Minor shadow on left arm"]
 }`;
     
-    const content = [{ image: imageUrl }];
+    const content: Array<{ image?: string; text?: string }> = [{ image: imageUrl }];
     if (referencePersonUrl) {
       content.push({ image: referencePersonUrl });
     }
@@ -181,8 +181,397 @@ async function applyBrandWatermark(supabaseClient: any, imageUrl: string): Promi
   }
 }
 
-// --- ENTERPRISE V5 BRAND STUDIO SYSTEM ---
-interface StudioProfile {
+// ============================================================================
+// ENTERPRISE CREATIVE ENGINE V5.8 — VISUAL OPERATING SYSTEM & CAMPAIGN DNA
+// ============================================================================
+//
+// Architecture:
+//   Reference Analysis (analyzeProductReference)
+//     → Reference Confidence Score
+//     → Product Geometry DNA
+//     → Commercial Photography DNA
+//     → Studio DNA (StudioSeed + BaseStudioDNA)
+//     → Category DNA + Category Styling DNA
+//     → Pose DNA + Camera DNA
+//     → Depth DNA + Composition Balance Engine
+//     → Brand Governance + Retail Styling DNA
+//     → Product Identity Lock
+//     → Scene Inheritance + Campaign DNA
+//     → assembleDeterministicPrompt() → Final Generation Prompt
+//     → Multi-Vector QA (Product Fidelity / Studio Identity / Commercial Photography)
+//     → Failure-Specific Targeted Regeneration
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// MODULE A: PRODUCT IDENTITY LOCK
+// The AI is a photographer. It does not design. It photographs.
+// ----------------------------------------------------------------------------
+const ProductIdentityLock = `PRODUCT IDENTITY LOCK — IMMUTABLE CONSTRAINT (NON-NEGOTIABLE):
+The uploaded catalogue product image is the SINGLE SOURCE OF TRUTH.
+You are acting as a commercial photographer, NOT a fashion designer, NOT a product designer.
+As a photographer you MUST:
+  ✓ Photograph this exact product exactly as it appears in the reference.
+  ✓ Preserve every construction detail with 100% fidelity.
+  ✓ Reproduce color, material, texture, hardware, and silhouette identically.
+
+You MUST NEVER:
+  ✗ Redesign the product.
+  ✗ Modernize the product.
+  ✗ Improve the product.
+  ✗ Reinterpret the product.
+  ✗ Simplify the product.
+  ✗ Stylize the product.
+  ✗ Add missing details.
+  ✗ Invent stitching, accessories, hardware, or branding.
+  ✗ Invent or hallucinate textures not present in the reference.
+  ✗ Substitute a different product.
+  ✗ Apply an alternative colorway.
+Any deviation from the uploaded product reference constitutes a critical failure.`;
+
+// ----------------------------------------------------------------------------
+// MODULE B: STUDIO SEED — Deterministic Physical Studio Dimensions
+// Ensures every FSC Signature Studio render feels like the same physical space.
+// ----------------------------------------------------------------------------
+const StudioSeed = {
+  archDimensions: "Central signature arch: 1.8m radius curvature, 3.2m total height, 2.2m width at base, smooth-edged plaster finish",
+  ledSpecification: "Integrated magenta LED strip (#B0208D): 25mm width, continuous glowing outline seamlessly embedded in arch plaster, constant intensity",
+  podiumDimensions: "Low circular cream travertine stone podium: 40cm height, 50cm diameter, positioned center-foreground",
+  planterPosition: "Tall cylindrical polished brass/gold planter: strictly left floor position, 120cm height, 40cm diameter, containing full Bird of Paradise or Monstera plant",
+  shelvingPosition: "Vertical recessed illuminated shelving unit: strictly on right wall, 180cm height, 60cm wide, warm 2700K backlighting, minimal brass decor accents",
+  panelDimensions: "Black fluted vertical side panels (#111111): extend full floor-to-ceiling height, warm tube sconces positioned at 160cm height",
+  lightingPositions: "Key light: 45° overhead camera-left. Fill light: large V-flat camera-right. Rim: behind subject, LED from arch. Sconces: practical ambient at 3000K",
+  floorSpecification: "Polished cream Calacatta marble, visible natural veining, controlled specular reflections showing product/model silhouette softly",
+  prompt: "STUDIO SEED (FSC FLAGSHIP PERMANENT DIMENSIONS): This studio is a permanent physical location photographed repeatedly — not recreated each generation. Apply consistent spatial dimensions: arch radius 1.8m, podium 40cm × 50cm travertine, brass planter strictly left at 120cm height, illuminated shelving strictly right wall, black fluted panels full height with sconces at 160cm. The environment feels like one unchanged flagship retail studio visited many times, not a different AI-imagined space each time."
+};
+
+// ----------------------------------------------------------------------------
+// MODULE C: BASE STUDIO DNA (FSC FLAGSHIP ARCHITECTURAL & BRAND IDENTITY CORE)
+// ----------------------------------------------------------------------------
+export interface BaseStudioDNASpec {
+  architecturePrompt: string;
+  lightingPrompt: string;
+  materialsPrompt: string;
+  brandingPrompt: string;
+  qualityRequirements: string[];
+  negativePrompt: string;
+}
+
+export const BaseStudioDNA: BaseStudioDNASpec = {
+  architecturePrompt: `FLAGSHIP FSC LUXURY ARCHITECTURAL DESTINATION (Forgiven Shopping Centre, Lilongwe, Malawi): Modern African luxury retail architecture engineered to international luxury standards (Dior, Louis Vuitton, COS, Apple Flagship, Harrods Beauty). ${StudioSeed.archDimensions}. The arch is seamlessly outlined by a glowing integrated magenta LED accent light strip (${StudioSeed.ledSpecification}). Flanking both the far left and right edges are vertical black fluted architectural panels (#111111) equipped with warm vertical tube sconces. On the right wall: ${StudioSeed.shelvingPosition}. On the left floor: ${StudioSeed.planterPosition}. In front of the arch on the floor sits ${StudioSeed.podiumDimensions}. The flooring is ${StudioSeed.floorSpecification}. ${StudioSeed.prompt}`,
+
+  lightingPrompt: `Warm premium luxury commercial studio lighting (3000K-3500K). ${StudioSeed.lightingPositions}. Key light provides soft, directional illumination, gentle fill opens shadows naturally, warm vertical tube sconces glow softly, and the integrated magenta arch LED strip (#B0208D) casts a radiant neon-pink accent outline on the cream stone wall. Physically accurate shadow falloff, zero blown-out highlights, and natural specular reflections on marble and brass.`,
+
+  materialsPrompt: "Authentic physical material finishes: micro-textured cream limestone plaster, honed travertine stone, polished cream Calacatta marble flooring with realistic natural veining and soft reflections, brushed brass metal fixtures, matte black fluted wooden panels (#111111), and organic tropical botanical greenery with real leaf veining.",
+
+  brandingPrompt: "PHYSICALLY MOUNTED 3D ARCHITECTURAL LOGO (FLAGSHIP RETAIL SIGNAGE): The official Forgiven Shopping Centre logo — a bold magenta (#B0208D) shopping bag icon containing a crisp white capital letter 'F', with 'Forgiven' written in bold magenta text directly below and 'Shopping Centre' in smaller magenta text beneath — is physically mounted onto the cream stone wall inside the signature arch as dimensional 3D acrylic and metal architectural lettering. The logo has real physical depth, sharp edges, casts a subtle natural drop shadow onto the textured cream stone wall behind it, and catches warm specular reflections from the studio sconces. It is permanently installed on the wall like a flagship retail boutique sign — NEVER floating, NEVER a digital watermark overlay, NEVER composited in post.",
+
+  qualityRequirements: [
+    "Signature arch (1.8m radius, 3.2m height) with integrated glowing magenta LED strip (#B0208D)",
+    "Textured cream stone back wall with physically mounted 3D brand logo inside arch",
+    "Black fluted vertical side panels (#111111) full ceiling height with warm sconce lights at 160cm",
+    "Polished cream Calacatta marble floor with realistic natural veining and soft reflections",
+    "Low circular cream travertine podium (40cm × 50cm) center-foreground",
+    "Tall polished brass planter (120cm) with lush Bird of Paradise / Monstera on left",
+    "Built-in recessed illuminated shelving unit (180cm) with warm 2700K backlighting on right",
+    "Forgiven Shopping Centre 3D physical logo 100% visible and unblocked inside arch",
+    "Warm premium commercial studio lighting (3000K-3500K) with realistic shadow falloff",
+    "Product is the primary hero with immaculate material fidelity and true colour"
+  ],
+
+  negativePrompt: "european luxury store imitation, american mall aesthetic, model standing in center blocking logo, model covering logo, blocked branding, wooden floors, hotel lobbies, office interiors, industrial lofts, exposed brick, futuristic architecture, cyberpunk lighting, RGB lighting, blue lighting, clutter, random logos, floating logos, watermark logos, AI text, distorted walls, oversized decor, unrealistic reflections, plastic-looking people, incorrect garment colours, altered garment shapes, mixed ethnicity drift, inconsistent model identity, CGI render, 3D render, artificial skin, wax texture, plastic skin, extra fingers, hyper-real uncanny valley."
+};
+
+// ----------------------------------------------------------------------------
+// MODULE D: POSE DNA — Standardized Commercial Human Pose Templates
+// ----------------------------------------------------------------------------
+export type PoseTemplate =
+  | "editorial_full_body"
+  | "luxury_standing"
+  | "walking"
+  | "looking_back"
+  | "holding_bag"
+  | "hands_in_pocket"
+  | "crossed_legs"
+  | "sitting_chair"
+  | "podium_lean"
+  | "mirror_pose"
+  | "catalogue_front"
+  | "catalogue_45"
+  | "editorial_motion";
+
+export const PoseDNA: Record<PoseTemplate, string> = {
+  editorial_full_body: "Editorial full-length pose: model standing with confident posture, weight shifted to one hip, arms relaxed at sides or gently behind back, face angled slightly away from camera. Full head-to-toe visibility including footwear.",
+  luxury_standing: "Luxury standing: model standing upright with elegant posture, chin slightly elevated, one hand lightly touching lapel or collar, other arm relaxed. Exudes quiet luxury confidence.",
+  walking: "Mid-stride walking pose: model caught in a graceful natural walking motion with one foot forward, arms in natural swing position, hair with subtle movement. Dynamic but controlled.",
+  looking_back: "Over-the-shoulder look: model walking away from camera at 3/4 angle, turning head back over shoulder with direct eye contact with lens. Shows garment back construction.",
+  holding_bag: "Bag carry pose: model holding luxury handbag naturally — either shoulder-carried or hand-carried at hip height. Off-center positioning with bag prominently visible.",
+  hands_in_pocket: "Hands in pocket: casual confident stance with one or both hands loosely in pockets, weight on back foot, relaxed facial expression. Feels editorial not stiff.",
+  crossed_legs: "Crossed legs standing: model standing with legs gently crossed at ankles or knees, arms folded loosely or resting. Relaxed sophisticated stance.",
+  sitting_chair: "Seated editorial: model seated elegantly on modern chair or low stool, knees together, straight posture, one hand resting in lap. Shows garment sit-behavior and hem.",
+  podium_lean: "Podium lean: model leaning elegantly with one hand resting on top of cream stone podium, weight shifted, creating a diagonal line through the composition.",
+  mirror_pose: "Mirror reflection: model positioned facing a floor-length mirror in the set, showing both the garment front and the mirror reflection in one composition.",
+  catalogue_front: "Catalogue front: model standing directly facing the camera, arms relaxed at sides, completely upright. Clean symmetrical catalogue reference shot showing exact garment construction.",
+  catalogue_45: "Catalogue 45°: model positioned at 45 degrees to the camera, looking slightly off-lens. Shows side seam construction and garment silhouette profile.",
+  editorial_motion: "Editorial motion: model caught mid-movement — hair and fabric in motion, slight lean or twist, capturing kinetic energy. Fashion editorial energy."
+};
+
+export function selectPoseTemplate(category: string, style?: string): { template: PoseTemplate, prompt: string } {
+  const lower = (style || category).toLowerCase();
+  if (lower.includes("walk")) return { template: "walking", prompt: PoseDNA.walking };
+  if (lower.includes("bag") || lower.includes("hold")) return { template: "holding_bag", prompt: PoseDNA.holding_bag };
+  if (lower.includes("sit")) return { template: "sitting_chair", prompt: PoseDNA.sitting_chair };
+  if (lower.includes("back") || lower.includes("rear")) return { template: "looking_back", prompt: PoseDNA.looking_back };
+  if (lower.includes("catalogue") || lower.includes("catalog")) return { template: "catalogue_front", prompt: PoseDNA.catalogue_front };
+  if (lower.includes("motion") || lower.includes("dynamic")) return { template: "editorial_motion", prompt: PoseDNA.editorial_motion };
+  if (lower.includes("lean")) return { template: "podium_lean", prompt: PoseDNA.podium_lean };
+  if (lower.includes("pocket")) return { template: "hands_in_pocket", prompt: PoseDNA.hands_in_pocket };
+  // default: luxury standing for fashion, catalogue_front for all else
+  const catLower = category.toLowerCase();
+  const isFashion = catLower.includes("apparel") || catLower.includes("fashion") || catLower.includes("clothing") || catLower.includes("dress") || catLower.includes("shirt");
+  return isFashion
+    ? { template: "luxury_standing", prompt: PoseDNA.luxury_standing }
+    : { template: "catalogue_front", prompt: PoseDNA.catalogue_front };
+}
+
+// ----------------------------------------------------------------------------
+// MODULE E: CAMERA DNA — Standardized Camera Positioning Templates
+// ----------------------------------------------------------------------------
+export type CameraPosition =
+  | "eye_level"
+  | "waist_level"
+  | "luxury_low_angle"
+  | "macro"
+  | "overhead_flat_lay"
+  | "45_degree"
+  | "three_quarter"
+  | "catalogue_front"
+  | "editorial_portrait"
+  | "lifestyle_environmental";
+
+export const CameraDNA: Record<CameraPosition, string> = {
+  eye_level: "Camera positioned at eye level (approximately 165cm from ground). Standard editorial perspective — natural proportions, no distortion.",
+  waist_level: "Camera positioned at waist height (approximately 90cm from ground). Lengthens legs, creates aspirational proportions ideal for full-body fashion.",
+  luxury_low_angle: "Low angle camera placement (approximately 50cm from ground). Dramatic product hero angle — product towers with authority. Ideal for shoes, handbags, bottles.",
+  macro: "Macro close-up: camera positioned at 30–50cm distance from product surface. 1:1 reproduction ratio for gemstones, watch faces, leather grain, stitching detail.",
+  overhead_flat_lay: "Overhead flat lay: camera directly above product (90° straight down). Used for accessories, jewellery, packaging, and editorial layouts.",
+  "45_degree": "45-degree angle: camera positioned at 45° diagonal to subject. Shows both front face and top plane — ideal for bags, watches, electronic devices.",
+  three_quarter: "Three-quarter view: camera at 30–45° off-center. Shows depth and dimension — ideal for structured products like bags, shoes, bottles.",
+  catalogue_front: "Straight catalogue front: camera precisely centered on product front face. Pure commercial reference shot for e-commerce and catalogue.",
+  editorial_portrait: "Editorial portrait: camera at model face height (170cm), slight upward tilt. Intimate editorial fashion connection.",
+  lifestyle_environmental: "Environmental wide: camera pulled back to 3m distance with 35mm lens, showing model/product in full environmental context with architectural surroundings."
+};
+
+export function selectCameraPosition(category: string, composition?: string): { position: CameraPosition, prompt: string } {
+  const lower = (composition || category).toLowerCase();
+  if (lower.includes("macro") || lower.includes("jewel") || lower.includes("watch") || lower.includes("detail")) return { position: "macro", prompt: CameraDNA.macro };
+  if (lower.includes("flat lay") || lower.includes("overhead")) return { position: "overhead_flat_lay", prompt: CameraDNA.overhead_flat_lay };
+  if (lower.includes("low angle") || lower.includes("hero")) return { position: "luxury_low_angle", prompt: CameraDNA.luxury_low_angle };
+  if (lower.includes("environmental") || lower.includes("lifestyle")) return { position: "lifestyle_environmental", prompt: CameraDNA.lifestyle_environmental };
+  if (lower.includes("portrait") || lower.includes("editorial")) return { position: "editorial_portrait", prompt: CameraDNA.editorial_portrait };
+  if (lower.includes("45") || lower.includes("diagonal")) return { position: "45_degree", prompt: CameraDNA["45_degree"] };
+  if (lower.includes("three quarter") || lower.includes("3/4")) return { position: "three_quarter", prompt: CameraDNA.three_quarter };
+  if (lower.includes("waist")) return { position: "waist_level", prompt: CameraDNA.waist_level };
+  const catLower = category.toLowerCase();
+  if (catLower.includes("shoe") || catLower.includes("bag") || catLower.includes("perfume")) return { position: "luxury_low_angle", prompt: CameraDNA.luxury_low_angle };
+  if (catLower.includes("jewel")) return { position: "macro", prompt: CameraDNA.macro };
+  return { position: "waist_level", prompt: CameraDNA.waist_level };
+}
+
+// ----------------------------------------------------------------------------
+// MODULE F: DEPTH DNA — 5-Layer Compositional Depth Engine
+// ----------------------------------------------------------------------------
+const DepthDNA = {
+  layers: [
+    "FOREGROUND (0–50cm from lens): Subtle out-of-focus props, soft shadow of product/model, FSC shopping bag or gift box edge",
+    "HERO PRODUCT PLANE (50–100cm from lens): The primary subject — product or model with garment — occupying approximately 60% of visual frame weight, critically sharp",
+    "MIDGROUND (100–200cm from lens): Travertine podium, marble floor surface, base of planter or shelving. Slightly soft with natural depth of field fall-off",
+    "ARCHITECTURAL PLANE (200–350cm from lens): Signature arch outline with magenta LED, cream stone back wall, black fluted side panels, shelving unit, sconce lights",
+    "BACKGROUND (350cm+ from lens): Soft vignetting on wall surface, subtle lighting falloff creating atmosphere and depth, FSC 3D logo inside arch at focal plane"
+  ],
+  compositionalBalance: {
+    heroSubject: "≈ 60% of visual frame weight — product or model is the undisputed primary subject",
+    negativeSpace: "≈ 25% of frame — intentional breathing room surrounding the subject; prevents visual clutter",
+    architecture: "≈ 15% of frame — studio architecture supports and frames the product; never overwhelms"
+  },
+  prompt: "DEPTH DNA — INTENTIONAL 5-LAYER VISUAL DEPTH: Build deliberate depth into the composition. Foreground: subtle soft shadows or props. Hero plane: sharp primary subject (60% visual weight). Midground: travertine podium, marble floor (soft falloff). Architectural plane: arch, LED strip, panels, sconces. Background: deep wall with FSC logo, soft lighting falloff. Compositional balance — Hero Subject ≈60%, Negative Space ≈25%, Architecture ≈15%. Nothing should feel flat or staged on a single plane."
+};
+
+// ----------------------------------------------------------------------------
+// MODULE G: COMMERCIAL PHOTOGRAPHY DNA (LENS PHYSICS, STROBES, & COMPOSITION)
+// ----------------------------------------------------------------------------
+export interface CommercialPhotographySpec {
+  camera: string;
+  lens: string;
+  aperture: string;
+  lightingSetup: string;
+  colorScience: string;
+  retouchingStandard: string;
+}
+
+export function getCommercialPhotographyDNA(category: string, isProductOnly: boolean = false): CommercialPhotographySpec {
+  const lowerCat = category.toLowerCase();
+
+  if (lowerCat.includes("perfume") || lowerCat.includes("cosmetic") || lowerCat.includes("jewel") || lowerCat.includes("watch")) {
+    return {
+      camera: "Hasselblad X2D 100C 100MP Medium Format",
+      lens: "Hasselblad XCD 120mm f/3.5 Macro Lens",
+      aperture: "f/11 for edge-to-edge optical sharpness, razor-sharp macro refraction across every gemstone facet and glass surface",
+      lightingSetup: "High-end commercial macro lighting rig: dual Profoto strip softboxes with grid diffusers, soft overhead fill box, micro white bounce reflectors revealing gemstone fire, glass wall thickness, and liquid transparency",
+      colorScience: "Hasselblad Natural Color Solution (HNCS) 16-bit color depth, true glass refraction rendering, zero color shift",
+      retouchingStandard: "High-end luxury commercial campaign standard: zero noise, pristine glass reflections, razor-sharp micro-textures, zero AI smoothing"
+    };
+  } else if (lowerCat.includes("shoe") || lowerCat.includes("bag") || lowerCat.includes("accessory") || lowerCat.includes("electronic")) {
+    return {
+      camera: "Sony A7R V 61MP Full-Frame Mirrorless",
+      lens: "Sony FE 90mm f/2.8 Macro G OSS",
+      aperture: "f/8 for razor-sharp product with sharp stitching, natural soft background separation",
+      lightingSetup: "Commercial product photography strobe setup: 150cm key softbox at 45°, silver bounce fill card, dedicated rim kicker highlighting leather grain, hardware buckles, and sole geometry",
+      colorScience: "Sony Alpha flagship color science with 100% accuracy calibrated against X-Rite ColorChecker",
+      retouchingStandard: "E-commerce flagship catalogue standard: clean crisp edges, natural contact ground shadow, authentic physical material texture"
+    };
+  }
+
+  // Default Fashion / Apparel
+  return {
+    camera: "Sony A7R V 61MP Full-Frame Mirrorless",
+    lens: "Sony FE 85mm f/1.4 GM II Prime",
+    aperture: "f/2.0 for striking subject isolation, pin-sharp garment stitches and eye catch-lights, buttery smooth background bokeh",
+    lightingSetup: `Luxury fashion campaign lighting rig: large 180cm Profoto Octabox key light, white V-flat fill card, warm sconce accents, and glowing magenta LED rim. ${StudioSeed.lightingPositions}`,
+    colorScience: "Sony Alpha flagship editorial color science: rich authentic skin tones, precise fabric color reproduction, controlled highlights",
+    retouchingStandard: "Vogue / Harper's Bazaar / Elle editorial fashion standard: authentic skin pores, real fabric drape folds, zero plastic skin, zero AI glow"
+  };
+}
+
+// ----------------------------------------------------------------------------
+// MODULE H: CATEGORY DNA (FASHION, SHOES, HANDBAGS, JEWELLERY, PERFUME, ETC.)
+// ----------------------------------------------------------------------------
+export interface CategoryDNASpec {
+  categoryName: string;
+  isFashion: boolean;
+  allowsModel: boolean;
+  defaultComposition: string;
+  framingPrompt: string;
+  productAdaptationPrompt: string;
+  brandRetentionRule: string;
+  stylingPrompt: string;
+}
+
+export const CategoryDNARegistry: Record<string, CategoryDNASpec> = {
+  fashion: {
+    categoryName: "Fashion & Apparel",
+    isFashion: true,
+    allowsModel: true,
+    defaultComposition: "OFF-CENTER EDITORIAL FULL BODY",
+    framingPrompt: "Full-length head-to-toe shot showing complete outfit including footwear. Model is positioned strictly OFF-CENTER (LEFT or RIGHT of the arch). The FSC 3D logo in the center of the signature arch remains 100% unblocked.",
+    productAdaptationPrompt: "Product → Model → Studio hierarchy. Garment is the hero. Immaculate tailoring, realistic fabric drape and weight, exact sleeve length, preserved neckline, exact silhouette.",
+    brandRetentionRule: "If product is a third-party designer item (e.g. Dior, Gucci, Louis Vuitton, Zara, Nike), preserve authentic manufacturer tags/logos on garment. FSC branding belongs strictly to the architecture and FSC packaging.",
+    stylingPrompt: "FASHION CATEGORY STYLING: Editorial movement, human presence, authentic garment behavior. Fabric drapes with real weight physics. Garment shows natural sitting wrinkles, fold lines, and real movement. Model's expression is confident but natural — Vogue editorial energy, not generic stock photo."
+  },
+  shoes: {
+    categoryName: "Footwear & Shoes",
+    isFashion: false,
+    allowsModel: false,
+    defaultComposition: "LUXURY FOOTWEAR HERO PODIUM — LOW ANGLE",
+    framingPrompt: "Eye-level to slightly low commercial shoe photography. Pair of shoes rests elegantly on the circular cream stone podium. Sole geometry, heel height, lacing, and side silhouette critically sharp. No human model unless explicitly requested.",
+    productAdaptationPrompt: "Eye-level 3/4 angle highlighting leather/canvas texture, stitching, sole tread pattern, buckle/lace hardware, heel profile, toe box curvature. Natural contact ground shadow on cream marble.",
+    brandRetentionRule: "Preserve authentic shoe brand (e.g. Nike swoosh, Adidas stripes, Christian Louboutin red sole, Jimmy Choo logo) on heel, tongue, and sole. FSC branding on wall logo and optional FSC shopping bag.",
+    stylingPrompt: "SHOE CATEGORY STYLING: Low camera angle for product authority. Side profile showing heel height and sole stack. 3/4 angle showing toe box curvature. Lace routing preserved exactly. Pair placed naturally — not arranged artificially. Real leather creasing and material texture."
+  },
+  bags: {
+    categoryName: "Handbags & Leather Goods",
+    isFashion: false,
+    allowsModel: false,
+    defaultComposition: "HERO LUXURY HANDBAG DISPLAY — SLIGHTLY LOW ANGLE",
+    framingPrompt: "Slightly low camera hero angle for bag authority. Luxury handbag on the low circular cream stone podium or polished marble floor. FSC white shopping bag placed naturally beside it as styling prop.",
+    productAdaptationPrompt: "Focus on leather grain scale, edge paint finish, metallic clasp hardware, handle drop distance, shoulder strap geometry, quilting pattern density, interior construction if partially visible. Contact shadow on marble.",
+    brandRetentionRule: "Preserve authentic bag brand (e.g. Louis Vuitton monogram, Chanel double-C clasp, Gucci GG canvas) on clasp and body. FSC branding on architectural wall sign and FSC gift box tag.",
+    stylingPrompt: "BAG CATEGORY STYLING: Handle or strap positioned naturally — not artificially propped. Hardware catches real specular highlights from key light. Leather surface shows authentic grain character and slight natural patina. Quilting stitches are counted and accurate."
+  },
+  jewellery: {
+    categoryName: "Jewellery & High Fine Jewelry",
+    isFashion: false,
+    allowsModel: false,
+    defaultComposition: "CLOSE-UP MACRO JEWELLERY DISPLAY",
+    framingPrompt: "Macro detail photography. Jewellery rests on pristine cream travertine block or velvet display pedestal inside the illuminated recessed wall niche. Soft background bokeh.",
+    productAdaptationPrompt: "Precision macro focus: gemstone facets emit brilliant multi-spectral sparkle, polished gold/platinum catches crisp specular highlights, ring/pendant engraving razor-sharp, prong setting precisely rendered.",
+    brandRetentionRule: "Preserve maker's hallmark and brand engraving (e.g. Cartier, Tiffany & Co., Van Cleef) on interior band. FSC branding on architectural wall logo.",
+    stylingPrompt: "JEWELLERY CATEGORY STYLING: Minimal props — clean travertine or velvet surface only. Gemstones show genuine fire and brilliance under focused macro light. Metal surfaces show no AI-smoothing — authentic polish with micro-scratches. Ring interior engraving visible with raking light."
+  },
+  perfume: {
+    categoryName: "Perfume & Fragrance",
+    isFashion: false,
+    allowsModel: false,
+    defaultComposition: "MACRO FRAGRANCE BOTTLING PORTRAIT",
+    framingPrompt: "Commercial fragrance portrait. Perfume bottle stands on honed travertine pedestal inside recessed illuminated shelving or central podium. FSC shopping bag and gift box as styling props nearby.",
+    productAdaptationPrompt: "Glass wall thickness, internal liquid transparency and color at correct fill level, spray atomizer nozzle detail, cap reflection and proportion, embossed label typography rendered with 100% optical accuracy.",
+    brandRetentionRule: "Preserve authentic perfume brand label (e.g. Chanel N°5, Dior Sauvage, Tom Ford Oud Wood, Creed Aventus) on bottle front panel. FSC branding on 3D wall logo and FSC shopping bag.",
+    stylingPrompt: "PERFUME CATEGORY STYLING: Glass bottle catches ambient light with multiple internal reflections showing liquid color and depth. Cap is precisely proportioned and rendered. Atomizer nozzle detail sharp. Natural shadow cast by bottle glass onto travertine surface. No artificial flare or CGI chrome effects."
+  },
+  watches: {
+    categoryName: "Watches & Timepieces",
+    isFashion: false,
+    allowsModel: false,
+    defaultComposition: "LUXURY HOROLOGY DISPLAY — MACRO",
+    framingPrompt: "Macro timepiece photography. Watch mounted on watch cushion or stone display block resting on circular stone podium. Diffused side key light for dial legibility.",
+    productAdaptationPrompt: "Watch bezel style (smooth, fluted, ceramic), watch face dial numerals and indices, hand positions, sapphire glass anti-reflective sheen, leather grain or metallic bracelet link geometry rendered with microscopic precision.",
+    brandRetentionRule: "Preserve authentic watch manufacturer branding (e.g. Rolex crown logo, Omega constellation logo, Patek Philippe Calatrava cross, TAG Heuer dial text) exactly on watch dial. FSC branding on background wall architecture.",
+    stylingPrompt: "WATCH CATEGORY STYLING: Dial is completely legible — no blown-out highlights on face. Bezel edges show real physical depth and dimension. Crown correctly positioned at 3 o'clock. Bracelet links show authentic finishing — polished vs satin alternation. Time set to 10:10 position for classic horology presentation."
+  },
+  cosmetics: {
+    categoryName: "Cosmetics & Beauty Products",
+    isFashion: false,
+    allowsModel: false,
+    defaultComposition: "BEAUTY PRODUCT HERO ARRANGEMENT",
+    framingPrompt: "Commercial cosmetics arrangement on cream marble or travertine pedestal with soft wrap-around softbox illumination and minimal botanical styling accent.",
+    productAdaptationPrompt: "Packaging typography crisp, cap texture accurate, formula shade color precisely matched, compact finish and lipstick bullet geometry exactly reproduced.",
+    brandRetentionRule: "Preserve original cosmetics brand label (e.g. Fenty Beauty, MAC Cosmetics, Estée Lauder, Charlotte Tilbury). FSC branding on retail packaging and architectural background.",
+    stylingPrompt: "COSMETICS CATEGORY STYLING: Products arranged in editorial cluster — not in a single line. Packaging labels face camera at legible angle. Shade bullets or applicators suggest the formula color accurately. Subtle botanical prop (single dried flower, leaf) for luxury beauty editorial feel."
+  },
+  electronics: {
+    categoryName: "Electronics & Tech Accessories",
+    isFashion: false,
+    allowsModel: false,
+    defaultComposition: "PREMIUM TECH PRODUCT DISPLAY — APPLE AESTHETIC",
+    framingPrompt: "Sleek architectural tech photography on circular stone podium with subtle backlight separation from arch LED. Clean, minimal, precise.",
+    productAdaptationPrompt: "Matte/anodized aluminum finish, screen glass reflections showing subtle environment, button edge chamfers, port geometry, and precise device silhouette reproduced exactly.",
+    brandRetentionRule: "Preserve original tech brand logos (e.g. Apple logo, Sony branding, Samsung wordmark). FSC branding on background architecture only.",
+    stylingPrompt: "ELECTRONICS CATEGORY STYLING: Apple-like minimalism. Device floats on stone podium with one clean shadow. Screen shows subtle reflection of studio environment — not a blank black mirror. Ports and buttons exactly placed. Matte surface shows micro-texture. No excessive reflection or flare."
+  }
+};
+
+export function getCategoryDNA(category: string): CategoryDNASpec {
+  const lower = category.toLowerCase();
+  if (lower.includes("shoe") || lower.includes("sneaker") || lower.includes("boot") || lower.includes("footwear") || lower.includes("heel")) return CategoryDNARegistry.shoes;
+  if (lower.includes("bag") || lower.includes("handbag") || lower.includes("tote") || lower.includes("clutch") || lower.includes("purse")) return CategoryDNARegistry.bags;
+  if (lower.includes("jewel") || lower.includes("ring") || lower.includes("necklace") || lower.includes("earring") || lower.includes("bracelet")) return CategoryDNARegistry.jewellery;
+  if (lower.includes("perfume") || lower.includes("fragrance") || lower.includes("cologne") || lower.includes("eau de")) return CategoryDNARegistry.perfume;
+  if (lower.includes("watch") || lower.includes("timepiece") || lower.includes("horology")) return CategoryDNARegistry.watches;
+  if (lower.includes("cosmetic") || lower.includes("makeup") || lower.includes("skincare") || lower.includes("lipstick") || lower.includes("beauty")) return CategoryDNARegistry.cosmetics;
+  if (lower.includes("electronic") || lower.includes("phone") || lower.includes("headphone") || lower.includes("gadget") || lower.includes("tech")) return CategoryDNARegistry.electronics;
+  return CategoryDNARegistry.fashion;
+}
+
+// ----------------------------------------------------------------------------
+// MODULE I: RETAIL STYLING DNA — Curated Props for Each Context
+// ----------------------------------------------------------------------------
+const RetailStylingDNA = {
+  universal: [
+    "FSC premium white shopping bag with magenta logo (#B0208D) handle facing camera",
+    "FSC burgundy gift box with gold ribbon and FSC branded gift tag"
+  ],
+  luxury_props: [
+    "Brass sculptural decor object (sphere, vase, or abstract form)",
+    "Hardcover coffee table art book (fashion, architecture, or nature)",
+    "Natural dried botanicals (pampas grass, eucalyptus, or protea)",
+    "Minimal honed travertine stone block"
+  ],
+  usage: "Retail styling props ONLY appear when contextually appropriate for the category and scene. NEVER use props for macro jewellery, macro watches, or pure product lab shots. Props are NEVER the focus — they frame and support the hero product."
+};
+
+// ----------------------------------------------------------------------------
+// MODULE J: SCENE PROFILES (EVOLUTIONARY VARIANTS OF FSC SIGNATURE STUDIO)
+// ----------------------------------------------------------------------------
+export interface StudioProfile {
   id: string;
   name: string;
   environmentPrompt: string;
@@ -192,332 +581,328 @@ interface StudioProfile {
   brandingPrompt: string;
   negativePrompt: string;
   qualityRequirements: string[];
+  inheritedFrom?: string;
 }
 
 const StudioProfileRegistry: Record<string, StudioProfile> = {
   fsc_signature: {
     id: "fsc_signature",
     name: "FSC Signature Studio (Lilongwe Flagship)",
-    environmentPrompt: "FSC SIGNATURE STUDIO ARCHITECTURAL SET (Flagship Studio inside Forgiven Shopping Centre, Lilongwe, Malawi): Modern African luxury fashion set featuring a textured cream stone back wall with a large central rounded architectural arch. The arch is outlined by a bright glowing magenta LED accent light strip (#B0208D). Flanking both the far left and right edges are black fluted vertical architectural column panels (#111111) with warm vertical tube sconces. On the right wall is a built-in vertical recessed display shelving unit with warm backlighting and minimal brass decor. On the left floor stands a tall cylindrical polished gold/brass planter with a lush green tropical plant. In front of the arch on the floor sits a low circular cream stone podium. Polished cream marble flooring with realistic soft reflections.",
-    lightingPrompt: "Warm premium luxury commercial studio lighting (3000K-3500K). Key light soft illumination, gentle fill, warm sconces, and glowing magenta LED arch outline (#B0208D).",
-    compositionPrompt: "CRITICAL OFF-CENTER MODEL POSITIONING: The model or product display MUST be positioned OFF-CENTER, standing or sitting strictly on the LEFT or RIGHT side of the arch/podium. The center of the arch wall and the Forgiven Shopping Centre brand logo MUST remain 100% UNBLOCKED and fully visible. Product is the hero.",
-    cameraPrompt: "Luxury commercial campaign photography, Sony A7R V 85mm f/1.4 GM II prime lens, pin-sharp detail, high-end editorial color grading.",
-    brandingPrompt: "The official Forgiven Shopping Centre logo — a bold magenta shopping bag icon containing a white letter 'F', with 'Forgiven' written in bold magenta below and 'Shopping Centre' in smaller magenta text beneath — is centered on the upper wall inside the signature arch. The logo is 100% visible, fully unobstructed, and lit by the arch lighting. Optional: an FSC white shopping bag with the magenta logo (#B0208D) and a wrapped gift box placed on the floor beside the podium.",
-    negativePrompt: "european luxury store imitation, american mall aesthetic, model standing in center blocking logo, model covering logo, blocked branding, wooden floors, office interiors, hotel lobbies, concrete walls, blue lighting, neon cyan/green backgrounds, outdoor scenery, random arches, exposed brick, industrial lofts, overly futuristic rooms, dark cinematic lighting, clutter, oversized furniture, different logo placement, CGI render, 3D render, artificial skin, wax texture, plastic skin, extra fingers, hyper-real uncanny valley.",
-    qualityRequirements: [
-      "Signature arch with magenta LED glowing outline (#B0208D)",
-      "Textured cream stone back wall",
-      "Black fluted vertical side panels with warm sconce lights",
-      "Polished cream marble floor with soft reflections",
-      "Low circular cream stone podium",
-      "Tall gold/brass planter with green plant on left",
-      "Built-in recessed shelving on right",
-      "Forgiven Shopping Centre logo fully visible in center of arch",
-      "OFF-CENTER model positioning (standing/sitting on left or right)",
-      "Warm premium commercial lighting (3000K-3500K)",
-      "Product is hero with immaculate tailoring and details"
-    ]
+    environmentPrompt: BaseStudioDNA.architecturePrompt,
+    lightingPrompt: BaseStudioDNA.lightingPrompt,
+    compositionPrompt: "CRITICAL OFF-CENTER POSITIONING: Product/model positioned strictly OFF-CENTER (LEFT or RIGHT). Signature arch center and 3D mounted FSC brand logo remain 100% unblocked. Priority: Product → Model → Studio. " + DepthDNA.prompt,
+    cameraPrompt: "Sony A7R V 85mm f/1.4 GM II prime lens, pin-sharp detail, real depth of field, natural white balance, high-end editorial color grading.",
+    brandingPrompt: BaseStudioDNA.brandingPrompt + " Optional styling: FSC white shopping bag with magenta logo (#B0208D) and wrapped burgundy gift box beside podium.",
+    negativePrompt: BaseStudioDNA.negativePrompt,
+    qualityRequirements: BaseStudioDNA.qualityRequirements
   },
   studio: {
     id: "studio",
-    name: "FSC Signature Studio ",
-    environmentPrompt: "FSC SIGNATURE STUDIO ARCHITECTURAL SET (Flagship Studio inside Forgiven Shopping Centre, Lilongwe, Malawi): Modern African luxury fashion set featuring a textured cream stone back wall with a large central rounded architectural arch. The arch is outlined by a bright glowing magenta LED accent light strip (#B0208D). Flanking both the far left and right edges are black fluted vertical architectural column panels (#111111) with warm vertical tube sconces. On the right wall is a built-in vertical recessed display shelving unit with warm backlighting and minimal brass decor. On the left floor stands a tall cylindrical polished gold/brass planter with a lush green tropical plant. In front of the arch on the floor sits a low circular cream stone podium. Polished cream marble flooring with realistic soft reflections.",
-    lightingPrompt: "Warm premium luxury commercial studio lighting (3000K-3500K). Key light soft illumination, gentle fill, warm sconces, and glowing magenta LED arch outline (#B0208D).",
-    compositionPrompt: "CRITICAL OFF-CENTER MODEL POSITIONING: The model or product display MUST be positioned OFF-CENTER, standing or sitting strictly on the LEFT or RIGHT side of the arch/podium. The center of the arch wall and the Forgiven Shopping Centre brand logo MUST remain 100% UNBLOCKED and fully visible. Product is the hero.",
-    cameraPrompt: "Luxury commercial campaign photography, Sony A7R V 85mm f/1.4 GM II prime lens, pin-sharp detail, high-end editorial color grading.",
-    brandingPrompt: "The official Forgiven Shopping Centre logo — a bold magenta shopping bag icon containing a white letter 'F', with 'Forgiven' written in bold magenta below and 'Shopping Centre' in smaller magenta text beneath — is centered on the upper wall inside the signature arch. The logo is 100% visible, fully unobstructed, and lit by the arch lighting. Optional: an FSC white shopping bag with the magenta logo (#B0208D) and a wrapped gift box placed on the floor beside the podium.",
-    negativePrompt: "european luxury store imitation, american mall aesthetic, model standing in center blocking logo, model covering logo, blocked branding, wooden floors, office interiors, hotel lobbies, concrete walls, blue lighting, neon cyan/green backgrounds, outdoor scenery, random arches, exposed brick, industrial lofts, overly futuristic rooms, dark cinematic lighting, clutter, oversized furniture, different logo placement, CGI render, 3D render, artificial skin, wax texture, plastic skin, extra fingers, hyper-real uncanny valley.",
-    qualityRequirements: [
-      "Signature arch with magenta LED glowing outline (#B0208D)",
-      "Textured cream stone back wall",
-      "Black fluted vertical side panels with warm sconce lights",
-      "Polished cream marble floor with soft reflections",
-      "Low circular cream stone podium",
-      "Tall gold/brass planter with green plant on left",
-      "Built-in recessed shelving on right",
-      "Forgiven Shopping Centre logo fully visible in center of arch",
-      "OFF-CENTER model positioning (standing/sitting on left or right)",
-      "Warm premium commercial lighting (3000K-3500K)",
-      "Product is hero with immaculate tailoring and details"
-    ]
+    name: "FSC Signature Studio (Lilongwe Flagship)",
+    environmentPrompt: BaseStudioDNA.architecturePrompt,
+    lightingPrompt: BaseStudioDNA.lightingPrompt,
+    compositionPrompt: "CRITICAL OFF-CENTER POSITIONING: Product/model positioned strictly OFF-CENTER (LEFT or RIGHT). Signature arch center and 3D mounted FSC brand logo remain 100% unblocked. Priority: Product → Model → Studio. " + DepthDNA.prompt,
+    cameraPrompt: "Sony A7R V 85mm f/1.4 GM II prime lens, pin-sharp detail, real depth of field, natural white balance, high-end editorial color grading.",
+    brandingPrompt: BaseStudioDNA.brandingPrompt + " Optional styling: FSC white shopping bag with magenta logo (#B0208D) and wrapped burgundy gift box beside podium.",
+    negativePrompt: BaseStudioDNA.negativePrompt,
+    qualityRequirements: BaseStudioDNA.qualityRequirements
   },
   luxury_white: {
     id: "luxury_white",
     name: "FSC Luxury White Studio",
-    environmentPrompt: "FSC LUXURY WHITE STUDIO (Lookbook & E-Commerce Studio at Forgiven Shopping Centre, Lilongwe): A professional fashion photography cyclorama studio. Seamless pure white curved sweep background — no visible horizon line. The floor transitions smoothly into the back wall, creating a floating, gravity-free sense of space. The studio floor has a barely-perceptible gloss — just enough to show a faint, soft reflection of the model's shoes and hem. Freshly painted matte white walls. The environment feels like a real high-end commercial studio — clean, functional, and purposefully minimal. No props, no decoration, pure product focus.",
-    lightingPrompt: "Professional commercial strobe lighting rig: Large 150cm Elinchrom Octabox as primary key light at 45 degrees, large white V-flat reflector on opposite side for even fill, gridded beauty dish for face, two kicker lights behind for subtle rim separation from background. Precisely 5600K daylight balanced. No lens flare. Clean shadow-free quality with soft ground shadow for grounding.",
-    compositionPrompt: "Classic commercial e-commerce and lookbook composition. Model centered or three-quarters turn. Full body shot — head to toe — showing complete outfit including footwear. Negative space used intentionally. Clean, professional magazine-ready framing.",
-    cameraPrompt: "Shot on Canon EOS R5 with 50mm f/1.2 RF lens, ISO 100, 1/200s shutter, f/8 for total sharpness. Color calibrated with X-Rite ColorChecker for true-to-life fabric color reproduction. Tethered capture workflow.",
-    brandingPrompt: "The official Forgiven Shopping Centre logo — a bold magenta shopping bag icon containing a white letter 'F', with 'Forgiven' written in bold magenta below and 'Shopping Centre' in smaller magenta text beneath — is composited into the lower-right corner as a clean professional watermark at 80% opacity. Logo dimensions are consistent and never stretched or distorted.",
-    negativePrompt: "grey background, dirty walls, visible floor joins, harsh shadows under chin, yellow tint, blown-out highlights, warm color cast, colored gels, Instagram filter, barrel distortion, JPEG compression artifacts, grainy texture, cheap ring-light catch-lights, ghost shadows, double shadows.",
-    qualityRequirements: ["Seamless white cyclorama with soft floor reflection", "Professional 5600K daylight strobe lighting rig", "Canon R5 color-accurate fabric rendering", "Head-to-toe full body framing", "FSC magenta logo watermark lower-right corner", "Clean professional e-commerce quality finish"]
+    inheritedFrom: "fsc_signature",
+    environmentPrompt: "FSC LUXURY WHITE STUDIO (Lookbook & Catalogue Studio at Forgiven Shopping Centre, Lilongwe): Professional fashion photography cyclorama studio. Seamless curved white sweep background transitioning smoothly into freshly painted matte white floor with barely-perceptible gloss and soft reflections. Clean, functional, minimal luxury retail photography space.",
+    lightingPrompt: "Professional 5600K daylight strobe lighting rig: 180cm Elinchrom Octabox key light, large white V-flat fill card, clean rim kickers. Shadow-free commercial clarity with soft natural ground contact shadow.",
+    compositionPrompt: "Clean commercial catalogue composition. Product or model positioned with balanced rule of thirds framing. Uncluttered negative space, magazine-ready finish. " + DepthDNA.prompt,
+    cameraPrompt: "Canon EOS R5 with 50mm f/1.2 RF lens at f/8. X-Rite ColorChecker calibrated for 100% true-to-life color reproduction.",
+    brandingPrompt: "FSC logo — bold magenta (#B0208D) shopping bag with white 'F' and 'Forgiven Shopping Centre' text — physically mounted as 3D white/magenta architectural wall sign on right cyclorama sweep wall.",
+    negativePrompt: "grey background, dirty walls, visible floor joins, yellow tint, blown-out highlights, warm color cast, colored gels, Instagram filter, visible grain.",
+    qualityRequirements: ["Seamless white cyclorama with soft floor reflection", "5600K daylight strobe lighting", "Canon R5 color-accurate rendering", "FSC 3D architectural wall logo visible", "Clean professional catalogue finish"]
   },
   lifestyle_home: {
     id: "lifestyle_home",
     name: "FSC Lifestyle Residence",
-    environmentPrompt: "FSC LIFESTYLE RESIDENCE (Luxury Residential Editorial Set at Forgiven Shopping Centre, Lilongwe): A real, lived-in feeling modern African luxury apartment interior. Warm cream limewash plaster walls with natural texture variation. Honed travertine marble floor in a herringbone pattern — warm honey and cream tones with a slight matte surface that catches soft raking light. A large floor-to-ceiling window on the left lets in abundant natural morning daylight, with white sheer linen curtains diffusing light softly. Contemporary understated furniture: a low cream bouclé sofa with brass legs, a slim dark wood side table with a small terracotta vase holding dried Malawian grasses, a woven raffia accent rug. Subtle editorial detail: a hardcover coffee table book slightly open on the side table. Warm indirect ambient lighting from a hidden cove. This space feels genuinely inhabited, not staged.",
-    lightingPrompt: "Primary illumination from natural morning sunlight through floor-to-ceiling windows — bright and directional, casting soft long architectural shadows across the herringbone floor. White sheer curtains diffuse direct sun into wrapping softbox-quality light. Fill from a large white bounce card on camera right to open shadows. Practical lamp on side table adds warm 2700K accent. Mixed color temperature: 5500K window daylight + 2700K practical lamp — this mix gives cinematic realism.",
-    compositionPrompt: "Relaxed editorial lifestyle composition. Model caught in a natural moment — standing near the window looking slightly off camera, or sitting on the edge of the sofa. Body language is natural and human: weight shifted to one hip, arm relaxed at side, slight shoulder turn. Not a posed runway shot — it looks like a real person in their own home. Product is clearly visible but the image tells a story.",
-    cameraPrompt: "Shot on Hasselblad X2D 100C with 90mm f/3.2 XCD lens. Medium aperture f/3.2 for creamy background bokeh on room details while keeping the garment critically sharp. Natural daylight color science. The image should feel like a page from Vogue Living or Wallpaper* — intimate, warm, editorial.",
-    brandingPrompt: "The official Forgiven Shopping Centre logo — a bold magenta shopping bag icon containing a white letter 'F', with 'Forgiven' written in bold magenta below and 'Shopping Centre' in smaller magenta text beneath — appears subtly integrated into the scene as a natural interior element: printed on the spine of the coffee table book, or as a small framed artwork on the wall in the background. It must be clearly readable and recognizable but feel like an organic part of the interior decor.",
-    negativePrompt: "cluttered rooms, messy styling, old or worn furniture, cheap apartment aesthetic, harsh on-camera flash, cold blue light, AI skin smoothing, plastic-looking surfaces, overly perfect staged room, empty soulless space, IKEA generic furniture, hotel room aesthetic.",
-    qualityRequirements: ["Warm cream limewash plaster walls with natural texture", "Honed travertine herringbone marble floor", "Floor-to-ceiling window with natural morning sunlight", "Sheer linen curtains diffusing window light", "Contemporary African luxury furniture (bouclé sofa, brass accents, raffia rug)", "Natural editorial lifestyle model pose", "FSC logo integrated naturally into interior decor"]
+    inheritedFrom: "fsc_signature",
+    environmentPrompt: "FSC LIFESTYLE RESIDENCE (Luxury Residential Showroom at Forgiven Shopping Centre, Lilongwe): Real modern African luxury apartment interior. Warm cream limewash plaster walls, honed travertine marble floor in herringbone pattern, floor-to-ceiling window with white sheer linen curtains diffusing natural morning sunlight. Cream bouclé sofa, dark wood side table, raffia accent rug, hardcover art volume.",
+    lightingPrompt: "Natural morning sunlight through floor-to-ceiling windows (5500K) paired with 2700K practical lamp ambient fill — casting soft architectural shadows.",
+    compositionPrompt: "Editorial lifestyle composition. Model or product in an authentic relaxed moment. Story-driven framing with natural human behavior. " + DepthDNA.prompt,
+    cameraPrompt: "Hasselblad X2D 100C with 90mm f/3.2 lens. Creamy background bokeh, critically sharp subject, natural daylight color science.",
+    brandingPrompt: "Forgiven Shopping Centre logo physically integrated into the interior: engraved into the travertine feature wall or displayed as 3D brass plaque on side table.",
+    negativePrompt: "cluttered rooms, worn furniture, cheap apartment, harsh flash, cold blue light, plastic surfaces, staged room, IKEA generic furniture.",
+    qualityRequirements: ["Warm cream limewash plaster walls", "Honed travertine herringbone floor", "Floor-to-ceiling window with natural sunlight", "Contemporary African luxury furniture", "FSC logo physically in interior feature wall"]
   },
   outdoor_fashion: {
     id: "outdoor_fashion",
     name: "FSC Outdoor Courtyard",
-    environmentPrompt: "FSC OUTDOOR COURTYARD (Contemporary Outdoor Terrace at Forgiven Shopping Centre, Lilongwe, Malawi): A real outdoor architectural terrace photographed on location. The ground is large-format rough-honed travertine stone pavers in warm cream and beige tones with subtle natural weathered grain. The back boundary is a textured dry-stack limestone wall at waist height, beyond which are established lush tropical and indigenous African garden plants: Elephant Ear leaves, Birds of Paradise, and Cycads — all botanically realistic. A mature shade tree with textured dark bark trunk stands to the left, casting real organic dappled shadow patterns across the terrace floor. Two simple architectural cream stone benches are visible in the background. The sky above is a vivid deep African blue with a few natural cumulus clouds near the horizon. This is Lilongwe — the light, the plants, and the stone all say East Africa.",
-    lightingPrompt: "Golden hour sunlight at approximately 15-20 degrees angle — warm amber-orange directional light (3200K-4000K) hitting the model from the right side, creating a beautiful warm rim on the shoulder and hair. Natural soft fill from open sky on the left. Real sun flares at lens edge are acceptable and add authenticity. Dappled tree shadow patterns fall across the stone floor.",
-    compositionPrompt: "High-fashion outdoor editorial composition. Model interacts authentically with the space — standing beside the limestone wall resting one hand on the top, looking toward the golden sun slightly off-axis, or seated on the stone bench with legs angled naturally. Environment is genuinely present and part of the story. Natural rule-of-thirds framing with architecture and vegetation providing visual depth layers.",
-    cameraPrompt: "Shot on Sony A7R V with Sony 85mm f/1.4 GM II lens. Aperture f/2.0 for subject separation with background foliage in soft bokeh. Natural RAW color science, warm golden color grade. Sun flare allowed when compositionally appropriate. The look of a real Vogue Africa or Elle Africa outdoor editorial shoot.",
-    brandingPrompt: "The official Forgiven Shopping Centre logo — a bold magenta shopping bag icon containing a white letter 'F', with 'Forgiven' written in bold magenta below and 'Shopping Centre' in smaller magenta text beneath — is integrated into the physical environment: engraved or sandblasted into the travertine stone wall as a tactile architectural feature, or as a slim brass plaque mounted to the limestone boundary wall. The logo must be physically present in the scene — three-dimensional and real — not a digital overlay or flat watermark.",
-    negativePrompt: "tourist crowds, concrete city streets, European garden aesthetic, generic tropical resort palms, mid-day harsh overhead sun, flat overcast sky, fake plastic plants, Dubai infinity pool, American suburban backyard, French chateau gardens, grey northern European stone, heavy artificial golden filter, oversaturated sky.",
-    qualityRequirements: ["Large-format travertine stone paver terrace", "Textured dry-stack limestone boundary wall", "Authentic African tropical and indigenous garden plants", "Mature shade tree with real dappled shadow on ground", "Golden hour warm directional sunlight (3200K-4000K)", "Deep vivid African blue sky", "Natural editorial outdoor model pose", "FSC logo engraved or mounted into physical architecture"]
+    inheritedFrom: "fsc_signature",
+    environmentPrompt: "FSC OUTDOOR COURTYARD (Contemporary Outdoor Terrace at Forgiven Shopping Centre, Lilongwe, Malawi): Large-format rough-honed travertine pavers in warm cream/beige. Textured dry-stack limestone boundary wall with lush tropical African garden plants (Birds of Paradise, Elephant Ears). Mature shade tree with dappled shadows. Vivid deep African blue sky.",
+    lightingPrompt: "Golden hour sunlight at 15–20° angle — warm amber-orange directional light (3200K-4000K) creating a warm rim highlight. Soft sky fill and dappled tree shadow patterns.",
+    compositionPrompt: "High-fashion outdoor editorial composition. Authentic interaction with architecture and garden. Layered visual depth. " + DepthDNA.prompt,
+    cameraPrompt: "Sony A7R V with 85mm f/1.4 GM II at f/2.0 for soft background bokeh. Warm golden RAW color science.",
+    brandingPrompt: "FSC logo physically sandblasted into travertine wall or mounted as slim 3D brass plaque on limestone boundary wall.",
+    negativePrompt: "concrete city streets, European garden, resort palms, mid-day harsh sun, flat overcast sky, fake plastic plants, oversaturated sky.",
+    qualityRequirements: ["Travertine stone paver terrace", "Dry-stack limestone boundary wall", "Authentic African tropical garden plants", "Golden hour warm sunlight (3200K-4000K)", "Deep African blue sky", "FSC logo physically in architecture"]
   },
   christmas_studio: {
     id: "christmas_studio",
     name: "FSC Christmas Pavilion",
-    environmentPrompt: "FSC CHRISTMAS PAVILION (Festive Holiday Studio Set at Forgiven Shopping Centre, Lilongwe): A sumptuous, opulent holiday editorial set designed by a world-class luxury retail set designer. The back wall is draped floor-to-ceiling in deep hunter green velvet — real fabric with weight and texture, natural fold shadows visible. Two tall slim Christmas trees (approximately 2.5 metres) dressed in deep burgundy satin ribbon, brushed gold baubles, and warm white fairy lights. The bokeh from the fairy lights creates beautiful out-of-focus warm orbs in the background. The floor is polished dark mahogany-toned hardwood, reflecting the warm fairy lights in long soft streaks. To the right sits a beautifully wrapped FSC gift box — deep burgundy wrapping, gold ribbon, magenta FSC shopping bag tag visible. A large antique-style champagne gold lantern sits on the floor to the left. The overall feeling is Harrods Christmas meets Lilongwe luxury — opulent, warm, tasteful, never tacky.",
-    lightingPrompt: "Primary: warm tungsten key light at 2700K positioned high and left for rich, flattering fashion light. Fill: large white bounce softens shadows without killing drama. Background: Christmas tree fairy lights glow naturally as warm bokeh orbs at 2400K-2700K. Practical lantern adds warm amber pool on floor. The mix of tungsten key and practical fairy lights creates warm, cinematic, genuinely festive atmosphere. Highlights are controlled — no blown-out specular spikes on baubles.",
-    compositionPrompt: "Festive luxury holiday fashion composition. Model stands elegantly slightly off-center to the right, three-quarters toward camera with natural relaxed pose — one hand perhaps touching the gift box lid, or standing with one foot forward. Christmas trees frame the model on both sides in the background, bokeh fairy lights floating behind. Warm, festive, editorial — like a luxury department store campaign.",
-    cameraPrompt: "Shot on Canon EOS R5 with 85mm f/1.4 RF lens. Aperture f/2.0 to throw fairy lights into beautiful round bokeh while keeping model and garment sharp. Tungsten color balance 3200K for rich warm holiday feel. Post-processed with elegant warm color grade, controlled highlight recovery on metallic surfaces, boosted deep green saturation in velvet.",
-    brandingPrompt: "The official Forgiven Shopping Centre logo — a bold magenta shopping bag icon containing a white letter 'F', with 'Forgiven' written in bold magenta below and 'Shopping Centre' in smaller magenta text beneath — appears on a physical brushed gold architectural panel mounted on the wall to the left of the velvet backdrop, lit by a small directional spotlight. Additionally the FSC magenta logo appears on the gift box tag in the foreground. The logo reads clearly but feels like an organic part of the festive set design.",
-    negativePrompt: "cheap plastic tinsel, tacky dollar-store decorations, blue or purple Christmas lights, cold color temperature, fluorescent lighting, Santa Claus imagery, reindeer or cartoon motifs, messy disorganized set, white plastic trees, silver aluminum decorations, cluttered floor, visible light stands or equipment, artificial snow spray, generic stock photo Christmas aesthetic.",
-    qualityRequirements: ["Deep hunter green velvet backdrop with real fabric fold shadows", "Two tall slim Christmas trees with burgundy ribbon, gold baubles, warm fairy lights", "Warm fairy light bokeh orbs in background", "Polished dark hardwood floor with light reflections", "FSC gift box with burgundy wrapping and gold ribbon in foreground", "Antique gold lantern floor accent", "Warm tungsten cinematic lighting (2700K key)", "FSC logo on gold architectural panel and gift tag", "Model natural relaxed festive pose"]
+    inheritedFrom: "fsc_signature",
+    environmentPrompt: "FSC CHRISTMAS PAVILION (Festive Holiday Studio at Forgiven Shopping Centre, Lilongwe): FSC Signature Studio architecture fully inherited — cream stone arch, magenta LED strip, polished marble floor, black fluted panels, brass planter — decorated for luxury holiday season. Twin tall Christmas trees with deep hunter green velvet backdrop accents, brushed gold baubles, burgundy satin ribbon, warm fairy lights bokeh. FSC burgundy gift box with gold ribbon in foreground.",
+    lightingPrompt: "Warm tungsten key (2700K) + fairy light bokeh orbs background. Practical antique gold lantern adding warm floor pool. Magenta LED arch retained (#B0208D).",
+    compositionPrompt: "Opulent festive luxury composition. Product/model off-center with Christmas trees and warm bokeh framing background. " + DepthDNA.prompt,
+    cameraPrompt: "Canon R5 with 85mm f/1.4 RF at f/2.0 for round bokeh orbs. Warm 3200K holiday color grading.",
+    brandingPrompt: "FSC logo mounted on physical brushed gold architectural panel lit by spotlight. FSC logo also on burgundy gift box tag in foreground.",
+    negativePrompt: "cheap tinsel, tacky decorations, blue/purple lights, cold temperature, Santa imagery, cartoon motifs, cluttered floor, plastic trees.",
+    qualityRequirements: ["FSC Signature Studio base architecture fully preserved", "Twin Christmas trees with gold baubles and warm fairy bokeh", "FSC burgundy gift box with gold ribbon", "FSC logo on gold architectural panel", "Magenta LED arch (#B0208D) retained"]
   },
   black_friday_studio: {
     id: "black_friday_studio",
     name: "FSC Black Friday Arena",
-    environmentPrompt: "FSC BLACK FRIDAY ARENA (High-Energy Promotional Campaign Studio at Forgiven Shopping Centre, Lilongwe): A sleek, dramatic high-contrast promotional set built for maximum visual impact. The back wall consists of large matte black architectural panels with a premium ribbed or fluted surface texture — not flat painted walls. Running horizontally across the back wall at mid-height is a continuous strip of vibrant magenta LED lighting (#B0208D) — glowing with intensity but without lens flare bloom. The floor is polished obsidian-black marble — so glossy it shows a near-perfect mirror reflection of the model's shoes and the magenta LED strip above. Slim black architectural columns flank the sides. The entire set feels like the premium VIP entrance to the most exclusive shopping event in Lilongwe.",
-    lightingPrompt: "Dramatic high-contrast commercial lighting rig: Primary tungsten spotlight from above (4000K) creating a defined pool of warm light on the model while the background stays dramatically darker. Rim lights behind the model on each side create sharp clean edge separation that pops the figure against the dark background. The magenta LED strip (#B0208D) provides practical ambient color. Deep rich blacks with no crushed shadow detail.",
-    compositionPrompt: "Bold, power-stance commercial campaign composition. Model stands with confident posture — feet shoulder-width apart, shoulders back, direct eye contact with camera or powerful three-quarter profile. Image must feel charged with energy and exclusivity. Low-angle camera position at hip height adds power and drama. The magenta LED strip and FSC logo are prominently visible in the background.",
-    cameraPrompt: "Shot on Sony A7R V with Sony 50mm f/1.2 GM lens. ISO 400 for subtle grain texture adding to dramatic feel. High contrast color grade — deep blacks, punchy midtones, controlled highlights. Magenta toning in shadows echoes the LED accent. Image feels like luxury streetwear meets premium African retail power.",
-    brandingPrompt: "The official Forgiven Shopping Centre logo — a bold magenta shopping bag icon containing a white letter 'F', with 'Forgiven' written in bold magenta below and 'Shopping Centre' in smaller magenta text beneath — is backlit and mounted on the matte black back wall, glowing in vivid magenta (#B0208D). It is the single most dominant branded element in the background. The logo is fully illuminated, sharp, and at full legibility — not glowing so brightly it blooms or becomes illegible.",
-    negativePrompt: "grey or beige background, soft warm cozy lighting, lifestyle casual feel, natural daylight, warm wood textures, flowers or plants, dull muted tones, washed-out contrast, low energy composition, timid pose, pastel colors, Instagram softness, excessive lens blur, muddy blacks without detail.",
-    qualityRequirements: ["Matte black ribbed/fluted architectural back wall panels", "Continuous magenta LED strip (#B0208D) across mid-wall", "Polished obsidian black marble floor with mirror reflections", "FSC logo backlit magenta — brightest background element", "Dramatic high-contrast spotlight on model", "Sharp rim lighting edge separation from background", "Low camera angle for power and drama", "Model with confident power-stance pose"]
+    inheritedFrom: "fsc_signature",
+    environmentPrompt: "FSC BLACK FRIDAY ARENA (High-Energy Promotional Studio at Forgiven Shopping Centre, Lilongwe): FSC Signature Studio architecture fully inherited — cream stone arch modified with dramatic magenta LED intensity, cream stone wall retained — with dramatic high-contrast black promotional set treatment. Matte black ribbed/fluted architectural wall panels (#111111) extend full width. Mid-wall continuous horizontal magenta LED strip (#B0208D) intensified. Polished obsidian-black marble floor with mirror reflections.",
+    lightingPrompt: "Dramatic high-contrast spotlight from above (4000K) with sharp rim kicker. Magenta LED strip (#B0208D) vibrant ambient accent at full intensity.",
+    compositionPrompt: "Bold high-energy power stance. Dynamic framing, high contrast, prominent magenta LED accent. " + DepthDNA.prompt,
+    cameraPrompt: "Sony A7R V with 50mm f/1.2 GM. High contrast color grade with deep rich blacks and magenta shadow tones.",
+    brandingPrompt: "FSC logo backlit in vivid magenta (#B0208D) physically mounted on matte black back wall — the brightest accent in the composition.",
+    negativePrompt: "soft warm cozy lighting, natural daylight, warm wood, flowers, dull muted tones, timid pose, pastel colors, washed-out contrast.",
+    qualityRequirements: ["Matte black fluted wall panels (#111111)", "Continuous magenta LED strip (#B0208D) intensified", "Polished obsidian black marble floor with mirror reflections", "Backlit magenta 3D FSC logo on back wall", "Dramatic high-contrast spotlighting"]
   },
   minimal_product_studio: {
     id: "minimal_product_studio",
     name: "FSC Product Lab",
-    environmentPrompt: "FSC PRODUCT LAB (Commercial Product Photography Studio at Forgiven Shopping Centre, Lilongwe): A real commercial product photography studio built for maximum garment detail accuracy. The background is a seamless sweep of warm off-white polished plaster — not pure white, but a gentle warm cream tone (#F5F0EA) that flatters fabric colors without distorting them. Smooth Italian polished plaster finish with a very subtle hand-applied texture visible under raking light. In the center-foreground is a solid travertine stone pedestal — approximately 40cm high, 50cm diameter — honed matte surface in warm honey-cream travertine. The floor is the same travertine material with natural stone grain patterns visible. A simple white fabric swatch card and a brass color-calibration tool rest on the pedestal edge — communicating precision and craftsmanship. This is a working studio, not a CGI set.",
-    lightingPrompt: "Precision garment photography lighting rig: Large 180cm Profoto Octabox positioned overhead-left for broad, wrapping, shadow-free illumination that reveals every thread and stitch. Secondary large rectangular softbox on camera right provides fill and eliminates harsh shadow under garment folds. Third narrow strip box behind the pedestal separates garment from background with a clean rim edge. Color temperature: precise 5000K D50 standard for true-to-print fabric color reproduction. Completely neutral — zero color casts.",
-    compositionPrompt: "Pure product-focused commercial composition. The garment or model is centered on the travertine pedestal — either worn by a model standing on or beside the pedestal with a clean, classic still-life inspired pose: standing straight with arms slightly forward showing garment sleeves, or turned to show back detail. Every seam, button, zipper, print, and texture must be critically sharp.",
-    cameraPrompt: "Shot on Hasselblad X2D 100C with XCD 90mm f/3.2 lens at f/11. 100-megapixel medium format capture for extreme detail retention. Color calibrated to X-Rite ColorChecker Passport for laboratory-accurate fabric color. Tethered capture with live view for precise focus on fabric weave. Used for both print catalogue and high-resolution digital zoom — every thread must be visible.",
-    brandingPrompt: "The official Forgiven Shopping Centre logo — a bold magenta shopping bag icon containing a white letter 'F', with 'Forgiven' written in bold magenta below and 'Shopping Centre' in smaller magenta text beneath — appears as a physical element: either as a small brass plaque affixed to the front face of the travertine pedestal, or as a crisp printed card leaning against the pedestal base. The logo is sharp, well-lit, and fully legible.",
-    negativePrompt: "cluttered styling props, patterned backdrops, colorful backgrounds, dramatic colored lighting, heavy retouching, oversaturated colors, missing product detail, soft focus on fabric, dark or moody atmosphere, visible lighting equipment, dust or debris on products, fashion campaign drama poses.",
-    qualityRequirements: ["Warm cream plaster seamless sweep background (#F5F0EA)", "Honed travertine stone pedestal with natural grain", "Precision 5000K D50 color-neutral lighting rig", "Profoto Octabox overhead key light for even fabric illumination", "100-megapixel Hasselblad capture — every thread visible", "Laboratory-accurate fabric color reproduction", "FSC logo as physical brass plaque or printed card on pedestal", "Technical detail composition — seams, buttons, zippers critically sharp"]
+    inheritedFrom: "fsc_signature",
+    environmentPrompt: "FSC PRODUCT LAB (Commercial Product Photography Studio at Forgiven Shopping Centre, Lilongwe): Seamless sweep of warm off-white cream plaster (#F5F0EA) with subtle hand-applied texture. Solid honed travertine stone pedestal (40cm high, 50cm diameter) in warm honey-cream tones. Travertine floor with natural grain.",
+    lightingPrompt: "Precision product photography rig: 180cm Profoto Octabox overhead key, rectangular fill softbox at 45°, 5000K D50 color-neutral standard. Zero color cast. Zero shadows outside product contact shadow.",
+    compositionPrompt: "Pure product-focused commercial composition. Garment or product centered on travertine pedestal. Seams, stitching, hardware critically sharp at 100MP resolution. " + DepthDNA.prompt,
+    cameraPrompt: "Hasselblad X2D 100C with 90mm f/3.2 at f/11 for 100MP extreme detail capture. Tethered color accuracy.",
+    brandingPrompt: "FSC logo displayed as physical 3D brass plaque affixed to front face of travertine pedestal.",
+    negativePrompt: "cluttered props, patterned backdrops, colorful background, dramatic colored lighting, soft focus, dark atmosphere.",
+    qualityRequirements: ["Warm cream plaster backdrop (#F5F0EA)", "Honed travertine stone pedestal", "5000K D50 neutral precision lighting", "Hasselblad 100MP extreme detail", "FSC 3D brass plaque logo on pedestal"]
   }
 };
-
-// --- MATERIAL PHYSICS ENGINE (V5) ---
-interface MaterialPhysicsSpec {
-  material: string;
-  physicsPrompt: string;
-  reflectionType: "specular" | "diffuse" | "sheen" | "matte" | "translucent";
-  drapeWeight: "heavy" | "medium" | "light" | "rigid";
-}
-
-const MaterialPhysicsRegistry: Record<string, MaterialPhysicsSpec> = {
-  satin: {
-    material: "satin",
-    physicsPrompt: "HIGH GLOSS SATIN: Liquid-smooth surface reflection, soft cascading drape folds, prominent specular highlights along curves, silky liquid sheen.",
-    reflectionType: "sheen", drapeWeight: "medium"
-  },
-  silk: {
-    material: "silk",
-    physicsPrompt: "PURE SILK: Delicate luster, soft organic micro-wrinkles, fluid draping, luminous light diffusion across fabric surface.",
-    reflectionType: "sheen", drapeWeight: "light"
-  },
-  cotton: {
-    material: "cotton",
-    physicsPrompt: "PREMIUM COTTON: Soft diffuse light absorption, natural weave texture, subtle micro-folds, zero synthetic gloss or plastic shine.",
-    reflectionType: "diffuse", drapeWeight: "medium"
-  },
-  denim: {
-    material: "denim",
-    physicsPrompt: "HEAVYWEIGHT DENIM: Rigid structured folds, visible twill weave pattern, thick reinforced seams, matte surface texture, authentic indigo dye depth.",
-    reflectionType: "matte", drapeWeight: "rigid"
-  },
-  linen: {
-    material: "linen",
-    physicsPrompt: "LUXURY LINEN: Crisp natural slub texture, airy relaxed wrinkles, matte organic light response, earthy fabric weave definition.",
-    reflectionType: "matte", drapeWeight: "light"
-  },
-  leather: {
-    material: "leather",
-    physicsPrompt: "GENUINE LEATHER: Rich surface grain texture, sharp specular reflections along seams, structured body contouring, subtle natural sheen.",
-    reflectionType: "specular", drapeWeight: "heavy"
-  },
-  suede: {
-    material: "suede",
-    physicsPrompt: "FINE SUEDE: Velvety soft nap texture, direction-dependent light absorption, rich tactile depth, zero gloss.",
-    reflectionType: "diffuse", drapeWeight: "medium"
-  },
-  chiffon: {
-    material: "chiffon",
-    physicsPrompt: "TRANSLUCENT CHIFFON: Ultra-light sheer transparency, delicate floating drapes, ethereal light passage through fabric layers.",
-    reflectionType: "translucent", drapeWeight: "light"
-  },
-  lace: {
-    material: "lace",
-    physicsPrompt: "INTRICATE LACE: Intricate openwork embroidery, crisp floral lace patterns, sheer see-through gaps, delicate scalloped edges.",
-    reflectionType: "translucent", drapeWeight: "light"
-  },
-  velvet: {
-    material: "velvet",
-    physicsPrompt: "ROYAL VELVET: Deep plush pile, rich color absorption with dramatic sheen highlights along folds, luxurious tactile depth.",
-    reflectionType: "sheen", drapeWeight: "heavy"
-  },
-  wool: {
-    material: "wool",
-    physicsPrompt: "TAILORED WOOL: Clean structured tailoring, subtle micro-fuzzy surface, matte finish, sharp lapels and crease retention.",
-    reflectionType: "matte", drapeWeight: "heavy"
-  },
-  knit: {
-    material: "knit",
-    physicsPrompt: "CHUNKY KNIT: Distinct rib-knit stitch pattern, soft elastic stretching over form, warm tactile yarn texture.",
-    reflectionType: "diffuse", drapeWeight: "heavy"
-  },
-  polyester: {
-    material: "polyester",
-    physicsPrompt: "TECHNICAL POLYESTER: Smooth synthetic weave, crisp clean seams, wrinkle-resistant drape, subtle semi-matte sheen.",
-    reflectionType: "diffuse", drapeWeight: "medium"
-  },
-  mesh: {
-    material: "mesh",
-    physicsPrompt: "ATHLETIC MESH: Perforated breathable hole pattern, semi-translucent structure, sporty technical texture.",
-    reflectionType: "translucent", drapeWeight: "light"
-  },
-  sequins: {
-    material: "sequins",
-    physicsPrompt: "GLAMOROUS SEQUINS: Hundreds of shimmering metallic disc facets, catching light from multiple angles, dazzling specular sparkle points.",
-    reflectionType: "specular", drapeWeight: "heavy"
-  }
-};
-
-function getMaterialPhysicsSpec(materialName: string): MaterialPhysicsSpec {
-  const lower = materialName.toLowerCase();
-  for (const key of Object.keys(MaterialPhysicsRegistry)) {
-    if (lower.includes(key)) return MaterialPhysicsRegistry[key];
-  }
-  return {
-    material: materialName || "fabric",
-    physicsPrompt: `PREMIUM FABRIC (${materialName}): Natural textile drape, accurate surface weave texture, realistic light response, zero plastic appearance.`,
-    reflectionType: "diffuse", drapeWeight: "medium"
-  };
-}
-
-// --- VIRTUAL CAMERA SIMULATION ENGINE (V5) ---
-interface CameraSimulationSpec {
-  camera: string;
-  lens: string;
-  aperture: string;
-  lightingSetup: string;
-  colorScience: string;
-}
-
-function buildPhotographySpecs(cameraType: string = "sony_a7rv", lensType: string = "85mm"): CameraSimulationSpec {
-  if (cameraType.includes("canon")) {
-    return {
-      camera: "Canon R5 Professional Mirrorless",
-      lens: "Canon RF 50mm f/1.2L USM Prime Lens",
-      aperture: "f/1.8 for razor-sharp product subject with soft creamy background bokeh",
-      lightingSetup: "High-end commercial fashion strobe lighting with 150cm octabox key light and soft white bounce card fill",
-      colorScience: "Vibrant true-to-life Canon skin tones and deep rich fabric hues"
-    };
-  } else if (cameraType.includes("hasselblad")) {
-    return {
-      camera: "Hasselblad X2D 100C Medium Format",
-      lens: "Hasselblad XCD 105mm f/1.4 Prime Lens",
-      aperture: "f/2.8 for medium format hyper-realistic texture detail and natural falloff",
-      lightingSetup: "Editorial natural window daylight paired with subtle warm tungsten accent rim light",
-      colorScience: "Hasselblad Natural Color Solution (HNCS) with unmatched 16-bit color depth"
-    };
-  }
-  return {
-    camera: "Sony A7R V 61MP Full-Frame Mirrorless",
-    lens: "Sony FE 85mm f/1.4 GM II Prime Lens",
-    aperture: "f/2.0 optical separation, pin-sharp eyes and garment stitches with natural depth",
-    lightingSetup: "Commercial studio lighting rig: soft key light, gentle fill, subtle backlight rim",
-    colorScience: "Sony Alpha flagship commercial color science with natural skin tones and pristine highlights"
-  };
-}
 
 function getStudioProfile(sceneType: string): StudioProfile {
   return StudioProfileRegistry[sceneType] || StudioProfileRegistry["fsc_signature"] || StudioProfileRegistry["studio"];
 }
 
-// FSC BRAND LOGO — exact definition, injected consistently into every studio
+// FSC BRAND LOGO — exact specification, injected consistently into every studio
 const FSC_BRAND_LOGO_DEFINITION = `EXACT FSC LOGO SPECIFICATION (NON-NEGOTIABLE):
-The Forgiven Shopping Centre logo must appear exactly as follows in every image:
+The Forgiven Shopping Centre logo must appear physically mounted inside the architecture as follows:
 - Shape: A bold shopping bag icon with a rounded rectangular form
 - Color: Solid vibrant magenta (#B0208D) bag body
 - Letter: A bold white capital letter 'F' centered on the bag icon
-- Brand name line 1: 'Forgiven' written in bold magenta (#B0208D) text directly below the bag icon
-- Brand name line 2: 'Shopping Centre' written in smaller magenta (#B0208D) text beneath 'Forgiven'
+- Brand name line 1: 'Forgiven' in bold magenta (#B0208D) text directly below the bag icon
+- Brand name line 2: 'Shopping Centre' in smaller magenta (#B0208D) text beneath 'Forgiven'
 - The logo lockup is always vertical: bag icon on top, 'Forgiven' below, 'Shopping Centre' below that
-- The logo must always be legible, sharply rendered, correctly proportioned, and never distorted, stretched, mirrored, or obscured
-- Logo color is always magenta (#B0208D) — never changed to match the garment, background, or any other element`;
+- Physical Mounting: Mounted on the cream stone wall inside the arch as 3D dimensional lettering with real depth and natural drop shadows
+- THIRD-PARTY BRAND INTEGRITY: Third-party manufacturer logos on products (e.g. Rolex, Nike, Apple, Louis Vuitton, Gucci, Chanel, Samsung) MUST be preserved 100% authentic and untouched on the product. FSC branding belongs ONLY to the retail architecture and FSC shopping bags/packaging.`;
 
-function buildEnterpriseBrandPrompt(sceneType: string, isVideo: boolean = false, cameraType?: string): { prompt: string, profile: StudioProfile } {
+// ----------------------------------------------------------------------------
+// MODULE K: CAMPAIGN DNA — Multi-Image Photoshoot Consistency Engine
+// ----------------------------------------------------------------------------
+export interface CampaignContext {
+  campaignId?: string;
+  sharedStudio: string;
+  sharedLighting: string;
+  sharedColorScience: string;
+  sharedCameraLanguage: string;
+  sharedEditingStyle: string;
+  modelIdentity?: string;
+  imageCount?: number;
+  imageIndex?: number;
+}
+
+export function buildCampaignDNA(ctx: CampaignContext): string {
+  const indexNote = (ctx.imageCount && ctx.imageIndex !== undefined)
+    ? `This is image ${ctx.imageIndex + 1} of ${ctx.imageCount} in this photoshoot session.`
+    : "";
+  return `CAMPAIGN DNA — UNIFIED PHOTOSHOOT CONSISTENCY:
+${indexNote}
+All images in this campaign share the following fixed visual language — like a Vogue editorial or Zara catalogue where every image belongs to the same photoshoot session:
+  Studio: ${ctx.sharedStudio}
+  Lighting: ${ctx.sharedLighting}
+  Color Science: ${ctx.sharedColorScience}
+  Camera Language: ${ctx.sharedCameraLanguage}
+  Editing Style: ${ctx.sharedEditingStyle}
+  ${ctx.modelIdentity ? `Model Identity: ${ctx.modelIdentity}` : ""}
+Every image in this campaign must feel like it was captured in the same physical location by the same photographer on the same day. Not independently recreated. One photoshoot. Multiple compositions.`;
+}
+
+// ----------------------------------------------------------------------------
+// MODULE L: DETERMINISTIC PROMPT ASSEMBLY ENGINE
+// Assembles all DNA modules into the final generation prompt
+// ----------------------------------------------------------------------------
+function assembleDeterministicPrompt(params: {
+  sceneType: string;
+  category: string;
+  isVideo?: boolean;
+  style?: string;
+  composition?: string;
+  campaign?: CampaignContext;
+  referenceAnalysis?: { dominantColor: string; material: string; finish: string; hardwareColor: string; brandingNotes: string; undertones: string };
+  failureDirective?: string;
+}): { prompt: string; profile: StudioProfile; categoryDNA: CategoryDNASpec; photoDNA: CommercialPhotographySpec } {
+  const { sceneType, category, isVideo, style, composition, campaign, referenceAnalysis, failureDirective } = params;
+
   const profile = getStudioProfile(sceneType);
-  const cameraSpecs = buildPhotographySpecs(cameraType);
-  const isRegisteredProfile = !!StudioProfileRegistry[sceneType];
-  const sceneIntent = isRegisteredProfile ? "" : `\nSCENE INTENT & MOOD:\nSet inside the ${profile.name}, the campaign theme/scene mood is: ${sceneType}.`;
+  const categoryDNA = getCategoryDNA(category);
+  const photoDNA = getCommercialPhotographyDNA(category);
+  const { prompt: posePrompt } = selectPoseTemplate(category, style);
+  const { prompt: cameraPrompt } = selectCameraPosition(category, composition);
 
-  let basePrompt = `STUDIO PROFILE & BRAND ENVIRONMENT:
-This image is for Forgiven Shopping Centre (FSC), a premium luxury retail brand headquartered in Lilongwe, Malawi.
-This must look like a REAL PHOTOGRAPH taken by a professional fashion photographer — not AI-generated, not CGI, not 3D-rendered.
+  let prompt = `ENTERPRISE V5.8 — VISUAL OPERATING SYSTEM — DETERMINISTIC PROMPT ASSEMBLY:
+Brand Destination: Forgiven Shopping Centre (FSC), Flagship Luxury Retailer, Lilongwe, Malawi.
+This image MUST look like a real commercial photograph captured by an expert fashion/product photographer — NOT AI art, NOT CGI, NOT a 3D render.
 
-PHOTOREALISM ENGINE (MANDATORY):
-- Render this as if it was shot on a real physical set with real lights, real materials, and a real human model
-- Skin must have natural real human texture — visible pores, micro-highlights, subtle subsurface scattering — not airbrushed or waxy
-- Fabric must drape, fold, and catch light the way real fabric does — with natural creases, weight, and texture
-- Surfaces (floor, walls, pedestal) must have real material grain, micro-imperfections, and authentic light interaction
-- Shadows must be soft, directional, and physically accurate — not flat, not absent, not artificially perfect
-- The environment must feel like a location you could walk into — not a composite, not a backdrop
-- Human body language must be natural — weight shift, natural arm position, relaxed hands, authentic gaze — not a mannequin pose
-- Eyes must be real human eyes with natural catch-lights from the actual lighting rig, not AI-generated circular ring-light reflections
+━━━ [BLOCK 1: PRODUCT IDENTITY LOCK] ━━━
+${ProductIdentityLock}
 
-REGIONAL DESIGN LANGUAGE & CULTURAL AUTHENTICITY (LILONGWE, MALAWI):
-Forgiven Shopping Centre is Malawi's premier luxury retail destination. Every environment must reflect modern African luxury.
-- DO NOT imitate European luxury stores, American shopping malls, Dubai mega-malls, or any other foreign retail aesthetic
-- Materials: warm cream limestone, natural travertine stone, polished marble, elegant brass, matte black architectural accents, lush indoor tropical greenery
-- AFRICAN MODEL AUTHENTICITY: Preserve authentic African facial features, real melanin-rich skin tones, and natural hairstyles without alteration. Celebrate African beauty at the highest editorial standard.
+━━━ [BLOCK 2: STUDIO SEED — DETERMINISTIC DIMENSIONS] ━━━
+${StudioSeed.prompt}
 
-STUDIO ENVIRONMENT — "${profile.name}":
+━━━ [BLOCK 3: BASE STUDIO DNA — FSC ARCHITECTURAL IDENTITY] ━━━
 ${profile.environmentPrompt}
-${sceneIntent}
 
+━━━ [BLOCK 4: COMMERCIAL PHOTOGRAPHY DNA] ━━━
+Camera: ${photoDNA.camera} (${photoDNA.lens})
+Aperture & DOF: ${photoDNA.aperture}
+Lighting Setup: ${photoDNA.lightingSetup}
+Color Science: ${photoDNA.colorScience}
+Retouching Standard: ${photoDNA.retouchingStandard}
+
+━━━ [BLOCK 5: CAMERA POSITION DNA] ━━━
+${cameraPrompt}
+
+━━━ [BLOCK 6: POSE DNA] ━━━
+${categoryDNA.allowsModel ? posePrompt : "PRODUCT ONLY — No human model. Hero product is the sole subject on the stone podium."}
+
+━━━ [BLOCK 7: DEPTH DNA — 5-LAYER VISUAL DEPTH] ━━━
+${DepthDNA.prompt}
+Depth Layers: ${DepthDNA.layers.join(" | ")}
+Balance: Hero Subject ${DepthDNA.compositionalBalance.heroSubject} | Negative Space ${DepthDNA.compositionalBalance.negativeSpace} | Architecture ${DepthDNA.compositionalBalance.architecture}
+
+━━━ [BLOCK 8: CATEGORY DNA & COMPOSITION — "${categoryDNA.categoryName}"] ━━━
+Category Style: ${categoryDNA.stylingPrompt}
+Product Adaptation: ${categoryDNA.productAdaptationPrompt}
+Framing: ${categoryDNA.framingPrompt}
+Model Policy: ${categoryDNA.allowsModel ? "Human model allowed (strictly off-center so arch logo remains 100% unblocked)." : "PRODUCT ONLY — Hero product on stone podium, no human model."}
+Brand Integrity: ${categoryDNA.brandRetentionRule}
+
+━━━ [BLOCK 9: SCENE PROFILE — "${profile.name}"] ━━━
+${profile.inheritedFrom ? `[INHERITS FROM: ${profile.inheritedFrom}] ` : ""}Lighting: ${profile.lightingPrompt}
+Composition: ${profile.compositionPrompt}
+
+━━━ [BLOCK 10: FSC BRAND LOGO SPECIFICATION] ━━━
 ${FSC_BRAND_LOGO_DEFINITION}
-
-BRANDING PLACEMENT FOR THIS STUDIO:
 ${profile.brandingPrompt}
-NEVER apply brand colors directly to the product or garment. The product must remain untouched and the hero of the image.
 
-LIGHTING & CAMERA SIMULATION:
-Camera: ${cameraSpecs.camera} (${cameraSpecs.lens})
-Aperture & DOF: ${cameraSpecs.aperture}
-Lighting Rig: ${cameraSpecs.lightingSetup}
-Color Science: ${cameraSpecs.colorScience}
-Studio Lighting: ${profile.lightingPrompt}
+━━━ [BLOCK 11: RETAIL STYLING] ━━━
+Curated props (use ONLY when contextually appropriate): ${RetailStylingDNA.universal.join(", ")}. ${RetailStylingDNA.usage}
 
-COMPOSITION:
-${profile.compositionPrompt}
+${referenceAnalysis ? `━━━ [BLOCK 12: PRODUCT REFERENCE INTELLIGENCE] ━━━
+Dominant Color: ${referenceAnalysis.dominantColor} | Undertones: ${referenceAnalysis.undertones}
+Material: ${referenceAnalysis.material} | Surface Finish: ${referenceAnalysis.finish}
+Hardware: ${referenceAnalysis.hardwareColor} | Manufacturer Branding on Product: ${referenceAnalysis.brandingNotes}
+CRITICAL: Reproduce these physical attributes with 100% accuracy. Do NOT alter any of the above.` : ""}
 
-CAMERA STYLE:
-${profile.cameraPrompt}
+${campaign ? `━━━ [BLOCK 13: CAMPAIGN DNA — PHOTOSHOOT CONSISTENCY] ━━━
+${buildCampaignDNA(campaign)}` : ""}
 
-NEGATIVE PROMPT (NEVER INCLUDE):
-${profile.negativePrompt}, CGI render, 3D render, artificial skin, plastic skin, wax figure, uncanny valley, AI-generated face, digital painting, illustration, ring-light catch-lights in eyes, flat uniform lighting, perfectly symmetrical pose, mannequin body language, fake background composite, stock photo aesthetic.
+${failureDirective ? `━━━ [BLOCK 14: TARGETED REGENERATION DIRECTIVE] ━━━
+${failureDirective}` : ""}
+
+━━━ [PERMANENT NEGATIVE RULES] ━━━
+${profile.negativePrompt}, model standing in center blocking logo, model covering logo, centered model blocking branding, altered logo design, generic placeholder logo, CGI render, 3D render, artificial skin, plastic skin, wax figure, uncanny valley, AI-generated face, digital painting, illustration, ring-light catch-lights only, flat uniform lighting, perfectly symmetrical stiff pose, mannequin body language, fake background composite, stock photo aesthetic, redesigned product, modernized product, hallucinated stitching, hallucinated accessories, hallucinated textures, wrong colorway, color drift.
 `;
 
   if (isVideo) {
-    basePrompt += "\nVIDEO SPECIFICS: Maintain realistic movement, natural camera motion, authentic luxury lighting, and a clearly visible FSC brand presence throughout the video. The motion must look genuinely captured, not AI-animated. Reference quality: Vogue, Harper's Bazaar, Elle editorial video production.";
+    prompt += "\nVIDEO SPECIFICS: Maintain realistic movement, natural camera motion, authentic luxury lighting, and clearly visible FSC brand presence throughout. Reference quality: Vogue, Harper's Bazaar editorial video.";
   }
 
-  return { prompt: basePrompt, profile };
+  return { prompt, profile, categoryDNA, photoDNA };
 }
+
+// Backwards-compatible wrapper for existing callers
+function buildEnterpriseBrandPrompt(
+  sceneType: string,
+  category: string = "apparel",
+  isVideo: boolean = false,
+  cameraType?: string
+): { prompt: string, profile: StudioProfile, categoryDNA: CategoryDNASpec, photoDNA: CommercialPhotographySpec } {
+  return assembleDeterministicPrompt({ sceneType, category, isVideo });
+}
+
+// ----------------------------------------------------------------------------
+// MODULE M: TARGETED FAILURE-SPECIFIC REGENERATION DIRECTIVES
+// ----------------------------------------------------------------------------
+export type QAFailureType =
+  | "color_drift"
+  | "wrong_material"
+  | "missing_arch_led"
+  | "missing_logo"
+  | "weak_reflections"
+  | "incorrect_stitching"
+  | "poor_composition"
+  | "weak_lighting"
+  | "inconsistent_architecture"
+  | "hallucinated_product"
+  | "poor_photography_quality";
+
+export const RegenerationDirectives: Record<QAFailureType, string> = {
+  color_drift: "STRICT COLOUR CORRECTION DIRECTIVE (REGENERATION): The previous attempt produced incorrect product colour. The dominant colour from the reference MUST be reproduced exactly — match hue, saturation, and value with scientific precision. Do NOT reinterpret, neutralize, or shift the colour. If the reference shows Olive Green, output MUST be Olive Green. If Jet Black, output MUST be Jet Black. Colour drift is a critical failure.",
+  wrong_material: "STRICT MATERIAL RECONSTRUCTION DIRECTIVE (REGENERATION): The previous attempt rendered the wrong material. Reproduce the exact physical material from the reference — leather grain scale, fabric weave pattern, surface finish (matte/satin/gloss), and material weight must be physically accurate. Do NOT substitute a generic material.",
+  missing_arch_led: "STRICT STUDIO ARCHITECTURE DIRECTIVE (REGENERATION): The previous attempt was missing the magenta LED arch outline. The signature arch with continuously glowing integrated magenta LED strip (#B0208D, 25mm width) is MANDATORY in every FSC Signature Studio render. This architectural element is non-negotiable and must be clearly visible.",
+  missing_logo: "STRICT FSC LOGO DIRECTIVE (REGENERATION): The previous attempt was missing the Forgiven Shopping Centre 3D physical logo. The physically mounted magenta (#B0208D) shopping bag logo with 'Forgiven Shopping Centre' text MUST appear inside the arch on the cream stone wall with real physical depth and natural drop shadows. It is never a watermark — it is architectural signage.",
+  weak_reflections: "STRICT REFLECTION & SURFACE DIRECTIVE (REGENERATION): The previous attempt had unrealistic or absent floor reflections. The polished cream Calacatta marble floor MUST show authentic natural specular reflections of the product or model silhouette. Reflections should be soft, not mirror-perfect — realistic marble physics.",
+  incorrect_stitching: "STRICT PRODUCT CONSTRUCTION DIRECTIVE (REGENERATION): The previous attempt hallucinated or misrendered garment stitching, seams, or construction details. Apply Product Identity Lock with maximum strictness. Reproduce the exact stitch density, seam placement, pocket construction, and hem finish from the reference image. Do NOT invent new construction details.",
+  poor_composition: "STRICT COMPOSITION DIRECTIVE (REGENERATION): The previous attempt had poor compositional balance. Apply Depth DNA and Composition Balance Engine: Hero Subject ≈60% of frame weight, Negative Space ≈25%, Architecture ≈15%. Product/model MUST be off-center to reveal the arch logo. Apply a different Composition DNA template from the pose library.",
+  weak_lighting: "STRICT LIGHTING DIRECTIVE (REGENERATION): The previous attempt had weak, flat, or incorrectly colored lighting. The FSC studio uses warm premium commercial lighting (3000K-3500K) with a large key softbox, V-flat fill, and the integrated magenta LED arch accent. Reproduce natural shadow falloff, real specular highlights on marble and brass, and physically accurate contact shadows.",
+  inconsistent_architecture: "STRICT STUDIO CONSISTENCY DIRECTIVE (REGENERATION): The previous attempt rendered an inconsistent studio environment. Apply StudioSeed dimensions exactly: arch radius 1.8m, podium 40cm × 50cm travertine, brass planter strictly left at 120cm, illuminated shelving strictly right wall, black fluted panels full ceiling height with sconces at 160cm. This studio is a permanent physical space photographed repeatedly — not a new AI invention.",
+  hallucinated_product: "STRICT PRODUCT IDENTITY LOCK DIRECTIVE (REGENERATION — CRITICAL): The previous attempt redesigned, modernized, or hallucinated product details not present in the reference. Apply maximum Product Identity Lock. You are a commercial photographer. Photograph the EXACT product shown in the reference. Do NOT add details. Do NOT improve the design. Do NOT reinterpret the product. Reproduce it as a camera would.",
+  poor_photography_quality: "STRICT COMMERCIAL PHOTOGRAPHY DIRECTIVE (REGENERATION): The previous attempt had poor photographic quality — AI artifacts, over-sharpening, plastic skin, HDR glow, or unnatural color science. Reproduce the image as a real commercial photographer would using the specified camera system. Zero AI glow. Zero over-processing. Authentic physical material rendering. Real skin texture. Natural depth of field falloff."
+};
+
+export function buildRegenerationDirective(failureTypes: QAFailureType[]): string {
+  if (failureTypes.length === 0) return "";
+  const directives = failureTypes.map(t => RegenerationDirectives[t]);
+  return `TARGETED REGENERATION (${failureTypes.length} failure(s) detected from previous attempt):\n${directives.join("\n\n")}`;
+}
+
+// ----------------------------------------------------------------------------
+// MODULE N: REFERENCE CONFIDENCE SCORE
+// ----------------------------------------------------------------------------
+export type ReferenceConfidence = "HIGH" | "MEDIUM" | "LOW";
+
+export function assessReferenceConfidence(analysis: { dominantColor: string; material: string; finish: string }): {
+  confidence: ReferenceConfidence;
+  notes: string;
+  directive: string;
+} {
+  const hasColorHex = /\(#[0-9A-Fa-f]{6}\)/.test(analysis.dominantColor);
+  const hasSpecificMaterial = analysis.material.length > 8 && !analysis.material.toLowerCase().includes("unknown");
+  const hasFinish = analysis.finish.length > 4 && !analysis.finish.toLowerCase().includes("diffuse");
+
+  const score = [hasColorHex, hasSpecificMaterial, hasFinish].filter(Boolean).length;
+
+  if (score === 3) return {
+    confidence: "HIGH",
+    notes: "Reference image is high quality with precise color, material, and finish data.",
+    directive: "Reproduce all product details with maximum fidelity — reference data is complete and reliable."
+  };
+  if (score === 2) return {
+    confidence: "MEDIUM",
+    notes: "Reference image has partial data — some product details may need inference from visible construction.",
+    directive: "Reproduce all clearly visible product details exactly. For any ambiguous details, default to the most conservative interpretation present in the reference — do NOT invent missing features."
+  };
+  return {
+    confidence: "LOW",
+    notes: "Reference image is low quality — blurry, cropped, or insufficiently detailed.",
+    directive: "RESTRICTED RECONSTRUCTION MODE: Reproduce ONLY what is clearly visible in the reference. Do NOT attempt to complete or invent missing details. When detail is ambiguous, leave it minimal and true to visible evidence only."
+  };
+}
+
+
+
 
 // --------------------------------
 
@@ -1510,8 +1895,17 @@ async function cleanProductImage(apiKey: string, productImageUrl: string) {
   return productImageUrl;
 }
 
-async function detectGarmentColor(apiKey: string, imageUrl: string): Promise<string> {
-  console.log("Detecting garment color via Qwen VL...");
+async function analyzeProductReference(apiKey: string, imageUrl: string, category: string = "apparel"): Promise<{
+  rawDetails: string;
+  dominantColor: string;
+  secondaryColor: string;
+  undertones: string;
+  material: string;
+  finish: string;
+  hardwareColor: string;
+  brandingNotes: string;
+}> {
+  console.log(`🔍 [Product Intelligence 2.0] Analyzing product reference via Qwen-VL for category: "${category}"...`);
   try {
     const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation", {
       method: "POST",
@@ -1523,24 +1917,75 @@ async function detectGarmentColor(apiKey: string, imageUrl: string): Promise<str
             role: "user",
             content: [
               { image: imageUrl },
-              { text: "You are a fashion product analyst. Analyze the clothing/shoes in this image with extreme precision. Identify:\n1. PRIMARY COLOR (be very specific, e.g. 'Coffee Brown', 'Jet-Black', 'Navy Blue', 'Burgundy Red')\n2. SECONDARY COLOR if any\n3. MATERIAL (e.g. 'Leather', 'Suede', 'Canvas', 'Cotton', 'Denim')\n4. TYPE (e.g. 'Sneakers', 'Dress Shoes', 'T-Shirt', 'Jacket')\n5. SLEEVE LENGTH/CUT (e.g. 'Long sleeve', 'Short sleeve', 'Sleeveless')\n6. KEY DETAILS (e.g. 'white sole', 'gold buckle', 'zip closure')\n\nReturn ONLY in this format:\nColor: [Primary Color], Material: [Material], Type: [Type], Sleeves: [Sleeve Length], Details: [Key Details]" }
+              { text: `You are an enterprise fashion & product color scientist and luxury retail analyst. Analyze this product image with 100% precision. Identify:
+1. DOMINANT COLOR (be extremely specific with exact hue & estimated hex, e.g. 'Olive Green (#556B2F)', 'Coffee Brown (#4A2C2A)', 'Jet Black (#1B1B1B)', 'Burgundy (#800020)')
+2. SECONDARY / ACCENT COLORS (if any)
+3. UNDERTONES (e.g. 'Warm golden undertones', 'Cool blue undertones', 'Earthy neutral')
+4. MATERIAL / FABRIC (e.g. 'High-gloss satin', 'Heavyweight denim', 'Genuine leather', 'Pure silk', 'Honed travertine', 'Gold-plated stainless steel')
+5. SURFACE FINISH (e.g. 'Liquid sheen', 'Matte diffuse', 'Specular metallic', 'Velvety nap', 'Glossy glass')
+6. HARDWARE & ACCENTS (e.g. 'Gold zipper and buckle', 'Silver chain strap', 'White soles', 'None')
+7. BRANDING / LABELS (note any visible manufacturer logos on product)
+
+Return ONLY in this format:
+Color: [Dominant Color], Secondary: [Secondary Color], Undertones: [Undertones], Material: [Material], Finish: [Finish], Hardware: [Hardware], Branding: [Branding Notes]` }
             ]
           }]
         }
       })
     });
     if (!res.ok) {
-      console.warn(`Qwen VL returned ${res.status}, using fallback`);
-      return "Color: original, Material: unknown";
+      console.warn(`[Product Intelligence] Qwen VL returned ${res.status}, using fallback`);
+      return {
+        rawDetails: "Color: original, Material: unknown",
+        dominantColor: "original",
+        secondaryColor: "none",
+        undertones: "neutral",
+        material: "fabric",
+        finish: "diffuse",
+        hardwareColor: "none",
+        brandingNotes: "original"
+      };
     }
     const data = await res.json();
     const content = data.output?.choices?.[0]?.message?.content?.[0]?.text || "Color: original, Material: unknown";
-    console.log(`✅ Detected product details: ${content}`);
-    return content;
+    console.log(`✅ [Product Intelligence 2.0] Vision Analysis Result: ${content}`);
+    
+    const domMatch = content.match(/Color:\s*([^,\n]+)/i);
+    const secMatch = content.match(/Secondary:\s*([^,\n]+)/i);
+    const undMatch = content.match(/Undertones:\s*([^,\n]+)/i);
+    const matMatch = content.match(/Material:\s*([^,\n]+)/i);
+    const finMatch = content.match(/Finish:\s*([^,\n]+)/i);
+    const hwdMatch = content.match(/Hardware:\s*([^,\n]+)/i);
+    const brdMatch = content.match(/Branding:\s*([^,\n]+)/i);
+
+    return {
+      rawDetails: content,
+      dominantColor: domMatch ? domMatch[1].trim() : "original",
+      secondaryColor: secMatch ? secMatch[1].trim() : "none",
+      undertones: undMatch ? undMatch[1].trim() : "neutral",
+      material: matMatch ? matMatch[1].trim() : "fabric",
+      finish: finMatch ? finMatch[1].trim() : "diffuse",
+      hardwareColor: hwdMatch ? hwdMatch[1].trim() : "none",
+      brandingNotes: brdMatch ? brdMatch[1].trim() : "original"
+    };
   } catch (e) {
-    console.warn("Color detection failed:", e);
-    return "Color: original, Material: unknown";
+    console.warn("[Product Intelligence] Vision analysis failed:", e);
+    return {
+      rawDetails: "Color: original, Material: unknown",
+      dominantColor: "original",
+      secondaryColor: "none",
+      undertones: "neutral",
+      material: "fabric",
+      finish: "diffuse",
+      hardwareColor: "none",
+      brandingNotes: "original"
+    };
   }
+}
+
+async function detectGarmentColor(apiKey: string, imageUrl: string): Promise<string> {
+  const analysis = await analyzeProductReference(apiKey, imageUrl);
+  return analysis.rawDetails;
 }
 
 async function verifyProductFidelity(
@@ -2200,7 +2645,7 @@ async function runUnifiedVTON(
   }
   const colorMatch = garmentDetails.match(/Color: ([^,]+)/);
   const garmentColor = colorMatch ? colorMatch[1].trim() : "original";
-  const enterprisePromptObj = buildEnterpriseBrandPrompt(scene || "studio");
+  const enterprisePromptObj = buildEnterpriseBrandPrompt(scene || "studio", category);
 
   // 2. Identify if non-apparel (specialized routing required)
   const lowerCat = category.toLowerCase();
@@ -2341,7 +2786,7 @@ async function runUnifiedVTON(
             `  - PERFECT TAILORED FIT: The clothing must fit the model with immaculate tailoring and realistic fabric drape/physics. No clipping, no warping.`,
             strictnessPromptModifier,
             anatomyPrompt,
-            buildEnterpriseBrandPrompt(scene || "studio").prompt,
+            buildEnterpriseBrandPrompt(scene || "studio", category).prompt,
             hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ``,
             makeup ? `MAKEUP: ${makeup}.` : ``,
             `Photorealistic render. The generated image MUST be indistinguishable from a real high-end commercial photoshoot.`
@@ -2617,7 +3062,7 @@ Deno.serve(async (req) => {
             const modelDesc = `Stunningly beautiful high-fashion supermodel. Striking editorial facial features. Top-tier modeling agency quality.`;
             const identityDesc = `MODEL GENDER: ${gender}. ETHNICITY/SKIN TONE: ${ethnicity} ${skinTone}.`;
             const styleDesc = `${hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ""} ${makeup ? `MAKEUP: ${makeup}.` : ""}`;
-            const luxurySetting = buildEnterpriseBrandPrompt(setting || "opulent fashion studio");
+            const luxurySetting = buildEnterpriseBrandPrompt(setting || "opulent fashion studio", productCategory || "apparel").prompt;
             const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
             
             if (body.isUGC) {
@@ -2639,7 +3084,7 @@ Deno.serve(async (req) => {
               console.log(`[generate-avatar] Generating VTON for variant ${i+1}/${variantImages.length}...`);
               const genUrl = await runUnifiedVTON(
                 { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
-                vtonPersonImage,
+                vtonPersonImage!,
                 [variantUrl],
                 productCategory || "apparel",
                 productName || "garment",
@@ -2660,7 +3105,7 @@ Deno.serve(async (req) => {
             // Map the exact product onto the reference image/generated baseline portrait
             const url = await runUnifiedVTON(
               { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
-              vtonPersonImage,
+              vtonPersonImage!,
               productImages,
               productCategory || "apparel",
               productName || "garment",
@@ -2728,7 +3173,7 @@ Deno.serve(async (req) => {
       // --- STAGE 2: VTON MASTER FRAME(S) ---
       let persistedMasterUrl: string;
       let videoUrl: string | undefined;
-      const enterprisePrompt = buildEnterpriseBrandPrompt(setting || body.scene || "studio", true);
+      const enterprisePrompt = buildEnterpriseBrandPrompt(setting || body.scene || "studio", productCategory || "apparel", true);
 
       if (gridVariants) {
         // ── Multi-Product Grid Path ──
