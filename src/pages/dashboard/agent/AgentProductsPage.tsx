@@ -14,7 +14,7 @@ import {
 import { 
   ShoppingBag, Copy, CheckCircle2, 
   Image as ImageIcon, Eye, Package, 
-  Ruler, Palette, Info
+  Ruler, Palette, Info, Sparkles
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -25,6 +25,7 @@ import {
   DialogTitle, 
   DialogDescription,
 } from "@/components/ui/dialog";
+import { useRecommendedProducts } from "@/hooks/useRecommendedProducts";
 
 export default function AgentProductsPage() {
   const { toast } = useToast();
@@ -141,6 +142,82 @@ export default function AgentProductsPage() {
           <span className="text-sm font-body text-muted-foreground">on every referred order</span>
         </div>
       </div>
+
+      {recommendedProducts.length > 0 && (
+        <div className="space-y-4 pt-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-amber-500" />
+            <h3 className="font-heading font-black text-xl">Recommended For You</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {recommendedProducts.map((product) => (
+              <motion.div
+                key={`rec-${product.id}`}
+                whileHover={{ y: -4 }}
+                className="group relative overflow-hidden rounded-[2rem] border border-amber-200 bg-gradient-to-b from-amber-50/50 to-white shadow-sm transition-all hover:shadow-lg"
+              >
+                <div className="absolute top-4 left-4 z-10 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-amber-200">
+                  {product.reason}
+                </div>
+                <div 
+                  className="aspect-[4/3] w-full overflow-hidden bg-muted relative"
+                  onClick={() => setSelectedProduct(product)}
+                >
+                  {product.images?.[0] ? (
+                    <img
+                      src={product.images[0]}
+                      alt={product.name}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 cursor-pointer"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-muted cursor-pointer">
+                      <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                    <Button variant="secondary" className="pointer-events-auto rounded-full font-heading font-black">
+                      <Eye className="mr-2 h-4 w-4" /> View Details
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <div className="mb-4">
+                    <Badge variant="secondary" className="mb-3 font-bold text-[10px] uppercase tracking-wider rounded-lg">
+                      {product.category || "Uncategorized"}
+                    </Badge>
+                    <h3 className="font-heading font-black text-lg line-clamp-1 group-hover:text-primary transition-colors">
+                      {product.name}
+                    </h3>
+                  </div>
+
+                  <div className="mb-6">
+                    <div className="flex items-center gap-2">
+                      <p className="text-2xl font-black text-foreground tabular-nums">
+                        <span className="text-sm text-muted-foreground mr-1">MWK</span>
+                        {formatPrice(product.price)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button 
+                    className="w-full h-12 rounded-xl font-heading font-black text-sm bg-foreground text-background hover:scale-[1.02] transition-transform"
+                    onClick={() => copyLink(product.id)}
+                  >
+                    {copiedId === product.id ? (
+                      <><CheckCircle2 className="mr-2 h-4 w-4 text-emerald-400" /> Copied!</>
+                    ) : (
+                      <><Copy className="mr-2 h-4 w-4" /> Copy Promotion Link</>
+                    )}
+                  </Button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {recommendedProducts.length > 0 && <div className="h-px bg-border my-8" />}
 
       {!products || products.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 border border-dashed border-border rounded-3xl bg-muted/10">

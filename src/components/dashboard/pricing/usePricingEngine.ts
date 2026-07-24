@@ -14,6 +14,7 @@ export interface PricingMetrics {
   markupPct: number;
   breakEvenPrice: number;
   maxDiscountPct: number;
+  minProfitablePrice: number; // NEW: minimum price for any profit
   confidenceScore: number;
   confidenceLabel: "Excellent" | "Good" | "Caution" | "Risk";
   vendorCostPct: number;
@@ -31,12 +32,22 @@ export interface PricingMetrics {
   scenarioDiscount15: ScenarioResult;
   // Narrative
   executiveInsight: string;
-  // Scalability
+  // Scalability (existing)
   scalability: {
     revenuePerSale: number;
     profit100: number;
     profit1000: number;
     profit10000: number;
+  };
+  // NEW: Bulk order projections
+  bulkProjections: Array<{ units: number; revenue: number; totalProfit: number; profitPerUnit: number }>;
+  // NEW: Time-based forecasts
+  forecast: {
+    dailyUnitsNeeded: (targetMonthlyProfit: number) => number;
+    monthlyRevenue: (dailySales: number) => number;
+    yearlyRevenue: (dailySales: number) => number;
+    monthlyProfit: (dailySales: number) => number;
+    yearlyProfit: (dailySales: number) => number;
   };
 }
 
@@ -146,6 +157,26 @@ export function usePricingEngine(
       }
     }
 
+    const minProfitablePrice = totalCost + 1; // 1 MWK above cost = any profit
+
+    // ── Bulk order projections ───────────────────────────────────────────────
+    const bulkProjections = [5, 10, 20, 50].map((units) => ({
+      units,
+      revenue: sellingPrice * units,
+      totalProfit: grossProfit * units,
+      profitPerUnit: grossProfit,
+    }));
+
+    // ── Time-based forecasts ─────────────────────────────────────────────────
+    const forecast = {
+      dailyUnitsNeeded: (targetMonthlyProfit: number) =>
+        grossProfit > 0 ? Math.ceil(targetMonthlyProfit / (grossProfit * 30)) : 0,
+      monthlyRevenue: (dailySales: number) => sellingPrice * dailySales * 30,
+      yearlyRevenue: (dailySales: number) => sellingPrice * dailySales * 365,
+      monthlyProfit: (dailySales: number) => grossProfit * dailySales * 30,
+      yearlyProfit: (dailySales: number) => grossProfit * dailySales * 365,
+    };
+
     return {
       sellingPrice,
       grossProfit,
@@ -153,6 +184,7 @@ export function usePricingEngine(
       markupPct,
       breakEvenPrice,
       maxDiscountPct,
+      minProfitablePrice,
       confidenceScore,
       confidenceLabel,
       vendorCostPct,
@@ -173,6 +205,8 @@ export function usePricingEngine(
         profit1000: grossProfit * 1000,
         profit10000: grossProfit * 10000,
       },
+      bulkProjections,
+      forecast,
     };
   }, [vendorCost, operationsCost]);
 }

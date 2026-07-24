@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,33 +97,66 @@ export function useOnboardingState(userId: string) {
     setState(getOnboardingState(userId) || DEFAULT_STATE);
   }, [userId]);
 
-  const update = (partial: Partial<OnboardingState>) => {
+  const update = useCallback((partial: Partial<OnboardingState>) => {
     setState((prev) => {
       const next = { ...prev, ...partial };
       saveOnboardingState(userId, next);
+      
+      // Async sync to Supabase (fire and forget)
+      supabase
+        .from("agents")
+        .update({ onboarding_state: next as any })
+        .eq("user_id", userId)
+        .then(({ error }) => {
+          if (error) console.error("Failed to sync onboarding state to Supabase:", error);
+        });
+
       return next;
     });
-  };
+  }, [userId]);
 
-  const advancePhase = () => {
+  const advancePhase = useCallback(() => {
     update({ phase: Math.min(6, state.phase + 1) });
-  };
+  }, [state.phase, update]);
 
-  const retreatPhase = () => {
+  const retreatPhase = useCallback(() => {
     update({ phase: Math.max(1, state.phase - 1) });
-  };
+  }, [state.phase, update]);
 
   const addXp = (amount: number) => {
     update({ totalXp: state.totalXp + amount });
   };
 
-  const completeCertification = () => {
+  const completeCertification = useCallback(() => {
     update({
       certified: true,
       certifiedAt: new Date().toISOString(),
       phase: 6,
     });
-  };
+  }, [update]);
+
+  // Optionally fetch from DB on mount to hydrate local storage if empty/outdated
+  useEffect(() => {
+    async function fetchRemote() {
+      if (!userId || userId === "guest") return;
+      const { data } = await supabase
+        .from("agents")
+        .select("onboarding_state")
+        .eq("user_id", userId)
+        .maybeSingle();
+        
+      if (data?.onboarding_state) {
+        const remoteState = data.onboarding_state as unknown as OnboardingState;
+        // Simple merge: remote wins for now, but could be smarter
+        setState(prev => {
+          const next = { ...DEFAULT_STATE, ...prev, ...remoteState };
+          localStorage.setItem(storageKey(userId), JSON.stringify(next));
+          return next;
+        });
+      }
+    }
+    fetchRemote();
+  }, [userId]);
 
   return { state, update, advancePhase, retreatPhase, addXp, completeCertification };
 }
@@ -145,7 +179,6 @@ export function calcProfileCompletion(
     categories.length > 0,
     channels.length > 0,
     !!estimatedCustomers,
-    pd.photoUrl,
   ];
   const filled = fields.filter(Boolean).length;
   return Math.round((filled / fields.length) * 100);

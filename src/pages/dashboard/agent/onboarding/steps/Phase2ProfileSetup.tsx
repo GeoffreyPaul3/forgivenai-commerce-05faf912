@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, ArrowRight, UserCircle2, MapPin, Building, Briefcase } from "lucide-react";
-import { OnboardingState } from "../hooks/useOnboardingState";
+import { OnboardingState, calcProfileCompletion } from "../hooks/useOnboardingState";
 
 interface Phase2ProfileSetupProps {
   state: OnboardingState;
@@ -29,9 +29,19 @@ const CHANNELS = [
 ];
 
 export default function Phase2ProfileSetup({ state, update, onNext, onBack }: Phase2ProfileSetupProps) {
-  
+
+  // Recalculate and persist completion any time relevant state changes
+  const recalc = (
+    pd: OnboardingState["profileData"],
+    categories: string[],
+    channels: string[],
+    estimatedCustomers: string
+  ) => calcProfileCompletion(pd, categories, channels, estimatedCustomers);
+
   const handleProfileChange = (key: keyof OnboardingState["profileData"], value: string) => {
-    update({ profileData: { ...state.profileData, [key]: value } });
+    const nextPd = { ...state.profileData, [key]: value };
+    const completion = recalc(nextPd, state.preferredCategories, state.salesChannels, state.estimatedCustomers);
+    update({ profileData: nextPd, profileCompletion: completion });
   };
 
   const toggleCategory = (cat: string) => {
@@ -39,7 +49,8 @@ export default function Phase2ProfileSetup({ state, update, onNext, onBack }: Ph
     const next = current.includes(cat)
       ? current.filter(c => c !== cat)
       : [...current, cat];
-    update({ preferredCategories: next });
+    const completion = recalc(state.profileData, next, state.salesChannels, state.estimatedCustomers);
+    update({ preferredCategories: next, profileCompletion: completion });
   };
 
   const toggleChannel = (ch: string) => {
@@ -47,7 +58,13 @@ export default function Phase2ProfileSetup({ state, update, onNext, onBack }: Ph
     const next = current.includes(ch)
       ? current.filter(c => c !== ch)
       : [...current, ch];
-    update({ salesChannels: next });
+    const completion = recalc(state.profileData, state.preferredCategories, next, state.estimatedCustomers);
+    update({ salesChannels: next, profileCompletion: completion });
+  };
+
+  const handleEstimatedCustomers = (v: string) => {
+    const completion = recalc(state.profileData, state.preferredCategories, state.salesChannels, v);
+    update({ estimatedCustomers: v, profileCompletion: completion });
   };
 
   // Determine if ready to advance (completion >= 70%)
@@ -246,7 +263,7 @@ export default function Phase2ProfileSetup({ state, update, onNext, onBack }: Ph
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold uppercase text-muted-foreground">Estimated Customers per Month</label>
-            <Select value={state.estimatedCustomers} onValueChange={v => update({ estimatedCustomers: v })}>
+            <Select value={state.estimatedCustomers} onValueChange={handleEstimatedCustomers}>
               <SelectTrigger className="bg-muted/30 md:w-1/2"><SelectValue placeholder="Select estimate" /></SelectTrigger>
               <SelectContent>
                 {["1 - 10", "11 - 25", "26 - 50", "50+"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}

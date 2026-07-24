@@ -105,7 +105,7 @@ export default function AgentOnboardingGate({ children }: AgentOnboardingGatePro
             <Phase4Assessment key="p4" state={state} update={update} onNext={advancePhase} onBack={retreatPhase} />
           )}
           {state.phase === 5 && (
-            <Phase5AIInterview key="p5" onNext={advancePhase} />
+            <Phase5AIInterview key="p5" onNext={advancePhase} state={state} update={update} />
           )}
           {state.phase === 6 && (
             <Phase6Certification key="p6" state={state} onFinish={completeCertification} />

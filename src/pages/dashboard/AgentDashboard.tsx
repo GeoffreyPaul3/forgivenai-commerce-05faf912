@@ -25,6 +25,12 @@ import {
 } from "@/components/ui/dialog";
 import { Eye, Package, Ruler, Palette, Info } from "lucide-react";
 import AgentBanner from "@/components/dashboard/AgentBanner";
+import DailyMissions from "@/components/dashboard/agent/DailyMissions";
+import AIPerformanceCoach from "@/components/dashboard/agent/AIPerformanceCoach";
+import AgentHealthScoreCard from "@/components/dashboard/agent/AgentHealthScoreCard";
+import AchievementsPanel from "@/components/dashboard/agent/AchievementsPanel";
+import SuccessJourney from "@/components/dashboard/agent/SuccessJourney";
+import { getOnboardingState } from "@/pages/dashboard/agent/onboarding/hooks/useOnboardingState";
 
 const AgentDashboard = () => {
   const { toast } = useToast();
@@ -225,6 +231,21 @@ const AgentDashboard = () => {
     };
   }, [myOrders, myCustomers, myCommissions, myPayouts, allAgents, agent?.id]);
 
+  // Calculate agent data for achievements & health score
+  const agentData = useMemo(() => ({
+    orderCount: myOrders?.length || 0,
+    totalEarnings: agent?.total_earnings || 0,
+    trainingCompleted: 0, // Placeholder until training is fully tracked in DB
+    daysActive: agent?.created_at ? Math.floor((Date.now() - new Date(agent.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+    firstSaleDate: myOrders?.length ? myOrders[myOrders.length - 1].created_at : null,
+    profileCompleted: true, // Assuming true if they are on dashboard
+  }), [myOrders, agent]);
+
+  // Load onboarding state for AI coach
+  const onboardingState = useMemo(() => getOnboardingState(session?.user?.id || "guest"), [session?.user?.id]);
+  const preferredCategories = onboardingState?.preferredCategories || [];
+  const topCategories = ["Fashion", "Electronics"]; // Placeholder
+
   if (agentLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -289,7 +310,38 @@ const AgentDashboard = () => {
       <AgentBanner />
 
       {/* KPI Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="space-y-6">
+        {/* V6.0 Agent Success Platform Components */}
+        {session?.user?.id && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-8 space-y-6">
+              <DailyMissions userId={session.user.id} />
+              <SuccessJourney certifiedAt={onboardingState?.certifiedAt || new Date().toISOString()} data={agentData} />
+              <AchievementsPanel data={agentData} />
+            </div>
+            <div className="lg:col-span-4 space-y-6">
+              <AgentHealthScoreCard
+                profileCompletion={100}
+                isCertified={onboardingState?.certified || true}
+                trainingModulesCompleted={0}
+                totalTrainingModules={5}
+                recentOrderCount={myOrders?.length || 0}
+                commissionEarned={agent?.total_earnings || 0}
+              />
+              <AIPerformanceCoach
+                topCategories={topCategories}
+                preferredCategories={preferredCategories}
+                recentOrderCount={myOrders?.length || 0}
+                trainingModulesCompleted={0}
+                totalTrainingModules={5}
+                commissionEarned={agent?.total_earnings || 0}
+                isCertified={onboardingState?.certified || true}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
@@ -652,6 +704,7 @@ const AgentDashboard = () => {
         </div>
       </div>
     </div>
+  </div>
   );
 };
 

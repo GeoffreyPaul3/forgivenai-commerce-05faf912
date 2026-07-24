@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePricingEngine } from "./usePricingEngine";
 import {
   TrendingUp, TrendingDown, ChevronDown, ChevronUp,
-  Zap, BarChart2, Percent,
+  Zap, BarChart2, Percent, Package, Calendar,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -21,6 +21,9 @@ export default function PricingIntelligenceCard({
   const [activeDiscount, setActiveDiscount] = useState<number | null>(null);
   const [targetMarginPct, setTargetMarginPct] = useState<number | null>(null);
   const [showScalability, setShowScalability] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
+  const [showForecast, setShowForecast] = useState(false);
+  const [dailySalesTarget, setDailySalesTarget] = useState(3);
 
   const p = usePricingEngine(vendorCost, operationsCost);
 
@@ -372,6 +375,121 @@ export default function PricingIntelligenceCard({
                           </div>
                         ))}
                       </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* ── Min Profitable Price ─────────────────────────────────── */}
+          <div className="rounded-2xl border border-amber-200/60 bg-amber-50/40 p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-amber-700">Min Profitable Price</p>
+              <p className="font-heading font-black text-lg text-amber-800 mt-0.5">{fmt(p.minProfitablePrice)}</p>
+              <p className="text-[10px] text-amber-600/70 mt-0.5">Lowest price that generates any profit</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Headroom</p>
+              <p className="font-heading font-black text-base text-foreground">{fmt(p.sellingPrice - p.minProfitablePrice)}</p>
+              <p className="text-[10px] text-muted-foreground/60">Above minimum</p>
+            </div>
+          </div>
+
+          {/* ── Bulk Order Projections (collapsible) ─────────────────── */}
+          <div className="rounded-2xl border border-border/40 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowBulk(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-muted/10 hover:bg-muted/20 transition-colors"
+            >
+              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Package className="w-3.5 h-3.5" /> Bulk Order Profit Projection
+              </span>
+              {showBulk ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+            </button>
+            <AnimatePresence>
+              {showBulk && (
+                <motion.div
+                  initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-4 border-t border-border/40 space-y-0">
+                    {p.bulkProjections.map((row) => (
+                      <div key={row.units} className="flex items-center justify-between py-2.5 border-b border-border/20 last:border-0">
+                        <div className="flex items-center gap-2">
+                          <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">{row.units}</span>
+                          <div>
+                            <p className="text-[10px] font-black text-foreground">{row.units} units</p>
+                            <p className="text-[9px] text-muted-foreground">Revenue: {fmt(row.revenue)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-black text-emerald-700">{fmt(row.totalProfit)}</p>
+                          <p className="text-[9px] text-muted-foreground">Total Profit</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* ── Monthly / Yearly Revenue Forecast (collapsible) ──────── */}
+          <div className="rounded-2xl border border-border/40 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowForecast(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-muted/10 hover:bg-muted/20 transition-colors"
+            >
+              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" /> Monthly &amp; Yearly Forecast
+              </span>
+              {showForecast ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+            </button>
+            <AnimatePresence>
+              {showForecast && (
+                <motion.div
+                  initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-4 border-t border-border/40 space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Daily Sales Target</p>
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 5, 10].map(n => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setDailySalesTarget(n)}
+                            className={`flex-1 py-2 rounded-xl text-[10px] font-black border transition-all ${
+                              dailySalesTarget === n
+                                ? "bg-primary text-white border-primary shadow-md"
+                                : "bg-muted/20 text-muted-foreground border-border/40 hover:border-primary/40"
+                            }`}
+                          >
+                            {n}/day
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: "Monthly Revenue", value: p.forecast.monthlyRevenue(dailySalesTarget), cls: "bg-blue-50 border-blue-200 text-blue-800" },
+                        { label: "Monthly Profit", value: p.forecast.monthlyProfit(dailySalesTarget), cls: "bg-emerald-50 border-emerald-200 text-emerald-800" },
+                        { label: "Yearly Revenue", value: p.forecast.yearlyRevenue(dailySalesTarget), cls: "bg-purple-50 border-purple-200 text-purple-800" },
+                        { label: "Yearly Profit", value: p.forecast.yearlyProfit(dailySalesTarget), cls: "bg-amber-50 border-amber-200 text-amber-800" },
+                      ].map(item => (
+                        <div key={item.label} className={`rounded-xl p-3 border ${item.cls}`}>
+                          <p className="text-[8px] font-bold uppercase opacity-70">{item.label}</p>
+                          <p className="font-heading font-black text-sm mt-0.5">{fmt(item.value)}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="rounded-xl bg-muted/20 p-3 border border-border/40">
+                      <p className="text-[9px] text-muted-foreground font-bold uppercase">Units needed for MWK 500k/month profit</p>
+                      <p className="font-heading font-black text-base mt-0.5">{p.forecast.dailyUnitsNeeded(500000)} <span className="text-xs font-body text-muted-foreground">units/day</span></p>
                     </div>
                   </div>
                 </motion.div>

@@ -21,6 +21,7 @@ export type Database = {
           email: string | null
           id: string
           name: string
+          onboarding_state: Json | null
           phone: string | null
           referral_code: string
           status: string | null
@@ -35,6 +36,7 @@ export type Database = {
           email?: string | null
           id?: string
           name: string
+          onboarding_state?: Json | null
           phone?: string | null
           referral_code: string
           status?: string | null
@@ -49,6 +51,7 @@ export type Database = {
           email?: string | null
           id?: string
           name?: string
+          onboarding_state?: Json | null
           phone?: string | null
           referral_code?: string
           status?: string | null

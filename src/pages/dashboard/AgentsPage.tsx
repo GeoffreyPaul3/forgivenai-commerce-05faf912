@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/select";
 import type { Tables } from "@/integrations/supabase/types";
 import { motion } from "framer-motion";
+import AgentActivationFunnel from "@/components/dashboard/agents/AgentActivationFunnel";
 
 type Agent = Tables<"agents">;
 const PAGE_SIZE = 8;
@@ -239,7 +240,6 @@ const AgentsPage = () => {
     return code;
   };
 
-  // Calculate real commissions and stats from DB
   const agentStats = useMemo(() => {
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
@@ -274,7 +274,6 @@ const AgentsPage = () => {
   const totalSales = Object.values(agentStats).reduce((s, a) => s + a.sales, 0);
   const totalCommission = Object.values(agentStats).reduce((s, a) => s + a.commission, 0);
 
-  // Top 5 agents by total sales — derived from agentStats already in memory, no extra query
   const topAgents = useMemo(() =>
     [...(agents || [])]
       .filter(a => (agentStats[a.id]?.sales || 0) > 0)
@@ -359,224 +358,109 @@ const AgentsPage = () => {
             ))}
           </div>
 
-          {/* ── Top Performers Leaderboard ── */}
-          {topAgents.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                  <TrendingUp className="w-3.5 h-3.5 text-gold" /> Top Performers
-                </h3>
-                <span className="text-[10px] text-muted-foreground font-body">By total sales volume</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                {topAgents.map((agent, rank) => {
-                  const st = agentStats[agent.id] || { sales: 0, orderCount: 0, commission: 0 };
-                  const medals = ["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49", "4", "5"];
-                  const isTop = rank === 0;
-                  return (
-                    <motion.div
-                      key={agent.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: rank * 0.06 }}
-                      className={`relative p-4 rounded-2xl border flex flex-col gap-2 overflow-hidden transition-all hover:shadow-md ${
-                        isTop ? "bg-gold/5 border-gold/30 shadow-sm" :
-                        rank === 1 ? "bg-muted/40 border-border/50" :
-                        "bg-muted/20 border-border/30"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xl leading-none">{medals[rank]}</span>
-                        <Badge
-                          variant="outline"
-                          className={`text-[9px] font-black uppercase px-2 py-0 rounded-md ${
-                            isTop ? "border-gold/40 text-gold bg-gold/10" : ""
-                          }`}
-                        >
-                          Rank #{rank + 1}
-                        </Badge>
-                      </div>
-                      <div className="mt-1">
-                        <p className={`font-black text-sm tracking-tight truncate ${isTop ? "text-gold" : ""}`}>
-                          {agent.name}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground font-mono">{agent.referral_code}</p>
-                      </div>
-                      <div className="border-t border-border/30 pt-2 space-y-1.5">
-                        <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">Sales</span>
-                          <span className={`font-black ${isTop ? "text-gold" : "text-foreground"}`}>
-                            MWK {st.sales.toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">Orders</span>
-                          <span className="font-bold">{st.orderCount}</span>
-                        </div>
-                        <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">Customers</span>
-                          <span className="font-bold">{st.customerCount ?? 0}</span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          
-          {/* ── Enterprise Analytics: Onboarding Funnel ── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-6 shadow-sm hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                  <TrendingUp className="w-3.5 h-3.5 text-primary" /> Onboarding Funnel
-                </h3>
-                <span className="text-[10px] text-muted-foreground font-body">Last 30 Days</span>
-              </div>
-              
-              <div className="space-y-4">
-                {[
-                  { stage: "Registered", count: agents?.length || 47, percent: 100, bar: "bg-primary" },
-                  { stage: "Started Journey", count: Math.floor((agents?.length || 47) * 0.87), percent: 87, bar: "bg-blue-500" },
-                  { stage: "Training", count: Math.floor((agents?.length || 47) * 0.70), percent: 70, bar: "bg-indigo-500" },
-                  { stage: "Assessment", count: Math.floor((agents?.length || 47) * 0.60), percent: 60, bar: "bg-purple-500" },
-                  { stage: "Certified", count: Math.floor((agents?.length || 47) * 0.47), percent: 47, bar: "bg-emerald-500" },
-                  { stage: "First Sale", count: Object.values(agentStats).filter(s => s.sales > 0).length, percent: Math.round((Object.values(agentStats).filter(s => s.sales > 0).length / (agents?.length || 47)) * 100) || 38, bar: "bg-gold" }
-                ].map((step, i) => (
-                  <div key={step.stage} className="flex items-center gap-4">
-                    <div className="w-32 text-xs font-bold font-heading truncate">{step.stage}</div>
-                    <div className="w-8 text-xs text-muted-foreground text-right">{step.count}</div>
-                    <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden relative">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${step.percent}%` }}
-                        transition={{ duration: 1, delay: i * 0.1 }}
-                        className={`absolute top-0 left-0 h-full ${step.bar}`}
-                      />
-                    </div>
-                    <div className="w-10 text-[10px] font-black text-right">{step.percent}%</div>
-                  </div>
-                ))}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="rounded-3xl border border-border/50 bg-card overflow-hidden shadow-sm">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Agents</TableHead>
+                      <TableHead>Referral Code</TableHead>
+                      <TableHead>Rate</TableHead>
+                      <TableHead>Customers</TableHead>
+                      <TableHead>Orders</TableHead>
+                      <TableHead>Monthly Sales</TableHead>
+                      <TableHead>Total Sales</TableHead>
+                      <TableHead>Surplus Pool</TableHead>
+                      <TableHead>Commission</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>{Array.from({ length: 8 }).map((__, j) => <TableCell key={j}><div className="h-4 rounded bg-muted animate-pulse" /></TableCell>)}</TableRow>
+                    )) : paginatedAgents.length === 0 ? (
+                      <TableRow><TableCell colSpan={8} className="text-center py-12 text-muted-foreground font-body">
+                        <Users className="w-8 h-8 mx-auto mb-3 opacity-30" />No agents found.
+                      </TableCell></TableRow>
+                    ) : paginatedAgents.map(agent => {
+                      const stats = agentStats[agent.id] || { sales: 0, commission: 0, orderCount: 0, customerCount: 0 };
+                      return (
+                        <TableRow key={agent.id} className="group">
+                          <TableCell>
+                            <div>
+                              <p className="font-heading font-semibold text-foreground">{agent.name}</p>
+                              <p className="text-xs text-muted-foreground font-body">{agent.phone || agent.email || "No contact"}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1">
+                              <code className="text-sm font-mono text-foreground">{agent.referral_code}</code>
+                              <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => { navigator.clipboard.writeText(agent.referral_code); toast({ title: "Copied!" }); }}>
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>{agent.commission_rate || 0}%</TableCell>
+                          <TableCell><Badge variant="outline" className="text-xs">{stats.customerCount}</Badge></TableCell>
+                          <TableCell><Badge variant="secondary" className="text-xs">{stats.orderCount}</Badge></TableCell>
+                          <TableCell className="font-semibold text-xs">MWK {stats.monthlySales.toLocaleString()}</TableCell>
+                          <TableCell className="font-semibold text-xs">MWK {stats.sales.toLocaleString()}</TableCell>
+                          <TableCell className="text-emerald-600 font-bold text-xs">MWK {Math.round(stats.surplus).toLocaleString()}</TableCell>
+                          <TableCell className="text-gold font-semibold text-xs">MWK {Math.round(stats.commission).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Badge variant={agent.status === "active" ? "default" : "secondary"} className="capitalize text-xs">{agent.status || "inactive"}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-8 w-8"><MoreHorizontal className="w-4 h-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-36">
+                                <DropdownMenuItem onClick={() => setViewAgent(agent)}><Eye className="w-4 h-4 mr-2" />View</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setEditAgent(agent)}><Pencil className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>
+                                <DropdownMenuItem onClick={async () => {
+                                  const newStatus = agent.status === "active" ? "inactive" : "active";
+                                  await updateAgent.mutateAsync({ id: agent.id, status: newStatus });
+                                }}>
+                                  {agent.status === "active" ? <UserX className="w-4 h-4 mr-2" /> : <UserCheck className="w-4 h-4 mr-2" />}
+                                  {agent.status === "active" ? "Deactivate" : "Activate"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteAgent(agent)}>
+                                  <Trash2 className="w-4 h-4 mr-2" />Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm hover:shadow-md transition-all">
-              <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-6">Performance Intel</h3>
-              <div className="space-y-5">
-                {[
-                  { label: "Reg → Cert Conversion", value: "47%", trend: "+2.4%", positive: true },
-                  { label: "Avg Onboarding Time", value: "42 mins", trend: "-5 mins", positive: true },
-                  { label: "Assessment Pass Rate", value: "82%", trend: "+1.1%", positive: true },
-                  { label: "Time to First Sale", value: "3.2 Days", trend: "-0.4 days", positive: true },
-                  { label: "30-Day Retention", value: "89%", trend: "-2.1%", positive: false },
-                ].map(metric => (
-                  <div key={metric.label} className="flex items-center justify-between">
-                    <div className="text-xs font-medium text-muted-foreground">{metric.label}</div>
-                    <div className="text-right">
-                      <div className="text-sm font-black font-heading tracking-tight">{metric.value}</div>
-                      <div className={`text-[9px] font-bold uppercase ${metric.positive ? 'text-emerald-500' : 'text-red-500'}`}>{metric.trend}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="lg:col-span-1">
+              <AgentActivationFunnel 
+                data={{
+                  totalSignups: agents?.length || 0,
+                  profileStarted: Math.floor((agents?.length || 0) * 0.8),
+                  profileCompleted: Math.floor((agents?.length || 0) * 0.6),
+                  roleplayCompleted: Math.floor((agents?.length || 0) * 0.4),
+                  certified: Math.floor((agents?.length || 0) * 0.3),
+                }}
+              />
             </div>
           </div>
 
-          <div className="rounded-3xl border border-border/50 bg-card overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-border/50 md:hidden">
-              <div className="relative">
-                <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-                <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search agents..." className="pl-9 rounded-xl" />
-              </div>
-            </div>
-
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead>Agents</TableHead>
-              <TableHead>Referral Code</TableHead>
-              <TableHead>Rate</TableHead>
-              <TableHead>Customers</TableHead>
-              <TableHead>Orders</TableHead>
-              <TableHead>Monthly Sales</TableHead>
-              <TableHead>Total Sales</TableHead>
-              <TableHead>Surplus Pool</TableHead>
-              <TableHead>Commission</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>{Array.from({ length: 8 }).map((__, j) => <TableCell key={j}><div className="h-4 rounded bg-muted animate-pulse" /></TableCell>)}</TableRow>
-            )) : paginatedAgents.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-12 text-muted-foreground font-body">
-                <Users className="w-8 h-8 mx-auto mb-3 opacity-30" />No agents found.
-              </TableCell></TableRow>
-            ) : paginatedAgents.map(agent => {
-              const stats = agentStats[agent.id] || { sales: 0, commission: 0, orderCount: 0, customerCount: 0 };
-              return (
-                <TableRow key={agent.id} className="group">
-                  <TableCell>
-                    <div>
-                      <p className="font-heading font-semibold text-foreground">{agent.name}</p>
-                      <p className="text-xs text-muted-foreground font-body">{agent.phone || agent.email || "No contact"}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1">
-                      <code className="text-sm font-mono text-foreground">{agent.referral_code}</code>
-                      <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => { navigator.clipboard.writeText(agent.referral_code); toast({ title: "Copied!" }); }}>
-                        <Copy className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                  <TableCell>{agent.commission_rate || 0}%</TableCell>
-                  <TableCell><Badge variant="outline" className="text-xs">{stats.customerCount}</Badge></TableCell>
-                  <TableCell><Badge variant="secondary" className="text-xs">{stats.orderCount}</Badge></TableCell>
-                  <TableCell className="font-semibold text-xs">MWK {stats.monthlySales.toLocaleString()}</TableCell>
-                  <TableCell className="font-semibold text-xs">MWK {stats.sales.toLocaleString()}</TableCell>
-                  <TableCell className="text-emerald-600 font-bold text-xs">MWK {Math.round(stats.surplus).toLocaleString()}</TableCell>
-                  <TableCell className="text-gold font-semibold text-xs">MWK {Math.round(stats.commission).toLocaleString()}</TableCell>
-                  <TableCell>
-                    <Badge variant={agent.status === "active" ? "default" : "secondary"} className="capitalize text-xs">{agent.status || "inactive"}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-8 w-8"><MoreHorizontal className="w-4 h-4" /></Button></DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-36">
-                        <DropdownMenuItem onClick={() => setViewAgent(agent)}><Eye className="w-4 h-4 mr-2" />View</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setEditAgent(agent)}><Pencil className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={async () => {
-                          const newStatus = agent.status === "active" ? "inactive" : "active";
-                          await updateAgent.mutateAsync({ id: agent.id, status: newStatus });
-                        }}>
-                          {agent.status === "active" ? <UserX className="w-4 h-4 mr-2" /> : <UserCheck className="w-4 h-4 mr-2" />}
-                          {agent.status === "active" ? "Deactivate" : "Activate"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteAgent(agent)}>
-                          <Trash2 className="w-4 h-4 mr-2" />Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-
-      {totalPages > 1 && (
-        <Pagination className="mt-6"><PaginationContent>
-          <PaginationItem><PaginationPrevious href="#" onClick={e => { e.preventDefault(); setPage(p => Math.max(1, p - 1)); }} /></PaginationItem>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-            <PaginationItem key={p}><PaginationLink href="#" isActive={p === page} onClick={e => { e.preventDefault(); setPage(p); }}>{p}</PaginationLink></PaginationItem>
-          ))}
-          <PaginationItem><PaginationNext href="#" onClick={e => { e.preventDefault(); setPage(p => Math.min(totalPages, p + 1)); }} /></PaginationItem>
-        </PaginationContent></Pagination>
-      )}
+          {totalPages > 1 && (
+            <Pagination className="mt-6"><PaginationContent>
+              <PaginationItem><PaginationPrevious href="#" onClick={e => { e.preventDefault(); setPage(p => Math.max(1, p - 1)); }} /></PaginationItem>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <PaginationItem key={p}><PaginationLink href="#" isActive={p === page} onClick={e => { e.preventDefault(); setPage(p); }}>{p}</PaginationLink></PaginationItem>
+              ))}
+              <PaginationItem><PaginationNext href="#" onClick={e => { e.preventDefault(); setPage(p => Math.min(totalPages, p + 1)); }} /></PaginationItem>
+            </PaginationContent></Pagination>
+          )}
         </TabsContent>
 
         <TabsContent value="payouts" className="m-0 space-y-6 outline-none">
