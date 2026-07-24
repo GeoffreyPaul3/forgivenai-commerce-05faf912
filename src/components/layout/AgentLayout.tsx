@@ -20,7 +20,9 @@ import { useState, useEffect } from "react";
 import logo from "@/assets/forgiven.png";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AgentSidebar } from "./AgentSidebar";
 import AgentOnboardingGate from "@/pages/dashboard/agent/onboarding/AgentOnboardingGate";
+import { AgentNotifications } from "../dashboard/agent/AgentNotifications";
 
 const agentMenuItems = [
   { title: "Dashboard",        url: "/dashboard",                     icon: LayoutDashboard },
@@ -116,10 +118,7 @@ export default function AgentLayout({ children, title }: { children: React.React
             <SidebarTrigger className="mr-4" />
             <h1 className="font-heading text-xl font-semibold text-foreground flex-1">{title}</h1>
 
-            <Button variant="ghost" size="icon" className="mr-2 h-9 w-9 rounded-full relative">
-              <Bell className="w-4 h-4 text-muted-foreground" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-background" />
-            </Button>
+            <AgentNotifications />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
