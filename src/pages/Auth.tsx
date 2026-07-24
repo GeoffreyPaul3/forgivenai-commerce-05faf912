@@ -33,6 +33,10 @@ function detectInitialAuthMode(): AuthMode {
 
 export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>(detectInitialAuthMode);
+  const [mobileShowForm, setMobileShowForm] = useState(() => {
+    const initial = detectInitialAuthMode();
+    return initial === "reset";
+  });
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [email, setEmail] = useState("");
@@ -246,7 +250,7 @@ export default function AuthPage() {
           <p className={`${isPortal ? 'text-neutral-500' : 'text-cream/40'} text-sm`}>Didn't receive it? Check spam or{" "}
             <button onClick={() => setResetSent(false)} className={`${isPortal ? 'text-maroon hover:text-maroon-light' : 'text-gold hover:text-gold-light'} font-bold`}>try again</button>
           </p>
-          <button onClick={() => { setMode("login"); setResetSent(false); }} className={`${isPortal ? 'text-neutral-500 hover:text-maroon' : 'text-cream/40 hover:text-cream/60'} text-sm mt-2`}>
+          <button onClick={() => { setMode("login"); setResetSent(false); setMobileShowForm(true); }} className={`${isPortal ? 'text-neutral-500 hover:text-maroon' : 'text-cream/40 hover:text-cream/60'} text-sm mt-2`}>
             ← Back to Sign In
           </button>
         </motion.div>
@@ -408,7 +412,7 @@ export default function AuthPage() {
         <p className={`text-xs font-body ${isPortal ? 'text-neutral-500' : 'text-cream/50'}`}>Our admin team reviews new accounts and approves access within 24 hours.</p>
       </div>
       <button
-        onClick={() => { setPendingApproval(false); setMode("login"); }}
+        onClick={() => { setPendingApproval(false); setMode("login"); setMobileShowForm(true); }}
         className={`text-sm transition-colors ${isPortal ? 'text-neutral-500 hover:text-maroon' : 'text-cream/40 hover:text-cream/60'}`}
       >
         ← Back to Sign In
@@ -419,7 +423,17 @@ export default function AuthPage() {
   const content = pendingApproval ? pendingScreen : formContent;
 
   if (appMode === "vendor" || appMode === "agent") {
-    return <PortalAuthLayout mode={appMode}>{content}</PortalAuthLayout>;
+    return (
+      <PortalAuthLayout 
+        mode={appMode}
+        formMode={mode}
+        setFormMode={setMode}
+        mobileShowForm={mobileShowForm}
+        setMobileShowForm={setMobileShowForm}
+      >
+        {content}
+      </PortalAuthLayout>
+    );
   }
 
   return (

@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import logo from "@/assets/forgiven.png";
 import agentBg from "@/assets/agent_signup_woman.png";
@@ -6,12 +7,18 @@ import vendorProductsImg from "@/assets/vendor_auth_products.png";
 import { 
   ShieldCheck, Zap, TrendingUp, Users, Globe, CheckCircle2, 
   Coins, Megaphone, Package, ShoppingBag, Tag, Percent, 
-  Truck, Phone, Mail, Heart, Facebook, Instagram, Store, Headphones, CreditCard
+  Truck, Phone, Mail, Heart, Facebook, Instagram, Store, Headphones, CreditCard,
+  UserPlus, ArrowRight
 } from "lucide-react";
+import { getRedirectUrl } from "@/lib/app-mode";
 
 interface PortalAuthLayoutProps {
   children: React.ReactNode;
   mode: "vendor" | "agent";
+  formMode: "login" | "signup" | "forgot" | "reset";
+  setFormMode: (mode: "login" | "signup" | "forgot" | "reset") => void;
+  mobileShowForm: boolean;
+  setMobileShowForm: (show: boolean) => void;
 }
 
 const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -121,32 +128,86 @@ const layoutContent = {
   }
 };
 
-export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutProps) {
+export default function PortalAuthLayout({ 
+  children, 
+  mode,
+  formMode,
+  setFormMode,
+  mobileShowForm,
+  setMobileShowForm
+}: PortalAuthLayoutProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const data = layoutContent[mode];
   const isAgent = mode === "agent";
 
   return (
     <div className={`min-h-screen flex flex-col justify-between relative overflow-hidden select-none ${isAgent ? 'bg-[#111111]' : 'bg-[#fcfcff]'}`}>
       
+      {/* Mobile Top Header (hidden on desktop) */}
+      <header className="lg:hidden sticky top-0 z-40 w-full bg-white border-b border-neutral-100 px-4 py-3.5 flex items-center justify-between shadow-sm">
+        <Link to="/" className="flex items-center gap-2.5 group">
+          <div className="rounded-lg bg-white p-1.5 flex items-center justify-center shadow-md border border-neutral-100">
+            <img src={logo} alt="Forgiven" className="w-8 h-8 object-contain" />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-heading text-lg font-extrabold tracking-tight leading-none uppercase text-neutral-900">
+              Forgiven
+            </span>
+            <span className="text-gold text-[7px] uppercase tracking-[0.3em] font-extrabold mt-0.5">
+              Shopping Centre
+            </span>
+          </div>
+        </Link>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => {
+              window.location.href = getRedirectUrl(isAgent ? "vendor" : "agent");
+            }}
+            className={`flex items-center gap-1.5 border ${isAgent ? 'border-[#3c1c4b]/20 text-[#3c1c4b]' : 'border-[#1c2c5b]/20 text-[#1c2c5b]'} px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white shadow-sm transition-all`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>{isAgent ? "Agent Portal" : "Vendor Portal"}</span>
+          </button>
+          
+          <button 
+            onClick={() => setMobileMenuOpen(true)}
+            className="p-1.5 text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+            aria-label="Toggle Menu"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
       {/* Main Body */}
-      <div className="flex-1 flex flex-col-reverse lg:flex-row relative z-10 w-full">
+      <div className="flex-1 flex flex-col lg:flex-row relative z-10 w-full">
         
-        {/* Marketing Side (Left Column) - Positioned below the card on mobile/tablet, side-by-side on desktop */}
-        <div className={`flex w-full lg:w-[54%] p-6 sm:p-10 xl:p-12 flex-col justify-between relative overflow-hidden min-h-[480px] lg:min-h-screen ${isAgent ? '' : 'bg-[#fcfcff] border-t lg:border-t-0 lg:border-r border-neutral-100'}`}>
+        {/* Marketing Side (Left Column) */}
+        <div className={`${mobileShowForm ? 'hidden lg:flex' : 'flex'} w-full lg:w-[54%] p-6 sm:p-10 xl:p-12 flex-col justify-between relative overflow-hidden min-h-[480px] lg:min-h-screen ${isAgent ? '' : 'bg-[#fcfcff] border-t lg:border-t-0 lg:border-r border-neutral-100'}`}>
           
           {/* Agent Mode background image & dark overlay */}
           {isAgent && (
             <>
+              {/* Desktop background */}
               <div 
-                className="absolute inset-0 bg-cover bg-center -z-10 brightness-[0.95]"
+                className="hidden lg:block absolute inset-0 bg-cover bg-center -z-10 brightness-[0.95]"
                 style={{ backgroundImage: `url(${agentBg})` }}
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-maroon-dark/95 via-maroon-dark/85 to-maroon-dark/30 -z-10" />
+              <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-maroon-dark/95 via-maroon-dark/85 to-maroon-dark/30 -z-10" />
+              
+              {/* Mobile background (light) and floating woman image */}
+              <div className="lg:hidden absolute inset-0 bg-[#f8f6f9] -z-20" />
+              <div 
+                className="lg:hidden absolute right-[-60px] sm:right-[-20px] bottom-0 w-[80%] max-w-[320px] h-[55%] bg-no-repeat bg-contain bg-bottom -z-10 pointer-events-none opacity-90"
+                style={{ backgroundImage: `url(${agentBg})` }}
+              />
             </>
           )}
 
-          {/* Top Logo and Badge */}
-          <div className="space-y-6">
+          {/* Top Logo and Badge (shown on desktop only since mobile has its own sticky header) */}
+          <div className="hidden lg:block space-y-6">
             <Link to="/" className="flex items-center gap-3 group inline-flex">
               <div className="rounded-xl bg-white p-2 flex items-center justify-center shadow-md border border-neutral-100">
                 <img src={logo} alt="Forgiven Shopping Centre" className="w-10 h-10 object-contain" />
@@ -169,34 +230,48 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
             </div>
           </div>
 
+          {/* Mobile-only Badge (placed inside the scroll content) */}
+          <div className="lg:hidden mb-4">
+            <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black tracking-wider uppercase ${isAgent ? 'bg-[#3c1c4b] text-white' : 'bg-[#f8f5fa] border border-maroon/10 text-maroon'}`}>
+              {isAgent ? <Users className="w-3.5 h-3.5 text-gold" /> : <Store className="w-3.5 h-3.5 text-maroon" />}
+              {isAgent ? "SALES AGENTS PROGRAM" : "VENDOR PORTAL"}
+            </span>
+          </div>
+
           {/* Heading and Benefit List */}
-          <div className="max-w-xl space-y-6 my-auto pt-4">
-            <h1 className={`font-heading text-4xl xl:text-5xl font-black tracking-tight leading-tight uppercase ${isAgent ? 'text-white' : 'text-neutral-900'}`}>
-              {isAgent ? data.heading : (
+          <div className="max-w-xl space-y-6 my-auto pt-4 relative">
+            <h1 className={`font-heading text-3xl sm:text-4xl xl:text-5xl font-black tracking-tight leading-tight uppercase ${isAgent ? 'text-neutral-900 lg:text-white' : 'text-neutral-900'}`}>
+              {isAgent ? (
+                <>
+                  TURN YOUR <br className="hidden sm:inline" />
+                  PHONE INTO <br className="hidden sm:inline" />
+                  <span className="text-maroon lg:text-gold">INCOME.</span>
+                </>
+              ) : (
                 <>
                   Grow your business <span className="text-maroon">with Forgiven.</span>
                 </>
               )}
             </h1>
             
-            <p className={`text-sm xl:text-base font-body leading-relaxed max-w-lg ${isAgent ? 'text-cream/90' : 'text-neutral-600'}`}>
+            <p className={`text-sm xl:text-base font-body leading-relaxed max-w-[75%] sm:max-w-lg ${isAgent ? 'text-neutral-600 lg:text-cream/90' : 'text-neutral-600'}`}>
               {data.description}
             </p>
 
             {/* List of 4 features */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div className="grid grid-cols-1 gap-5 pt-2 max-w-[70%] sm:max-w-lg">
               {data.features.map((item, i) => {
                 const Icon = item.icon;
                 return (
-                  <div key={i} className="flex gap-4 items-start">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm border ${isAgent ? 'bg-white/10 border-white/20 text-gold' : 'bg-[#f8f5fa] border-maroon/5 text-maroon'}`}>
-                      <Icon className="w-5 h-5" />
+                  <div key={i} className="flex gap-3.5 items-start">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ${isAgent ? 'bg-[#3c1c4b] text-white lg:bg-white/10 lg:border lg:border-white/20 lg:text-gold' : 'bg-[#f8f5fa] border border-maroon/5 text-maroon'}`}>
+                      <Icon className="w-4 h-4" />
                     </div>
-                    <div className="space-y-1">
-                      <h4 className={`font-extrabold text-sm tracking-wide uppercase ${isAgent ? 'text-white' : 'text-neutral-950'}`}>
+                    <div className="space-y-0.5">
+                      <h4 className={`font-black text-xs tracking-wider uppercase ${isAgent ? 'text-neutral-900 lg:text-white' : 'text-neutral-950'}`}>
                         {item.title}
                       </h4>
-                      <p className={`text-xs leading-relaxed font-body ${isAgent ? 'text-cream/70' : 'text-neutral-500'}`}>
+                      <p className={`text-[11px] leading-relaxed font-body ${isAgent ? 'text-neutral-500 lg:text-cream/70' : 'text-neutral-500'}`}>
                         {item.desc}
                       </p>
                     </div>
@@ -205,19 +280,40 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
               })}
             </div>
 
-            {/* Middle Brush-Style banner (Agent mode only) */}
+            {/* Middle Brush-Style banner */}
             {isAgent && data.highlightBox && (
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-maroon/90 via-maroon-light/80 to-maroon/90 border border-white/10 px-6 py-4 shadow-xl">
-                <h3 className="font-['Playball'] text-3xl text-gold text-center mb-3">
-                  {data.highlightBox.title}
-                </h3>
-                <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-white font-medium">
-                  {data.highlightBox.benefits.map((benefit, bIdx) => (
-                    <div key={bIdx} className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-gold" />
-                      <span>{benefit}</span>
-                    </div>
-                  ))}
+              <div className="relative overflow-hidden rounded-3xl bg-[#3c1c4b] px-6 py-5 shadow-xl text-white flex flex-col sm:flex-row items-center gap-4 border border-white/10 mt-6">
+                {/* Left side: Icon and handwriting title */}
+                <div className="flex items-center gap-3.5 flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
+                    <Users className="w-6 h-6 text-gold" />
+                  </div>
+                  <div>
+                    <h3 className="font-['Playball'] text-2xl lg:text-3xl text-gold leading-none">
+                      {data.highlightBox.title}
+                    </h3>
+                  </div>
+                </div>
+                
+                {/* Divider on larger screens */}
+                <div className="hidden sm:block w-[1px] h-10 bg-white/20" />
+                
+                {/* Right side: Benefits list */}
+                <div className="space-y-1 text-xs font-semibold text-white/95 w-full">
+                  {data.highlightBox.benefits.map((benefit, bIdx) => {
+                    const text = benefit.replace("Let us ", "");
+                    const verb = text.includes("earn") ? "earn" : text.includes("grow") ? "grow" : text.includes("benefit") ? "benefit" : "";
+                    const display = verb ? (
+                      <>Let us <span className="text-gold font-bold">{verb}</span> together.</>
+                    ) : benefit;
+                    
+                    return (
+                      <div key={bIdx} className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                        <span>{display}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -234,11 +330,77 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
               </motion.div>
             )}
 
+            {/* Mobile-only Highlights Card (Product range, Competitive prices, etc.) */}
+            <div className="lg:hidden bg-white rounded-3xl p-5 border border-neutral-100 shadow-lg shadow-neutral-900/5 mt-6 w-full">
+              <div className="grid grid-cols-2 gap-4">
+                {data.footerHighlights.map((hl, hlIdx) => {
+                  const HlIcon = hl.icon;
+                  return (
+                    <div key={hlIdx} className="flex flex-col items-center text-center p-2 rounded-2xl">
+                      <div className={`p-2 rounded-xl ${isAgent ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-blue-50 text-blue-700 border border-blue-100'} flex-shrink-0 mb-2`}>
+                        <HlIcon className="w-5 h-5" />
+                      </div>
+                      <h5 className="text-[10px] font-black text-neutral-900 leading-tight tracking-wider uppercase mb-1">
+                        {hl.title}
+                      </h5>
+                      <p className="text-[9px] text-neutral-500 font-medium leading-normal max-w-[120px]">
+                        {hl.desc}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Mobile-only CTA Buttons */}
+            <div className="lg:hidden flex flex-col gap-3.5 pt-4 w-full">
+              {/* APPLY NOW */}
+              <button
+                onClick={() => {
+                  setFormMode("signup");
+                  setMobileShowForm(true);
+                }}
+                className="w-full flex items-center justify-between px-6 py-3.5 bg-gradient-to-r from-[#ab0979] to-[#490c6a] text-white rounded-2xl shadow-xl shadow-purple-900/10 hover:brightness-110 active:scale-[0.98] transition-all"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="p-1 bg-white/10 rounded-lg">
+                    <UserPlus className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-xs font-black tracking-wider uppercase">APPLY NOW</div>
+                    <div className="text-[10px] text-white/80">Become an {isAgent ? "Agent" : "Vendor"}</div>
+                  </div>
+                </div>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+
+              {/* SIGN IN */}
+              <button
+                onClick={() => {
+                  setFormMode("login");
+                  setMobileShowForm(true);
+                }}
+                className={`w-full flex items-center justify-between px-6 py-3.5 bg-white border ${isAgent ? 'border-[#490c6a] text-[#490c6a]' : 'border-[#1c2c5b] text-[#1c2c5b]'} rounded-2xl shadow-sm hover:bg-neutral-50 active:scale-[0.98] transition-all`}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className={`p-1 ${isAgent ? 'bg-[#490c6a]/5 text-[#490c6a]' : 'bg-[#1c2c5b]/5 text-[#1c2c5b]'} rounded-lg`}>
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-xs font-black tracking-wider uppercase">
+                      {isAgent ? "AGENT SIGN IN" : "VENDOR SIGN IN"}
+                    </div>
+                    <div className="text-[10px] text-neutral-500">I already have an account</div>
+                  </div>
+                </div>
+              </button>
+            </div>
+
           </div>
 
-          {/* Bottom Grid Highlights (Agent mode only - shown inside left column) */}
+          {/* Desktop-only Bottom Grid Highlights (Agent mode only) */}
           {isAgent && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-white/95 rounded-2xl p-4 border border-white/10 shadow-lg max-w-3xl">
+            <div className="hidden lg:grid grid-cols-4 gap-4 bg-white/95 rounded-2xl p-4 border border-white/10 shadow-lg max-w-3xl">
               {data.footerHighlights.map((hl, hlIdx) => {
                 const HlIcon = hl.icon;
                 return (
@@ -263,7 +425,7 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
         </div>
 
         {/* Auth Column (Right Column) */}
-        <div className={`flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-12 relative min-h-[calc(100vh-80px)] lg:min-h-screen ${isAgent ? 'bg-[#f4f3f6]' : 'bg-[#fbfcff]'}`}>
+        <div className={`${mobileShowForm ? 'flex w-full' : 'hidden lg:flex'} flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-12 relative min-h-[calc(100vh-80px)] lg:min-h-screen ${isAgent ? 'bg-[#f4f3f6]' : 'bg-[#fbfcff]'}`}>
           
           {/* Top header navigation for desktop vendor mode */}
           {!isAgent && (
@@ -275,17 +437,32 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
             </div>
           )}
 
-          {/* Mobile logo header */}
-          <div className="lg:hidden absolute top-6 left-6">
-            <Link to="/" className="flex items-center gap-2.5">
-              <div className="rounded-lg bg-white p-1.5 flex items-center justify-center shadow-md">
-                <img src={logo} alt="Forgiven" className="w-8 h-8 object-contain" />
-              </div>
-              <span className="font-heading text-lg font-bold text-neutral-900 tracking-tight leading-none uppercase">
-                Forgiven
-              </span>
-            </Link>
-          </div>
+          {/* Mobile Back Button to return to landing page */}
+          {mobileShowForm && (
+            <button
+              onClick={() => setMobileShowForm(false)}
+              className="lg:hidden absolute top-6 left-6 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-neutral-600 hover:text-maroon transition-colors bg-white px-4 py-2.5 rounded-xl shadow-sm border border-neutral-100"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span>Back to Info</span>
+            </button>
+          )}
+
+          {/* Mobile logo header (hidden when form is active to prevent overlap) */}
+          {!mobileShowForm && (
+            <div className="lg:hidden absolute top-6 left-6">
+              <Link to="/" className="flex items-center gap-2.5">
+                <div className="rounded-lg bg-white p-1.5 flex items-center justify-center shadow-md">
+                  <img src={logo} alt="Forgiven" className="w-8 h-8 object-contain" />
+                </div>
+                <span className="font-heading text-lg font-bold text-neutral-900 tracking-tight leading-none uppercase">
+                  Forgiven
+                </span>
+              </Link>
+            </div>
+          )}
 
           {/* White Card Container */}
           <motion.div
@@ -328,14 +505,14 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
 
       </div>
 
-      {/* Vendor Mode Bottom Highlights Block - Clean and Centered */}
+      {/* Desktop-only Vendor Mode Bottom Highlights Block */}
       {!isAgent && (
-        <div className="bg-white border-t border-neutral-100 py-10 px-6 lg:px-12 w-full z-10">
+        <div className="hidden lg:block bg-white border-t border-neutral-100 py-10 px-6 lg:px-12 w-full z-10">
           <div className="max-w-6xl mx-auto space-y-6">
             <h3 className="text-center font-heading text-xl lg:text-2xl font-bold text-neutral-800 tracking-tight uppercase">
               Why vendors choose Forgiven Shopping Centre
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-4 gap-6">
               {data.footerHighlights.map((hl, hlIdx) => {
                 const HlIcon = hl.icon;
                 return (
@@ -360,39 +537,42 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
       )}
 
       {/* WhatsApp, Email, & Social Footer Bar */}
-      <div className="bg-[#0b0b0b] border-t border-white/5 py-4 px-4 sm:px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-4 z-10 text-center md:text-left">
+      <div className={`py-6 px-4 sm:px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-4 z-10 text-center md:text-left border-t border-white/5 ${isAgent ? 'bg-[#1c0c30] text-cream/70' : 'bg-[#0f172a] text-cream/70'}`}>
         
         {/* WhatsApp & Email */}
-        <div className="flex flex-col sm:flex-row justify-center gap-y-2 gap-x-8 text-xs font-medium text-cream/70">
-          <a href={`https://wa.me/${data.contactInfo.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center md:justify-start gap-2 hover:text-green-500 transition-colors">
-            <WhatsAppIcon className="w-4 h-4 text-green-500" />
-            <span>Need help? <span className="hidden sm:inline">WhatsApp us:</span> <span className="text-white font-bold">{data.contactInfo.phone}</span></span>
+        <div className="flex flex-col sm:flex-row justify-center gap-y-2 gap-x-8 text-xs font-medium">
+          <a href={`https://wa.me/${data.contactInfo.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center md:justify-start gap-2 hover:text-green-400 transition-colors">
+            <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white">
+              <WhatsAppIcon className="w-3.5 h-3.5" />
+            </div>
+            <span>Need help? WhatsApp us: <span className="text-white font-bold">{data.contactInfo.phone}</span></span>
           </a>
           <a href={`mailto:${data.contactInfo.email}`} className="flex items-center justify-center md:justify-start gap-2 hover:text-gold transition-colors">
-            <Mail className="w-4 h-4 text-gold" />
-            <span>Email: <span className="text-white font-bold">{data.contactInfo.email}</span></span>
+            <div className={`w-6 h-6 rounded-full ${isAgent ? 'bg-purple-500' : 'bg-blue-500'} flex items-center justify-center text-white`}>
+              <Mail className="w-3.5 h-3.5" />
+            </div>
+            <span>Email us: <span className="text-white font-bold">{data.contactInfo.email}</span></span>
           </a>
         </div>
 
         {/* Social Follow */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 md:gap-4 text-xs font-medium text-cream/70">
+        <div className="flex flex-col sm:flex-row items-center gap-3 md:gap-4 text-xs font-medium">
           <span>Follow us:</span>
           <div className="flex items-center gap-3 text-white/95">
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-full hover:bg-white/10 hover:text-blue-500 transition-colors">
+            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-full hover:bg-white/10 hover:text-blue-400 transition-colors">
               <Facebook className="w-4 h-4" />
             </a>
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-full hover:bg-white/10 hover:text-pink-500 transition-colors">
+            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-full hover:bg-white/10 hover:text-pink-400 transition-colors">
               <Instagram className="w-4 h-4" />
             </a>
             <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-full hover:bg-white/10 hover:text-teal-400 transition-colors">
               <TikTokIcon className="w-4 h-4" />
             </a>
           </div>
-          <span className="text-cream/40 font-body pl-2 hidden sm:inline border-l border-white/10">Forgiven Shopping Centre</span>
         </div>
 
         {/* Empowering text & heart icon */}
-        <div className="flex items-center gap-2 text-xs font-medium text-cream/60">
+        <div className="flex items-center gap-2 text-xs font-medium">
           <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1 rounded-lg">
             {isAgent ? <Users className="w-3.5 h-3.5 text-gold" /> : <Store className="w-3.5 h-3.5 text-gold" />}
             <span className="text-[10px] tracking-wide uppercase font-extrabold text-white">
@@ -404,6 +584,87 @@ export default function PortalAuthLayout({ children, mode }: PortalAuthLayoutPro
         </div>
 
       </div>
+
+      {/* Hamburger Menu Drawer */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black z-50 lg:hidden"
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 bottom-0 w-[280px] bg-white z-50 shadow-2xl p-6 flex flex-col justify-between lg:hidden text-neutral-900"
+            >
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b pb-4">
+                  <span className="font-heading text-lg font-bold text-neutral-900 uppercase">Menu</span>
+                  <button onClick={() => setMobileMenuOpen(false)} className="p-1 rounded-lg hover:bg-neutral-100">
+                    <svg className="w-6 h-6 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Portals</div>
+                  
+                  <Link 
+                    to="/" 
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-neutral-50 font-semibold"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Store className="w-5 h-5 text-maroon" />
+                    <span>Main Shop Website</span>
+                  </Link>
+
+                  <button 
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      window.location.href = getRedirectUrl("agent");
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl hover:bg-neutral-50 font-semibold text-left ${isAgent ? 'bg-purple-50 text-purple-900' : ''}`}
+                  >
+                    <Users className="w-5 h-5 text-maroon" />
+                    <span>Sales Agent Portal</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      window.location.href = getRedirectUrl("vendor");
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl hover:bg-neutral-50 font-semibold text-left ${!isAgent ? 'bg-blue-50 text-blue-900' : ''}`}
+                  >
+                    <Store className="w-5 h-5 text-maroon" />
+                    <span>Vendor Portal</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-3">
+                <div className="text-xs text-neutral-500">Need immediate help?</div>
+                <a 
+                  href={`https://wa.me/${data.contactInfo.phone.replace(/[^0-9]/g, '')}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center gap-2 text-xs font-semibold text-green-600 hover:underline"
+                >
+                  <WhatsAppIcon className="w-4 h-4 text-green-500" />
+                  <span>WhatsApp Support</span>
+                </a>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
     </div>
   );
