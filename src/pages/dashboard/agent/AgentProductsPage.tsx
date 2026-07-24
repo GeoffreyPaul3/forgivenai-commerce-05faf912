@@ -101,6 +101,9 @@ export default function AgentProductsPage() {
     },
   });
 
+  const recommendedProducts = useRecommendedProducts(products || [], session?.user?.id || "");
+  const totalPages = Math.ceil((products?.length || 0) / ITEMS_PER_PAGE);
+
   const copyLink = (productId: string) => {
     if (!agent?.referral_code) {
       toast({ title: "Referral code not found", variant: "destructive" });
@@ -195,7 +198,7 @@ export default function AgentProductsPage() {
                     <div className="flex items-center gap-2">
                       <p className="text-2xl font-black text-foreground tabular-nums">
                         <span className="text-sm text-muted-foreground mr-1">MWK</span>
-                        {formatPrice(product.price)}
+                        {Number(product.price || 0).toLocaleString()}
                       </p>
                     </div>
                   </div>
