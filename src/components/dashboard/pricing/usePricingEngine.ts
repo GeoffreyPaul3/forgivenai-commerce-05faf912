@@ -1,183 +1,111 @@
-import { useMemo } from "react";
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { PricingInputs, FullPricingResult } from './engines/types';
+import { computeCosts } from './engines/costEngine';
+import { computeProfit } from './engines/profitEngine';
+import { computeMargins } from './engines/marginEngine';
+import { computeHealth } from './engines/healthEngine';
+import { evaluateRules } from './engines/recommendationEngine';
+import { computeSensitivity } from './engines/sensitivityEngine';
+import { runScenario, DEFAULT_SCENARIOS } from './engines/scenarioEngine';
+import { computeForecast } from './engines/forecastEngine';
 
-export interface ScenarioResult {
-  price: number;
-  profit: number;
-  margin: number;
-  delta: number; // delta vs base margin
-}
+const DEFAULT_POLICY = {
+  commission_rate: 8.00,
+  gateway_rate: 2.50,
+  marketing_rate: 3.00,
+  platform_rate: 1.00,
+  reserve_rate: 1.00,
+  tax_rate: 0.00,
+  packaging_cost: 500.00,
+  delivery_cost: 2000.00,
+  target_margin: 30.00
+};
 
-export interface PricingMetrics {
-  sellingPrice: number;
-  grossProfit: number;
-  grossMarginPct: number;
-  markupPct: number;
-  breakEvenPrice: number;
-  maxDiscountPct: number;
-  minProfitablePrice: number; // NEW: minimum price for any profit
-  confidenceScore: number;
-  confidenceLabel: "Excellent" | "Good" | "Caution" | "Risk";
-  vendorCostPct: number;
-  operationsPct: number;
-  fscProfitPct: number;
-  isValid: boolean;
-  // Advisory helpers
-  priceForMargin: (targetMarginPct: number) => number;
-  discountedPrice: (discountPct: number) => number;
-  discountedProfit: (discountPct: number) => number;
-  discountedMargin: (discountPct: number) => number;
-  // Sensitivity scenarios
-  scenarioSupplierUp10: ScenarioResult;
-  scenarioSupplierDown10: ScenarioResult;
-  scenarioDiscount15: ScenarioResult;
-  // Narrative
-  executiveInsight: string;
-  // Scalability (existing)
-  scalability: {
-    revenuePerSale: number;
-    profit100: number;
-    profit1000: number;
-    profit10000: number;
-  };
-  // NEW: Bulk order projections
-  bulkProjections: Array<{ units: number; revenue: number; totalProfit: number; profitPerUnit: number }>;
-  // NEW: Time-based forecasts
-  forecast: {
-    dailyUnitsNeeded: (targetMonthlyProfit: number) => number;
-    monthlyRevenue: (dailySales: number) => number;
-    yearlyRevenue: (dailySales: number) => number;
-    monthlyProfit: (dailySales: number) => number;
-    yearlyProfit: (dailySales: number) => number;
-  };
-}
-
-/**
- * usePricingEngine — pure reactive pricing calculation hook.
- * The pricing formula (ceil((cost + ops) / 0.80)) is synchronized with
- * the VendorProductsPage business logic.
- */
 export function usePricingEngine(
   vendorCost: number,
-  operationsCost: number
-): PricingMetrics {
-  return useMemo(() => {
-    const isValid = vendorCost > 0;
-    const totalCost = vendorCost + operationsCost;
-
-    // ── Core formula ─────────────────────────────────────────────────────────
-    const sellingPrice = isValid ? Math.ceil(totalCost / 0.80) : 0;
-    const grossProfit = sellingPrice - totalCost;
-    const grossMarginPct =
-      sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
-    const markupPct = vendorCost > 0 ? (grossProfit / vendorCost) * 100 : 0;
-    const breakEvenPrice = totalCost;
-    const maxDiscountPct =
-      sellingPrice > 0
-        ? ((sellingPrice - breakEvenPrice) / sellingPrice) * 100
-        : 0;
-
-    // ── Percentage splits ────────────────────────────────────────────────────
-    const vendorCostPct =
-      sellingPrice > 0 ? (vendorCost / sellingPrice) * 100 : 0;
-    const operationsPct =
-      sellingPrice > 0 ? (operationsCost / sellingPrice) * 100 : 0;
-    const fscProfitPct = grossMarginPct;
-
-    // ── Confidence Score (0–100, weighted composite) ─────────────────────────
-    // margin weight 40% | discount resilience 20% | cost ratio 20% | markup 20%
-    const marginScore = Math.min(100, (grossMarginPct / 20) * 100) * 0.4;
-    const discountScore =
-      Math.min(100, (maxDiscountPct / 15) * 100) * 0.2;
-    const costRatioScore =
-      Math.min(100, ((100 - vendorCostPct) / 50) * 100) * 0.2;
-    const markupScore = Math.min(100, (markupPct / 80) * 100) * 0.2;
-    const rawConfidence = isValid
-      ? Math.round(marginScore + discountScore + costRatioScore + markupScore)
-      : 0;
-    const confidenceScore = Math.min(100, Math.max(0, rawConfidence));
-    const confidenceLabel: PricingMetrics["confidenceLabel"] =
-      confidenceScore >= 80
-        ? "Excellent"
-        : confidenceScore >= 60
-        ? "Good"
-        : confidenceScore >= 40
-        ? "Caution"
-        : "Risk";
-
-    // ── Advisory helpers ─────────────────────────────────────────────────────
-    const priceForMargin = (targetPct: number): number =>
-      totalCost > 0 ? Math.ceil(totalCost / (1 - targetPct / 100)) : 0;
-
-    const discountedPrice = (pct: number): number =>
-      sellingPrice * (1 - pct / 100);
-    const discountedProfit = (pct: number): number =>
-      discountedPrice(pct) - totalCost;
-    const discountedMargin = (pct: number): number => {
-      const dp = discountedPrice(pct);
-      return dp > 0 ? (discountedProfit(pct) / dp) * 100 : 0;
-    };
-
-    // ── Sensitivity scenarios ────────────────────────────────────────────────
-    const makeScenario = (
-      costMultiplier: number,
-      discPct: number
-    ): ScenarioResult => {
-      const newVendorCost = vendorCost * costMultiplier;
-      const newTotalCost = newVendorCost + operationsCost;
-      const dp = sellingPrice * (1 - discPct / 100);
-      const profit = dp - newTotalCost;
-      const margin = dp > 0 ? (profit / dp) * 100 : 0;
-      return { price: dp, profit, margin, delta: margin - grossMarginPct };
-    };
-
-    // ── Executive AI Insight (template-driven, deterministic) ────────────────
-    let executiveInsight = "";
-    if (!isValid) {
-      executiveInsight =
-        "Enter a supplier cost above to unlock live pricing intelligence.";
-    } else {
-      const currency = "MWK";
-      const profitStr = `${currency} ${Math.round(grossProfit).toLocaleString()}`;
-      const marginStr = grossMarginPct.toFixed(1);
-      const disc15Str = makeScenario(1, 15).margin.toFixed(1);
-      const vendorPctStr = vendorCostPct.toFixed(1);
-      const maxDiscStr = maxDiscountPct.toFixed(0);
-
-      if (grossMarginPct >= 20) {
-        executiveInsight = `Excellent product. FSC retains ${profitStr} (${marginStr}%) per sale. A 10% promotional discount still holds a healthy margin. You can discount up to ${maxDiscStr}% before hitting break-even. Supplier cost is ${vendorPctStr}% of revenue — well within range.`;
-      } else if (grossMarginPct >= 15) {
-        executiveInsight = `Solid pricing profile. FSC earns ${profitStr} (${marginStr}%) per sale. Limit discounts to 5% to protect profitability. Supplier cost is ${vendorPctStr}% of revenue. Consider negotiating bulk pricing to improve margins further.`;
-      } else if (grossMarginPct >= 10) {
-        executiveInsight = `Thin margin at ${marginStr}%. FSC earns ${profitStr} per sale, but any discount approaches break-even. Supplier cost (${vendorPctStr}% of revenue) is high — a 5% cost reduction would improve margin to approximately ${(
-          ((grossProfit + vendorCost * 0.05) / sellingPrice) *
-          100
-        ).toFixed(1)}%.`;
-      } else {
-        executiveInsight = `⚠️ Margin alert: only ${marginStr}% gross margin. FSC retains ${profitStr} per sale at current pricing. Discounting is not recommended. Strongly consider increasing the selling price or renegotiating supplier terms to achieve at least 20% gross margin.`;
+  operationsCost: number,
+  policyOverrides?: Partial<PricingInputs>
+): FullPricingResult {
+  // Fetch active policy
+  const { data: activePolicy } = useQuery({
+    queryKey: ['activePricingPolicy'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_active_pricing_policy');
+      if (error || !data || data.length === 0) {
+        // Fallback to fetching directly if rpc fails (e.g. migration not fully run)
+        const { data: directData } = await supabase.from('pricing_policies').select('*').eq('is_active', true).maybeSingle();
+        return directData || DEFAULT_POLICY;
       }
-    }
+      return data[0];
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+  });
 
-    const minProfitablePrice = totalCost + 1; // 1 MWK above cost = any profit
-
-    // ── Bulk order projections ───────────────────────────────────────────────
-    const bulkProjections = [5, 10, 20, 50].map((units) => ({
-      units,
-      revenue: sellingPrice * units,
-      totalProfit: grossProfit * units,
-      profitPerUnit: grossProfit,
-    }));
-
-    // ── Time-based forecasts ─────────────────────────────────────────────────
-    const forecast = {
-      dailyUnitsNeeded: (targetMonthlyProfit: number) =>
-        grossProfit > 0 ? Math.ceil(targetMonthlyProfit / (grossProfit * 30)) : 0,
-      monthlyRevenue: (dailySales: number) => sellingPrice * dailySales * 30,
-      yearlyRevenue: (dailySales: number) => sellingPrice * dailySales * 365,
-      monthlyProfit: (dailySales: number) => grossProfit * dailySales * 30,
-      yearlyProfit: (dailySales: number) => grossProfit * dailySales * 365,
+  return useMemo(() => {
+    const policy = activePolicy || DEFAULT_POLICY;
+    const isValid = vendorCost > 0;
+    
+    // Core inputs 
+    const inputs: PricingInputs = {
+      vendorCost,
+      operationsCost,
+      sellingPrice: isValid ? Math.ceil((vendorCost + operationsCost) / 0.80) : 0,
+      gatewayRate: policyOverrides?.gatewayRate ?? policy.gateway_rate,
+      marketingRate: policyOverrides?.marketingRate ?? policy.marketing_rate,
+      commissionRate: policyOverrides?.commissionRate ?? policy.commission_rate,
+      platformRate: policyOverrides?.platformRate ?? policy.platform_rate,
+      reserveRate: policyOverrides?.reserveRate ?? policy.reserve_rate,
+      taxRate: policyOverrides?.taxRate ?? policy.tax_rate,
+      packagingCost: policyOverrides?.packagingCost ?? policy.packaging_cost,
+      deliveryCost: policyOverrides?.deliveryCost ?? policy.delivery_cost,
+      targetMarginPct: policyOverrides?.targetMarginPct ?? policy.target_margin
     };
+
+    const costs = computeCosts(inputs);
+    const profit = computeProfit(inputs, costs);
+    const margins = computeMargins(inputs, costs, profit);
+    const health = computeHealth(margins, inputs.targetMarginPct);
+    const recommendations = evaluateRules(inputs, margins, profit);
+    const sensitivity = computeSensitivity(inputs, costs, profit);
+    const forecast = computeForecast(inputs, profit);
+    const scenarios = DEFAULT_SCENARIOS.map(s => runScenario(inputs, profit.netProfit, s));
+
+    // Legacy fields for backward compatibility
+    const sellingPrice = inputs.sellingPrice;
+    const grossProfit = profit.grossProfit;
+    const grossMarginPct = margins.grossMarginPct;
+    const breakEvenPrice = margins.breakEvenPrice;
+    const maxDiscountPct = margins.maxSafeDiscountPct;
+    const markupPct = margins.markupPct;
+    const minProfitablePrice = breakEvenPrice + 1;
+    
+    const confidenceScore = health.score;
+    const confidenceLabel = health.tier;
+    const executiveInsight = recommendations.length > 0 ? recommendations[0].message(inputs, margins, profit) : '';
+
+    const vendorCostPct = margins.vendorShare;
+    const operationsPct = sellingPrice > 0 ? (operationsCost / sellingPrice) * 100 : 0;
+    const fscProfitPct = margins.netMarginPct; // Using net margin for FSC profit in UI 
+
+    const priceForMargin = (targetPct: number) => costs.totalCost > 0 ? Math.ceil(costs.totalCost / (1 - targetPct / 100)) : 0;
+    const discountedPrice = (pct: number) => sellingPrice * (1 - pct / 100);
+    const discountedProfit = (pct: number) => discountedPrice(pct) - costs.totalCost;
+    const discountedMargin = (pct: number) => discountedPrice(pct) > 0 ? (discountedProfit(pct) / discountedPrice(pct)) * 100 : 0;
 
     return {
+      inputs,
+      isValid,
+      costs,
+      profit,
+      margins,
+      health,
+      recommendations,
+      sensitivity,
+      scenarios,
+      forecast,
+      
       sellingPrice,
       grossProfit,
       grossMarginPct,
@@ -187,26 +115,14 @@ export function usePricingEngine(
       minProfitablePrice,
       confidenceScore,
       confidenceLabel,
+      executiveInsight,
       vendorCostPct,
       operationsPct,
       fscProfitPct,
-      isValid,
       priceForMargin,
       discountedPrice,
       discountedProfit,
-      discountedMargin,
-      scenarioSupplierUp10: makeScenario(1.1, 0),
-      scenarioSupplierDown10: makeScenario(0.9, 0),
-      scenarioDiscount15: makeScenario(1, 15),
-      executiveInsight,
-      scalability: {
-        revenuePerSale: sellingPrice,
-        profit100: grossProfit * 100,
-        profit1000: grossProfit * 1000,
-        profit10000: grossProfit * 10000,
-      },
-      bulkProjections,
-      forecast,
+      discountedMargin
     };
-  }, [vendorCost, operationsCost]);
+  }, [vendorCost, operationsCost, activePolicy, policyOverrides]);
 }

@@ -306,6 +306,9 @@ const SettingsPage = () => {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="financial" className="flex-1 gap-2">
+            <BarChart2 className="w-4 h-4" /> Financial Policies
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-6">
@@ -730,6 +733,26 @@ const SettingsPage = () => {
               </div>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="financial" className="space-y-6">
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
+                  <BarChart2 className="w-5 h-5 text-gold" /> Financial Policies
+                </h3>
+                <p className="text-sm text-muted-foreground font-body">Manage enterprise margin targets, cost defaults, and commission rates.</p>
+              </div>
+            </div>
+            <div className="p-4 rounded-xl bg-muted/20 border border-border text-sm flex items-center gap-3">
+              <Zap className="w-5 h-5 text-primary" />
+              <div>
+                <p className="font-bold text-foreground">Pricing Settings Managed via Database</p>
+                <p className="text-muted-foreground">In V7, global financial rules are version-controlled in the <code>pricing_policies</code> table to preserve historical integrity. Contact your database administrator to configure active rates.</p>
+              </div>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 

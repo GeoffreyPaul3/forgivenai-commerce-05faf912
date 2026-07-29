@@ -651,7 +651,23 @@ function VendorProductDialog({ product, open, onClose, onSave, isNew, operations
         colors: form.colors,
         metadata: Object.keys(metadata).length > 0 ? metadata : null,
       };
-      if (product) data.id = product.id;
+      if (product) {
+        data.id = product.id;
+        
+        // Fire-and-forget pricing event audit (V7)
+        if (product.price !== data.price || product.vendor_cost !== data.vendor_cost) {
+          supabase.from("pricing_events").insert({
+            product_id: product.id,
+            event_type: "price_set",
+            old_selling_price: product.price,
+            new_selling_price: data.price,
+            old_vendor_cost: product.vendor_cost,
+            new_vendor_cost: data.vendor_cost,
+            reason: "Vendor updated product pricing"
+          }).then(); // Fire and forget
+        }
+      }
+      
       onSave(data);
     } catch (err: any) {
       toast({ title: "Failed to upload images", description: err.message, variant: "destructive" });
