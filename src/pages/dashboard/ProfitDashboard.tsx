@@ -232,11 +232,19 @@ const ProfitDashboard = () => {
            <div className="grid grid-cols-2 gap-4">
               <div className="bg-muted/30 p-4 rounded-2xl">
                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Operating Runway</p>
-                 <p className="text-2xl font-black font-heading text-foreground">{treasury.runway.toFixed(1)} Mos</p>
+                 <p className="text-2xl font-black font-heading text-foreground">
+                   {treasury.runway > 0 && treasury.runway < 0.1 ? '< 0.1' : treasury.runway.toFixed(1)} Mos
+                 </p>
               </div>
               <div className="bg-muted/30 p-4 rounded-2xl">
                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Reserve Balance</p>
-                 <p className="text-2xl font-black font-heading text-foreground">{(treasury.reserveBalance / 1000000).toFixed(1)}M</p>
+                 <p className="text-2xl font-black font-heading text-foreground">
+                   {treasury.reserveBalance >= 1000000 
+                     ? (treasury.reserveBalance / 1000000).toFixed(2) + 'M' 
+                     : treasury.reserveBalance >= 1000 
+                       ? (treasury.reserveBalance / 1000).toFixed(1) + 'k'
+                       : treasury.reserveBalance.toFixed(0)}
+                 </p>
               </div>
            </div>
            <div className="bg-muted/30 p-4 rounded-2xl mt-auto">

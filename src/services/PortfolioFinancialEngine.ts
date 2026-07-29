@@ -275,7 +275,12 @@ export class PortfolioFinancialEngine {
     return Object.values(this.vendorMetrics).sort((a, b) => b.ppi - a.ppi);
   }
 
-  public getTreasuryAnalytics(actualReserveBalance: number = 0) {
+  public getTreasuryAnalytics(fallbackReserveBalance: number = 0) {
+    // As per user prompt, calculate Reserve Fund using live markup
+    // No static fallback values unless there are zero completed orders
+    const liveReserve = this.costs.distribution.reserve;
+    const actualReserveBalance = liveReserve > 0 ? liveReserve : fallbackReserveBalance;
+    
     const monthlyOps = this.monthlyFscMarkupTarget * 0.33; // Target operations allocation
     const runway = monthlyOps > 0 ? actualReserveBalance / monthlyOps : 0;
     
