@@ -29,7 +29,156 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+// ─── Financial Policies Panel ──────────────────────────────────────────────
+const DEFAULT_POLICY = {
+  commission_rate: 8,
+  gateway_rate: 2.5,
+  marketing_rate: 3,
+  platform_rate: 1,
+  reserve_rate: 1,
+  tax_rate: 0,
+  packaging_cost: 500,
+  delivery_cost: 2000,
+  operations_cost: 5000,
+};
+
+function FinancialPoliciesPanel() {
+  const { toast } = useToast();
+  const [policy, setPolicy] = useState<Record<string, number>>(DEFAULT_POLICY);
+  const [policyId, setPolicyId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [fetching, setFetching] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setFetching(true);
+      const { data, error } = await supabase
+        .from("pricing_policies")
+        .select("*")
+        .eq("is_active", true)
+        .maybeSingle();
+      if (data) {
+        setPolicyId(data.id);
+        setPolicy({
+          commission_rate: data.commission_rate ?? DEFAULT_POLICY.commission_rate,
+          gateway_rate: data.gateway_rate ?? DEFAULT_POLICY.gateway_rate,
+          marketing_rate: data.marketing_rate ?? DEFAULT_POLICY.marketing_rate,
+          platform_rate: data.platform_rate ?? DEFAULT_POLICY.platform_rate,
+          reserve_rate: data.reserve_rate ?? DEFAULT_POLICY.reserve_rate,
+          tax_rate: data.tax_rate ?? DEFAULT_POLICY.tax_rate,
+          packaging_cost: data.packaging_cost ?? DEFAULT_POLICY.packaging_cost,
+          delivery_cost: data.delivery_cost ?? DEFAULT_POLICY.delivery_cost,
+          operations_cost: data.operations_cost ?? DEFAULT_POLICY.operations_cost,
+        });
+      }
+      setFetching(false);
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      if (policyId) {
+        const { error } = await supabase
+          .from("pricing_policies")
+          .update({ ...policy, updated_at: new Date().toISOString() })
+          .eq("id", policyId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from("pricing_policies")
+          .insert({ ...policy, is_active: true })
+          .select()
+          .single();
+        if (error) throw error;
+        if (data) setPolicyId(data.id);
+      }
+      toast({ title: "Financial policies saved", description: "Active pricing policy has been updated." });
+    } catch (e: any) {
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fields = [
+    { key: "commission_rate",  label: "Agent Commission",       unit: "%",   description: "% of vendor cost paid to agents" },
+    { key: "gateway_rate",     label: "Payment Gateway Fee",    unit: "%",   description: "% of selling price charged by payment gateway" },
+    { key: "marketing_rate",   label: "Marketing / CAC Rate",   unit: "%",   description: "% of vendor cost allocated to customer acquisition" },
+    { key: "platform_rate",    label: "Platform Overhead Rate", unit: "%",   description: "% of selling price reserved for platform costs" },
+    { key: "reserve_rate",     label: "Reserve Rate",           unit: "%",   description: "% allocated to emergency reserve fund" },
+    { key: "tax_rate",         label: "Tax Rate",               unit: "%",   description: "VAT / government tax % on selling price" },
+    { key: "packaging_cost",   label: "Packaging Cost",         unit: "MWK", description: "Fixed cost per item for packaging" },
+    { key: "delivery_cost",    label: "Delivery / Logistics",   unit: "MWK", description: "Fixed cost per item for delivery" },
+    { key: "operations_cost",  label: "Operations Cost",        unit: "MWK", description: "Fixed operations overhead per item" },
+  ];
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-6 space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
+            <BarChart2 className="w-5 h-5 text-gold" /> Financial Policies
+          </h3>
+          <p className="text-sm text-muted-foreground font-body mt-0.5">
+            Live rates read from the <code className="text-xs bg-muted px-1 py-0.5 rounded">pricing_policies</code> table.
+            Changes apply globally to the Profit Intelligence engine.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {policyId ? (
+            <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/5 text-xs">Active Policy Loaded</Badge>
+          ) : (
+            <Badge variant="outline" className="text-amber-500 border-amber-500/30 bg-amber-500/5 text-xs">No Active Policy — Using Defaults</Badge>
+          )}
+        </div>
+      </div>
+
+      {fetching ? (
+        <div className="flex items-center gap-3 text-muted-foreground py-8 justify-center">
+          <Loader2 className="w-5 h-5 animate-spin" /> Loading policy from database…
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {fields.map(f => (
+              <div key={f.key} className="space-y-1.5">
+                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1 flex items-center gap-1">
+                  {f.label} <span className="text-primary/60 font-mono">({f.unit})</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step={f.unit === "%" ? "0.1" : "100"}
+                    min={0}
+                    value={policy[f.key]}
+                    onChange={e => setPolicy(p => ({ ...p, [f.key]: parseFloat(e.target.value) || 0 }))}
+                    className="w-full h-11 rounded-xl bg-background border border-border/60 font-mono font-bold text-sm px-3 pr-12 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-muted-foreground/50 pointer-events-none">{f.unit}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground/60 px-1">{f.description}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-border/50">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Zap className="w-3.5 h-3.5 text-primary" />
+              Changes are applied immediately to future profit calculations
+            </div>
+            <Button onClick={handleSave} disabled={saving} className="gap-2 h-10 px-5 rounded-xl font-bold text-sm">
+              {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Check className="w-4 h-4" /> Save Policy</>}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const SettingsPage = () => {
+
   const { toast } = useToast();
   const [crawlUrl, setCrawlUrl] = useState("https://www.forgivenshoppingcentre.com/");
   const [crawling, setCrawling] = useState(false);
@@ -736,23 +885,7 @@ const SettingsPage = () => {
         </TabsContent>
 
         <TabsContent value="financial" className="space-y-6">
-          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
-                  <BarChart2 className="w-5 h-5 text-gold" /> Financial Policies
-                </h3>
-                <p className="text-sm text-muted-foreground font-body">Manage enterprise margin targets, cost defaults, and commission rates.</p>
-              </div>
-            </div>
-            <div className="p-4 rounded-xl bg-muted/20 border border-border text-sm flex items-center gap-3">
-              <Zap className="w-5 h-5 text-primary" />
-              <div>
-                <p className="font-bold text-foreground">Pricing Settings Managed via Database</p>
-                <p className="text-muted-foreground">In V7, global financial rules are version-controlled in the <code>pricing_policies</code> table to preserve historical integrity. Contact your database administrator to configure active rates.</p>
-              </div>
-            </div>
-          </div>
+          <FinancialPoliciesPanel />
         </TabsContent>
       </Tabs>
 
