@@ -992,13 +992,17 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-muted-foreground uppercase px-1">Vendor Cost (MWK)</label>
                     <Input 
-                      type="number" 
-                      placeholder="0.00" 
-                      value={form.vendor_cost} 
+                      type="text" 
+                      placeholder="0" 
+                      value={form.vendor_cost ? (() => {
+                        const [int, dec] = form.vendor_cost.toString().split(".");
+                        return int.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (dec !== undefined ? "." + dec : "");
+                      })() : ""} 
                       onChange={e => {
-                        const cost = e.target.value;
-                        const suggested = cost ? Math.ceil((parseFloat(cost) + operationsCost) / 0.80) : "";
-                        setForm(f => ({ ...f, vendor_cost: cost, price: suggested.toString() }));
+                        const rawCost = e.target.value.replace(/,/g, "");
+                        if (!/^\d*\.?\d*$/.test(rawCost)) return;
+                        const suggested = rawCost && !isNaN(parseFloat(rawCost)) ? Math.ceil((parseFloat(rawCost) + operationsCost) / 0.80) : "";
+                        setForm(f => ({ ...f, vendor_cost: rawCost, price: suggested.toString() }));
                       }} 
                       className="h-12 rounded-xl bg-background border-border/50 font-mono font-bold" 
                     />
@@ -1006,10 +1010,17 @@ function ProductDialog({ product, open, onClose, onSave, categories, isNew, oper
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-primary uppercase px-1">FSC Store Price (MWK)</label>
                     <Input 
-                      type="number" 
-                      placeholder="0.00" 
-                      value={form.price} 
-                      onChange={e => setForm(f => ({ ...f, price: e.target.value }))} 
+                      type="text" 
+                      placeholder="0" 
+                      value={form.price ? (() => {
+                        const [int, dec] = form.price.toString().split(".");
+                        return int.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (dec !== undefined ? "." + dec : "");
+                      })() : ""} 
+                      onChange={e => {
+                        const rawPrice = e.target.value.replace(/,/g, "");
+                        if (!/^\d*\.?\d*$/.test(rawPrice)) return;
+                        setForm(f => ({ ...f, price: rawPrice }));
+                      }} 
                       className="h-12 rounded-xl bg-background border-primary/30 font-mono font-black text-primary text-lg" 
                     />
                   </div>
