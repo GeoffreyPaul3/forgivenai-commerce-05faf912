@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings, RefreshCw, Loader2, Store, Globe, Phone, Banknote, Users, Check, X, Shield, UserCog, Ban, MoreHorizontal, Eye, TrendingUp, UserPlus } from "lucide-react";
+import { Settings, RefreshCw, Loader2, Store, Globe, Phone, Banknote, Users, Check, X, Shield, UserCog, Ban, MoreHorizontal, Eye, TrendingUp, UserPlus, BarChart2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
