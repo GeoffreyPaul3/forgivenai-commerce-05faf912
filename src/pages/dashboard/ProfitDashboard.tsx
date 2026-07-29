@@ -239,18 +239,14 @@ const ProfitDashboard = () => {
               <div className="bg-muted/30 p-4 rounded-2xl">
                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Reserve Balance</p>
                  <p className="text-2xl font-black font-heading text-foreground">
-                   {treasury.reserveBalance >= 1000000 
-                     ? (treasury.reserveBalance / 1000000).toFixed(2) + 'M' 
-                     : treasury.reserveBalance >= 1000 
-                       ? (treasury.reserveBalance / 1000).toFixed(1) + 'k'
-                       : treasury.reserveBalance.toFixed(0)}
+                   MWK {treasury.reserveBalance.toLocaleString(undefined, {maximumFractionDigits:0})}
                  </p>
               </div>
            </div>
            <div className="bg-muted/30 p-4 rounded-2xl mt-auto">
               <div className="flex justify-between items-center mb-1">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Ops Fund Needed</p>
-                <span className="text-xs font-bold">MWK {(treasury.operatingCosts/1000).toFixed(0)}k/mo</span>
+                <span className="text-xs font-bold">MWK {treasury.operatingCosts.toLocaleString(undefined, {maximumFractionDigits:0})}/mo</span>
               </div>
               <div className="w-full bg-border rounded-full h-1.5 mt-2">
                 <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, treasury.reserveCoverage)}%` }} />
@@ -330,7 +326,7 @@ const ProfitDashboard = () => {
                      {vendors.slice(0,5).map((v, i) => (
                        <tr key={i} className="hover:bg-muted/10 transition-colors">
                          <td className="px-4 py-3 font-medium text-foreground truncate max-w-[150px]">{v.name}</td>
-                         <td className="px-4 py-3 font-bold text-gold">MWK {(v.markupGenerated/1000).toFixed(1)}k</td>
+                         <td className="px-4 py-3 font-bold text-gold">MWK {v.markupGenerated.toLocaleString(undefined, {maximumFractionDigits:0})}</td>
                          <td className="px-4 py-3 text-center font-mono">{v.ppi.toFixed(1)}%</td>
                          <td className="px-4 py-3 text-right">
                            <Badge variant="outline" className={`${v.healthScore > 80 ? 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' : 'text-amber-500 bg-amber-500/10 border-amber-500/20'} font-bold`}>
