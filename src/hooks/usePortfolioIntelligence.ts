@@ -70,6 +70,7 @@ export function usePortfolioIntelligence(timeRangeDays: number) {
         products: engine.getProductAnalytics(),
         vendors: engine.getVendorAnalytics(),
         treasury: engine.getTreasuryAnalytics(reserveBalance),
+        breakEven: engine.getBreakEvenIntelligence(),
         rawOrders: ordersData || [] // useful for trend charts
       };
     },
