@@ -33,8 +33,16 @@ CREATE TABLE IF NOT EXISTS public.fund_allocations (
 );
 
 -- Enable RLS on fund_allocations
-ALTER TABLE public.fund_allocations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Admins can manage fund allocations" ON public.fund_allocations FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'fund_allocations' 
+        AND policyname = 'Admins can manage fund allocations'
+    ) THEN
+        CREATE POLICY "Admins can manage fund allocations" ON public.fund_allocations FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
+END $$;
 
 -- 4. Rewrite `calculate_product_price`
 CREATE OR REPLACE FUNCTION public.calculate_product_price()

@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   ShoppingBag, LayoutDashboard, MessageSquare, CreditCard,
   Users, BarChart3, Video, Settings, Bot, ShieldCheck,
-  User, LogOut, ChevronDown, Store, Bell, Truck
+  User, LogOut, ChevronDown, Store, Bell, Truck, ShieldAlert
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -18,29 +18,15 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useState, useEffect } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
-import { UserCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-
-const adminMenuItems = [
-  { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Products", url: "/dashboard/products", icon: ShoppingBag },
-  { title: "Orders", url: "/dashboard/orders", icon: CreditCard },
-  { title: "Customers", url: "/dashboard/customers", icon: Users },
-  { title: "Conversations", url: "/dashboard/conversations", icon: MessageSquare },
-  { title: "Content & UGC", url: "/dashboard/content", icon: Video },
-  { title: "Courier", url: "/dashboard/courier", icon: Truck },
-  { title: "Agents", url: "/dashboard/agents", icon: ShieldCheck },
-  { title: "Vendors", url: "/dashboard/vendors", icon: Store },
-  { title: "Profit Intel", url: "/dashboard/profit-intel", icon: BarChart3 },
-  { title: "AI Assistant", url: "/dashboard/assistant", icon: Bot },
-  { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
-  { title: "Settings", url: "/dashboard/settings", icon: Settings },
-];
+import { useEnterpriseRBAC } from "@/hooks/useEnterpriseRBAC";
 
 function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { dynamicMenuItems, positions } = useEnterpriseRBAC();
+  const primaryPos = positions[0]?.name || "Executive Staff";
 
   return (
     <Sidebar collapsible="icon">
@@ -50,19 +36,22 @@ function AdminSidebar() {
            <img src="/forgiven.png" alt="Forgiven Shop Logo" width={40} height={40}/>
           </div>
           {!collapsed && (
-            <span className="font-heading text-lg font-bold text-sidebar-foreground">Forgiven Admin</span>
+            <div className="flex flex-col min-w-0">
+              <span className="font-heading text-lg font-bold text-sidebar-foreground truncate">Forgiven Admin</span>
+              <span className="text-[10px] text-gold font-body font-semibold truncate">{primaryPos}</span>
+            </div>
           )}
         </div>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/40">Commerce OS</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground/40">Enterprise OS</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {adminMenuItems.map((item) => (
+              {dynamicMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.url}>
                     <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
-                      <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      <item.icon className="mr-2 h-4 w-4 shrink-0" />
+                      {!collapsed && <span className="truncate">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -78,12 +67,13 @@ function AdminSidebar() {
 export default function AdminLayout({ children, title }: { children: React.ReactNode, title: string }) {
   const navigate = useNavigate();
   const [user, setUser] = useState<SupabaseUser | null>(null);
+  const { positions } = useEnterpriseRBAC();
 
   useEffect(() => {
-    document.title = "Command Center | Forgiven Shopping Centre";
+    document.title = "Enterprise Commerce OS | Forgiven";
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
-      metaDescription.setAttribute("content", "Centralized management for your entire retail supply chain, vendor network, and sales operations.");
+      metaDescription.setAttribute("content", "Enterprise RBAC & Decision Intelligence Platform");
     }
   }, []);
 
@@ -100,119 +90,79 @@ export default function AdminLayout({ children, title }: { children: React.React
     navigate("/");
   };
 
-  const { data: pendingPayouts = [] } = useQuery({
-    queryKey: ["admin-pending-payouts-notifications"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("vendor_payouts")
-        .select("*, vendors(business_name)")
-        .eq("status", "pending")
-        .order("created_at", { ascending: false });
-      if (error) {
-        console.error("Error fetching payouts notifications:", error);
-        return [];
-      }
-      return data || [];
-    },
-    refetchInterval: 30000,
-  });
-
   const { data: pendingApprovals = [] } = useQuery({
-    queryKey: ["admin-pending-approvals-notifications"],
+    queryKey: ["admin-pending-approval-requests-bell"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, role, created_at")
+      const { data } = await supabase
+        .from("approval_requests")
+        .select("id, title, workflow_type, created_at")
         .eq("status", "pending")
-        .neq("role", "admin")
         .order("created_at", { ascending: false });
-      if (error) return [];
       return data || [];
     },
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
 
-  const totalNotifications = pendingPayouts.length + pendingApprovals.length;
+  const totalNotifications = pendingApprovals.length;
 
   const initials = user?.user_metadata?.full_name
     ? user.user_metadata.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
     : user?.email?.[0]?.toUpperCase() || "A";
+
+  const primaryPositionName = positions[0]?.name || "Managing Director";
 
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AdminSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center border-b border-border px-4 shrink-0 min-w-0 w-full">
+          <header className="h-14 flex items-center border-b border-border px-4 shrink-0 min-w-0 w-full bg-background/95 backdrop-blur">
             <SidebarTrigger className="mr-4 shrink-0" />
-            <h1 className="font-heading text-xl font-semibold text-foreground flex-1 truncate pr-4">{title}</h1>
+            <div className="flex-1 flex items-center gap-3 min-w-0 pr-4">
+              <h1 className="font-heading text-xl font-semibold text-foreground truncate">{title}</h1>
+              <span className="hidden md:inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20 shrink-0">
+                {primaryPositionName}
+              </span>
+            </div>
 
-            {/* Notification Bell */}
+            {/* Notification Bell for High Risk Approvals */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="relative p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full transition-colors mr-2">
                   <Bell className="w-5 h-5" />
                   {totalNotifications > 0 && (
-                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white animate-pulse">
+                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-slate-950 animate-pulse">
                       {totalNotifications}
                     </span>
                   )}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80 p-2">
-                <div className="px-3 py-2 border-b border-border/50">
-                  <p className="text-sm font-semibold text-foreground">Notifications</p>
-                  <p className="text-xs text-muted-foreground">
-                    {totalNotifications > 0 ? `${totalNotifications} item(s) need your attention` : "No new notifications"}
-                  </p>
+                <div className="px-3 py-2 border-b border-border/50 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">Approvals Center</p>
+                  {totalNotifications > 0 && (
+                    <span className="text-[10px] bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded font-bold">
+                      {totalNotifications} High-Risk
+                    </span>
+                  )}
                 </div>
                 <div className="max-h-72 overflow-y-auto mt-1 space-y-1">
                   {totalNotifications === 0 ? (
-                    <div className="px-3 py-6 text-center text-xs text-muted-foreground">All caught up! 🎉</div>
+                    <div className="px-3 py-6 text-center text-xs text-muted-foreground">No pending approvals required 🎉</div>
                   ) : (
-                    <>
-                      {/* Pending user approvals */}
-                      {pendingApprovals.length > 0 && (
-                        <>
-                          <p className="px-3 pt-2 pb-1 text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Account Requests</p>
-                          {pendingApprovals.map((u: any) => (
-                            <DropdownMenuItem
-                              key={u.id}
-                              onClick={() => navigate("/dashboard/settings")}
-                              className="flex flex-col items-start gap-0.5 p-3 cursor-pointer hover:bg-accent rounded-lg"
-                            >
-                              <div className="flex items-center justify-between w-full">
-                                <span className="text-xs font-bold text-amber-600">{u.full_name || u.email || "New User"}</span>
-                                <span className="text-[10px] text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</span>
-                              </div>
-                              <p className="text-xs text-muted-foreground capitalize">Wants to join as {u.role} · awaiting approval</p>
-                            </DropdownMenuItem>
-                          ))}
-                        </>
-                      )}
-
-                      {/* Pending payouts */}
-                      {pendingPayouts.length > 0 && (
-                        <>
-                          <p className="px-3 pt-2 pb-1 text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Withdrawal Requests</p>
-                          {pendingPayouts.map((payout: any) => (
-                            <DropdownMenuItem
-                              key={payout.id}
-                              onClick={() => navigate(`/dashboard/vendors?tab=payouts`)}
-                              className="flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-accent rounded-lg"
-                            >
-                              <div className="flex items-center justify-between w-full">
-                                <span className="text-xs font-bold text-primary">{payout.vendors?.business_name || "Vendor"}</span>
-                                <span className="text-[10px] text-muted-foreground">{new Date(payout.created_at).toLocaleDateString()}</span>
-                              </div>
-                              <p className="text-xs text-foreground font-medium">
-                                Requested payout of <span className="font-bold text-emerald-600">MWK {payout.amount.toLocaleString()}</span>
-                              </p>
-                            </DropdownMenuItem>
-                          ))}
-                        </>
-                      )}
-                    </>
+                    pendingApprovals.map((req: any) => (
+                      <DropdownMenuItem
+                        key={req.id}
+                        onClick={() => navigate("/dashboard/workspace/executive?tab=approvals")}
+                        className="flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-accent rounded-lg"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-xs font-bold text-amber-600">{req.workflow_type}</span>
+                          <span className="text-[10px] text-muted-foreground">{new Date(req.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-xs text-foreground font-medium">{req.title}</p>
+                      </DropdownMenuItem>
+                    ))
                   )}
                 </div>
               </DropdownMenuContent>
@@ -228,20 +178,27 @@ export default function AdminLayout({ children, title }: { children: React.React
                       {initials}
                     </div>
                   )}
-                  <span className="hidden sm:block text-sm font-medium text-foreground font-body max-w-[120px] truncate">
-                    {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Admin"}
-                  </span>
+                  <div className="hidden sm:flex flex-col items-start max-w-[120px]">
+                    <span className="text-xs font-bold text-foreground font-body truncate w-full">
+                      {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Admin"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground truncate w-full">{primaryPositionName}</span>
+                  </div>
                   <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuContent align="end" className="w-56">
                 <div className="px-3 py-2">
                   <p className="text-sm font-semibold text-foreground truncate">{user?.user_metadata?.full_name || "Admin"}</p>
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  <p className="text-[10px] text-gold font-semibold mt-1">Position: {primaryPositionName}</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/dashboard/profile")} className="gap-2 cursor-pointer">
                   <User className="w-4 h-4" /> Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/dashboard/settings?tab=rbac")} className="gap-2 cursor-pointer">
+                  <ShieldCheck className="w-4 h-4 text-primary" /> Staff Positions & RBAC
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="gap-2 cursor-pointer text-destructive focus:text-destructive">

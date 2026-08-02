@@ -1,0 +1,93 @@
+import React, { useState } from "react";
+import { useEnterpriseRBAC } from "@/hooks/useEnterpriseRBAC";
+import { ExecutiveWorkspace } from "@/pages/dashboard/workspaces/ExecutiveWorkspace";
+import { FinanceWorkspace } from "@/pages/dashboard/workspaces/FinanceWorkspace";
+import { OperationsWorkspace } from "@/pages/dashboard/workspaces/OperationsWorkspace";
+import { FulfillmentWorkspace } from "@/pages/dashboard/workspaces/FulfillmentWorkspace";
+import { BusinessDevelopmentWorkspace } from "@/pages/dashboard/workspaces/BusinessDevelopmentWorkspace";
+import { ShieldCheck, BarChart3, Package, Truck, Store, Layers } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+
+const WORKSPACE_COMPONENTS: Record<string, React.FC> = {
+  executive_workspace: ExecutiveWorkspace,
+  finance_workspace: FinanceWorkspace,
+  operations_workspace: OperationsWorkspace,
+  fulfillment_workspace: FulfillmentWorkspace,
+  biz_dev_workspace: BusinessDevelopmentWorkspace,
+};
+
+const WORKSPACE_ICONS: Record<string, any> = {
+  executive_workspace: ShieldCheck,
+  finance_workspace: BarChart3,
+  operations_workspace: Package,
+  fulfillment_workspace: Truck,
+  biz_dev_workspace: Store,
+};
+
+export const EnterpriseAdminPortal: React.FC = () => {
+  const { visibleWorkspaces, positions, isLoading } = useEnterpriseRBAC();
+  const [activeTab, setActiveTab] = useState<string>(visibleWorkspaces[0]?.code || "executive_workspace");
+
+  // Keep activeTab valid
+  const currentTab = visibleWorkspaces.some((w) => w.code === activeTab)
+    ? activeTab
+    : visibleWorkspaces[0]?.code || "executive_workspace";
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center p-8">
+        <div className="text-center space-y-2 font-body text-sm text-muted-foreground">
+          <Layers className="w-8 h-8 text-primary animate-spin mx-auto" />
+          <p>Composing Enterprise Admin Portal...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const primaryPositionName = positions[0]?.name || "Managing Director";
+
+  return (
+    <div className="space-y-6">
+      {/* Enterprise Workspace Navigation Bar */}
+      {visibleWorkspaces.length > 1 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-body font-semibold">Active Position:</span>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
+              {primaryPositionName}
+            </span>
+          </div>
+
+          <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
+            <TabsList className="bg-muted/60 p-1 flex-wrap h-auto">
+              {visibleWorkspaces.map((ws) => {
+                const Icon = WORKSPACE_ICONS[ws.code] || ShieldCheck;
+                return (
+                  <TabsTrigger
+                    key={ws.code}
+                    value={ws.code}
+                    className="text-xs font-semibold gap-1.5 data-[state=active]:bg-background data-[state=active]:text-foreground"
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{ws.title}</span>
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
+
+      {/* Render Selected Dynamic Workspace */}
+      <div>
+        {visibleWorkspaces.map((ws) => {
+          const Component = WORKSPACE_COMPONENTS[ws.code] || ExecutiveWorkspace;
+          if (ws.code !== currentTab) return null;
+          return <Component key={ws.code} />;
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default EnterpriseAdminPortal;

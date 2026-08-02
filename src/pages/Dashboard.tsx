@@ -574,6 +574,7 @@ const pageTitles: Record<string, string> = {
   "/dashboard/profile": "My Profile",
 };
 
+import EnterpriseAdminPortal from "@/pages/dashboard/EnterpriseAdminPortal";
 import { getAppMode } from "@/lib/app-mode";
 import AdminLayout from "@/components/layout/AdminLayout";
 import VendorLayout from "@/components/layout/VendorLayout";
@@ -582,15 +583,16 @@ import AgentLayout from "@/components/layout/AgentLayout";
 const DashboardPage = () => {
   const location = useLocation();
   const appMode = getAppMode();
-  const title = pageTitles[location.pathname] || "Dashboard";
+  const title = pageTitles[location.pathname] || "Enterprise Workspace";
 
   const mainContent = (
     <Routes>
       <Route index element={
         appMode === "agent" ? <AgentDashboard /> : 
         appMode === "vendor" ? <VendorDashboard /> : 
-        <OverviewPage />
+        <EnterpriseAdminPortal />
       } />
+      <Route path="workspace/*" element={<EnterpriseAdminPortal />} />
       <Route path="products" element={<ProductsPage />} />
       <Route path="orders" element={<OrdersPage />} />
       <Route path="customers" element={<CustomersPage />} />

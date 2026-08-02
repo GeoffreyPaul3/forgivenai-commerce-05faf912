@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import StaffPositionsManagement from "@/pages/dashboard/settings/StaffPositionsManagement";
 
 // ─── Financial Policies Panel ──────────────────────────────────────────────
 const DEFAULT_POLICY = {
@@ -432,33 +433,43 @@ const SettingsPage = () => {
     );
   }
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const defaultTab = urlParams.get("tab") || "general";
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
         <h2 className="font-heading text-2xl font-bold text-foreground tracking-tight">Settings</h2>
-        <p className="text-muted-foreground text-sm font-body">Manage your store configuration and team.</p>
+        <p className="text-muted-foreground text-sm font-body">Manage your store configuration, staff positions, and RBAC policies.</p>
       </div>
 
-      <Tabs defaultValue="general" className="w-full">
-        <TabsList className="w-full mb-8 flex">
-          <TabsTrigger value="general" className="flex-1 gap-2">
-            <Settings className="w-4 h-4" /> General
-          </TabsTrigger>
-          <TabsTrigger value="payments" className="flex-1 gap-2">
-            <Banknote className="w-4 h-4" /> Payments
-          </TabsTrigger>
-          <TabsTrigger value="team" className="flex-1 gap-2">
-            <Users className="w-4 h-4" /> Team Management
-            {isAdmin && pendingUsers.length > 0 && (
-              <Badge variant="destructive" className="ml-1 h-5 w-5 flex items-center justify-center p-0 text-[10px]">
-                {pendingUsers.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="financial" className="flex-1 gap-2">
-            <BarChart2 className="w-4 h-4" /> Financial Policies
-          </TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue={defaultTab} className="w-full">
+        <TabsList className="w-full mb-8 flex flex-wrap">
+              <TabsTrigger value="general" className="flex-1 gap-2">
+                <Settings className="w-4 h-4" /> General
+              </TabsTrigger>
+              <TabsTrigger value="payments" className="flex-1 gap-2">
+                <Banknote className="w-4 h-4" /> Payments
+              </TabsTrigger>
+              <TabsTrigger value="team" className="flex-1 gap-2">
+                <Users className="w-4 h-4" /> Team Management
+                {isAdmin && pendingUsers.length > 0 && (
+                  <Badge variant="destructive" className="ml-1 h-5 w-5 flex items-center justify-center p-0 text-[10px]">
+                    {pendingUsers.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="rbac" className="flex-1 gap-2">
+                <Shield className="w-4 h-4 text-primary" /> Staff Positions & RBAC
+              </TabsTrigger>
+              <TabsTrigger value="financial" className="flex-1 gap-2">
+                <BarChart2 className="w-4 h-4" /> Financial Policies
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="rbac" className="space-y-6">
+              <StaffPositionsManagement />
+            </TabsContent>
 
         <TabsContent value="general" className="space-y-6">
           {/* Website Sync */}

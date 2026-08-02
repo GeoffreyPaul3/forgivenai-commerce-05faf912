@@ -1,5 +1,5 @@
 -- 1. Create pricing_policies table
-CREATE TABLE public.pricing_policies (
+CREATE TABLE IF NOT EXISTS public.pricing_policies (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name                 TEXT NOT NULL,
   version              INTEGER NOT NULL DEFAULT 1,
@@ -24,32 +24,30 @@ CREATE TABLE public.pricing_policies (
 );
 
 -- Only one policy active at a time
-CREATE UNIQUE INDEX idx_pricing_policies_active
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pricing_policies_active
   ON public.pricing_policies (is_active) WHERE is_active = true;
 
 -- Enable RLS
 ALTER TABLE public.pricing_policies ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow public read access to active policies" 
-ON public.pricing_policies FOR SELECT 
-USING (is_active = true OR auth.role() = 'authenticated');
-
-CREATE POLICY "Allow admin full access to pricing policies" 
-ON public.pricing_policies FOR ALL 
-USING (
-  EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
-  )
-);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'pricing_policies' AND policyname = 'Allow public read access to active policies') THEN
+        CREATE POLICY "Allow public read access to active policies" ON public.pricing_policies FOR SELECT USING (is_active = true OR auth.role() = 'authenticated');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'pricing_policies' AND policyname = 'Allow admin full access to pricing policies') THEN
+        CREATE POLICY "Allow admin full access to pricing policies" ON public.pricing_policies FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));
+    END IF;
+END $$;
 
 -- Insert Default Policy
 INSERT INTO public.pricing_policies (name, version, is_active, notes)
-VALUES ('FSC Standard Pricing Policy', 1, true, 'Default policy seeded during V7 upgrade.');
+VALUES ('FSC Standard Pricing Policy', 1, true, 'Default policy seeded during V7 upgrade.')
+ON CONFLICT DO NOTHING;
 
 
 -- 2. Create pricing_events table
-CREATE TABLE public.pricing_events (
+CREATE TABLE IF NOT EXISTS public.pricing_events (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id        UUID REFERENCES public.products(id) ON DELETE SET NULL,
   event_type        TEXT NOT NULL CHECK (event_type IN (
@@ -67,25 +65,22 @@ CREATE TABLE public.pricing_events (
   created_at        TIMESTAMPTZ DEFAULT now()
 );
 
--- Enable RLS (Append Only, read by admin)
+-- Enable RLS
 ALTER TABLE public.pricing_events ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow admin read access to pricing events" 
-ON public.pricing_events FOR SELECT 
-USING (
-  EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
-  )
-);
-
-CREATE POLICY "Allow authenticated insert to pricing events" 
-ON public.pricing_events FOR INSERT 
-WITH CHECK (auth.role() = 'authenticated');
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'pricing_events' AND policyname = 'Allow admin read access to pricing events') THEN
+        CREATE POLICY "Allow admin read access to pricing events" ON public.pricing_events FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'pricing_events' AND policyname = 'Allow authenticated insert to pricing events') THEN
+        CREATE POLICY "Allow authenticated insert to pricing events" ON public.pricing_events FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+    END IF;
+END $$;
 
 
 -- 3. Create product_financial_profiles table
-CREATE TABLE public.product_financial_profiles (
+CREATE TABLE IF NOT EXISTS public.product_financial_profiles (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id               UUID NOT NULL UNIQUE REFERENCES public.products(id) ON DELETE CASCADE,
   policy_id                UUID REFERENCES public.pricing_policies(id) ON DELETE SET NULL,
@@ -102,20 +97,17 @@ CREATE TABLE public.product_financial_profiles (
 -- Enable RLS
 ALTER TABLE public.product_financial_profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow public read access to product profiles" 
-ON public.product_financial_profiles FOR SELECT 
-USING (true);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'product_financial_profiles' AND policyname = 'Allow public read access to product profiles') THEN
+        CREATE POLICY "Allow public read access to product profiles" ON public.product_financial_profiles FOR SELECT USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'product_financial_profiles' AND policyname = 'Allow admin full access to product profiles') THEN
+        CREATE POLICY "Allow admin full access to product profiles" ON public.product_financial_profiles FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));
+    END IF;
+END $$;
 
-CREATE POLICY "Allow admin full access to product profiles" 
-ON public.product_financial_profiles FOR ALL 
-USING (
-  EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
-  )
-);
-
--- Optional: Function to get active policy easily from Edge Functions or triggers
+-- Function to get active policy easily from Edge Functions or triggers
 CREATE OR REPLACE FUNCTION public.get_active_pricing_policy()
 RETURNS SETOF public.pricing_policies
 LANGUAGE sql STABLE
