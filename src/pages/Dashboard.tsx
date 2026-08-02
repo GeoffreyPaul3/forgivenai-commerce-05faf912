@@ -590,7 +590,7 @@ const DashboardPage = () => {
       <Route index element={
         appMode === "agent" ? <AgentDashboard /> : 
         appMode === "vendor" ? <VendorDashboard /> : 
-        <EnterpriseAdminPortal />
+        <OverviewPage />
       } />
       <Route path="workspace/*" element={<EnterpriseAdminPortal />} />
       <Route path="products" element={<ProductsPage />} />

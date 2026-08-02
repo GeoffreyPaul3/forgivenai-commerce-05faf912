@@ -20,6 +20,8 @@ import { useState, useEffect } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { useQuery } from "@tanstack/react-query";
 import { useEnterpriseRBAC } from "@/hooks/useEnterpriseRBAC";
+import { NAVIGATION_GROUPS } from "@/services/registries/navigationGroupRegistry";
+import type { MenuItem } from "@/services/navigation/dynamicNavigationService";
 
 function AdminSidebar() {
   const { state } = useSidebar();
@@ -28,37 +30,67 @@ function AdminSidebar() {
   const { dynamicMenuItems, positions } = useEnterpriseRBAC();
   const primaryPos = positions[0]?.name || "Executive Staff";
 
+  // Build ordered groups — only include groups that have visible items
+  const groupedNav = NAVIGATION_GROUPS
+    .map((group) => ({
+      group,
+      items: dynamicMenuItems.filter((item) => item.navigationGroup === group.code),
+    }))
+    .filter(({ items }) => items.length > 0)
+    .sort((a, b) => a.group.priority - b.group.priority);
+
+  const renderNavItem = (item: MenuItem) => (
+    <SidebarMenuItem key={item.code}>
+      <SidebarMenuButton
+        asChild
+        isActive={location.pathname === item.url.split("?")[0]}
+      >
+        <NavLink
+          to={item.url}
+          end
+          className="hover:bg-sidebar-accent/50"
+          activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+        >
+          <item.icon className="mr-2 h-4 w-4 shrink-0" />
+          {!collapsed && <span className="truncate">{item.title}</span>}
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
+        {/* Logo + Position Badge */}
         <div className="px-4 py-4 flex items-center gap-2">
           <div className="rounded-lg bg-white/80 flex items-center justify-center shrink-0">
-           <img src="/forgiven.png" alt="Forgiven Shop Logo" width={40} height={40}/>
+            <img src="/forgiven.png" alt="Forgiven Shop Logo" width={40} height={40} />
           </div>
           {!collapsed && (
             <div className="flex flex-col min-w-0">
-              <span className="font-heading text-lg font-bold text-sidebar-foreground truncate">Forgiven Admin</span>
-              <span className="text-[10px] text-gold font-body font-semibold truncate">{primaryPos}</span>
+              <span className="font-heading text-lg font-bold text-sidebar-foreground truncate">
+                Forgiven Admin
+              </span>
+              <span className="text-[10px] text-gold font-body font-semibold truncate">
+                {primaryPos}
+              </span>
             </div>
           )}
         </div>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/40">Enterprise OS</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {dynamicMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                    <NavLink to={item.url} end className="hover:bg-sidebar-accent/50" activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
-                      <item.icon className="mr-2 h-4 w-4 shrink-0" />
-                      {!collapsed && <span className="truncate">{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+
+        {/* Registry-driven navigation groups */}
+        {groupedNav.map(({ group, items }) => (
+          <SidebarGroup key={group.code}>
+            <SidebarGroupLabel className="text-sidebar-foreground/40">
+              {group.title}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {items.map(renderNavItem)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
     </Sidebar>
   );

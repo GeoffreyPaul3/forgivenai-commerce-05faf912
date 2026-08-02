@@ -11,6 +11,7 @@ import {
 } from "@/services/rbac/permissionEngine";
 import { getVisibleWorkspaces } from "@/services/registries/workspaceRegistry";
 import { getDynamicMenuItems } from "@/services/navigation/dynamicNavigationService";
+import { getVisibleApplications } from "@/services/registries/applicationRegistry";
 
 export function useEnterpriseRBAC() {
   const queryClient = useQueryClient();
@@ -34,6 +35,7 @@ export function useEnterpriseRBAC() {
   };
 
   const visibleWorkspaces = getVisibleWorkspaces(permissions);
+  const visibleApplications = getVisibleApplications(permissions);
   const dynamicMenuItems = getDynamicMenuItems(permissions);
 
   return {
@@ -43,6 +45,7 @@ export function useEnterpriseRBAC() {
     permissions,
     isAdmin,
     visibleWorkspaces,
+    visibleApplications,
     dynamicMenuItems,
     hasPermission: (code: string) => hasPermission(code, context),
     canViewTreasury: () => canViewTreasury(context),

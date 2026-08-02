@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useEnterpriseRBAC } from "@/hooks/useEnterpriseRBAC";
 import { ExecutiveWorkspace } from "@/pages/dashboard/workspaces/ExecutiveWorkspace";
 import { FinanceWorkspace } from "@/pages/dashboard/workspaces/FinanceWorkspace";
@@ -6,7 +7,7 @@ import { OperationsWorkspace } from "@/pages/dashboard/workspaces/OperationsWork
 import { FulfillmentWorkspace } from "@/pages/dashboard/workspaces/FulfillmentWorkspace";
 import { BusinessDevelopmentWorkspace } from "@/pages/dashboard/workspaces/BusinessDevelopmentWorkspace";
 import { ShieldCheck, BarChart3, Package, Truck, Store, Layers } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const WORKSPACE_COMPONENTS: Record<string, React.FC> = {
   executive_workspace: ExecutiveWorkspace,
@@ -24,14 +25,18 @@ const WORKSPACE_ICONS: Record<string, any> = {
   biz_dev_workspace: Store,
 };
 
-export const EnterpriseAdminPortal: React.FC = () => {
-  const { visibleWorkspaces, positions, isLoading } = useEnterpriseRBAC();
-  const [activeTab, setActiveTab] = useState<string>(visibleWorkspaces[0]?.code || "executive_workspace");
+const ROUTE_TO_WORKSPACE_CODE: Record<string, string> = {
+  "/dashboard/workspace/executive": "executive_workspace",
+  "/dashboard/workspace/finance": "finance_workspace",
+  "/dashboard/workspace/operations": "operations_workspace",
+  "/dashboard/workspace/fulfillment": "fulfillment_workspace",
+  "/dashboard/workspace/bizdev": "biz_dev_workspace",
+};
 
-  // Keep activeTab valid
-  const currentTab = visibleWorkspaces.some((w) => w.code === activeTab)
-    ? activeTab
-    : visibleWorkspaces[0]?.code || "executive_workspace";
+export const EnterpriseAdminPortal: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { visibleWorkspaces, positions, isLoading } = useEnterpriseRBAC();
 
   if (isLoading) {
     return (
@@ -43,6 +48,21 @@ export const EnterpriseAdminPortal: React.FC = () => {
       </div>
     );
   }
+
+  // Determine active workspace code based on current URL path
+  const currentPath = location.pathname;
+  const matchedCode = ROUTE_TO_WORKSPACE_CODE[currentPath];
+  
+  const currentTab = visibleWorkspaces.some((w) => w.code === matchedCode)
+    ? matchedCode
+    : visibleWorkspaces[0]?.code || "executive_workspace";
+
+  const handleTabChange = (code: string) => {
+    const ws = visibleWorkspaces.find((w) => w.code === code);
+    if (ws && ws.navigationNodes[0]?.url) {
+      navigate(ws.navigationNodes[0].url);
+    }
+  };
 
   const primaryPositionName = positions[0]?.name || "Managing Director";
 
@@ -58,7 +78,7 @@ export const EnterpriseAdminPortal: React.FC = () => {
             </span>
           </div>
 
-          <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
+          <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full sm:w-auto">
             <TabsList className="bg-muted/60 p-1 flex-wrap h-auto">
               {visibleWorkspaces.map((ws) => {
                 const Icon = WORKSPACE_ICONS[ws.code] || ShieldCheck;

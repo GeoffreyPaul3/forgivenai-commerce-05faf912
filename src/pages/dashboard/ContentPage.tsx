@@ -457,8 +457,18 @@ function VendorProductPicker({ selectedId, onSelect, label, placeholder = "Selec
   );
 }
 
+import { useSearchParams } from "react-router-dom";
+
 const ContentPage = () => {
-  const [activeTab, setActiveTab] = useState("content");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const initialTab = tabParam === "ugc" ? "ugc" : tabParam === "influencers" ? "influencers" : "content";
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  const handleTabChange = (val: string) => {
+    setActiveTab(val);
+    setSearchParams(val === "content" ? {} : { tab: val });
+  };
 
   return (
     <div className="space-y-6">
@@ -470,7 +480,7 @@ const ContentPage = () => {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="bg-muted/50">
           <TabsTrigger value="content" className="gap-2"><FileText className="w-4 h-4" />Content Manager</TabsTrigger>
           <TabsTrigger value="ugc" className="gap-2"><Clapperboard className="w-4 h-4" />UGC Studio</TabsTrigger>
