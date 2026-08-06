@@ -37,40 +37,40 @@ export interface PromptBuilderExtras {
 export const FSC_STUDIO_CANONICAL = `
 STUDIO REPRODUCTION DIRECTIVE — FSC FLAGSHIP STUDIO (NON-NEGOTIABLE):
 
-You are reproducing the EXACT physical studio environment shown in the reference image (studio.jpeg).
-Do not design a new studio. Do not reinterpret. Reproduce what is there.
+You MUST reproduce the exact physical interior shown below. This is NOT a creative brief. This is a technical reproduction order. Do NOT invent a new room. Do NOT simplify. Reproduce every element listed here exactly.
 
-── BACK WALL & ARCH ──
-Smooth warm cream/ivory plaster wall, full width and floor-to-ceiling.
-In the centre of this wall is a large architectural arch with a smooth semicircular top.
-  • The inner edge of the arch features recessed architectural cove lighting — a subtle, warm indirect LED strip that casts a soft, gentle ambient glow and faint warm magenta wash onto the cream plaster wall. (It is subtle architectural backlight, NOT a harsh bright neon tube).
-  • The wall INSIDE the arch is smooth cream plaster.
-  • Mounted on that inner cream wall, centered horizontally in the upper-middle section of the arch, is the official 3D FORGIVEN SHOPPING CENTRE ARCHITECTURAL LOGO EMBLEM:
-    – The logo is sized elegantly and proportionally (occupies ~20-25% of the arch height, not oversized).
-    – At top: The FSC shopping bag mark — a rich deep plum/magenta (#8B1B68) shopping bag with a crisp white capital letter "F" on its front face. Peeking out subtly behind its left side is a smaller royal blue bag shape, and behind its right side a smaller lime-green bag shape.
-    – Directly below the bag: The wordmark "Forgiven" in clean, 3D-extruded dark plum/magenta (#8B1B68) lettering with elegant rounded sans-serif strokes.
-    – Directly below "Forgiven": The subtitle "Shopping Centre" in smaller, refined dark lettering.
-    – The logo is a physically mounted 3D wall sign with real depth (≈2cm extrusion), sharp architectural edges, soft specular highlights, and natural drop shadows onto the cream plaster wall behind it. It is NOT glowing neon, NOT a cartoon graphic, NOT a 2D watermark.
+══ ELEMENT 1: BACK WALL ══
+Full-width smooth cream/ivory plaster wall (#F2EBD9), floor-to-ceiling. No texture variation. No patterns. Pure warm cream.
 
-── LEFT SIDE (camera-left) ──
-A full-height vertical wall section of dark charcoal fluted wood panels at the far-left edge.
-In front of this panel stands a tall cylindrical planter made of polished brass/gold metal (~60cm height).
-Inside the planter is a lush green tropical plant with large, full leaves (Bird of Paradise / Monstera).
-Mounted on the fluted panel behind the plant: a slender vertical tube sconce light emitting a warm amber ambient glow (3000K).
+══ ELEMENT 2: THE ARCH (most distinctive feature — MUST BE PRESENT) ══
+A large, wide architectural arch centered on the back wall. The arch has a smooth, clean semicircular top.
+  MAGENTA LED TRIM: The entire inner edge of the arch (both sides and the curved top) has a BRIGHT PINK-MAGENTA (#B0208D) glowing LED strip inset. This creates a vivid magenta halo/glow on the cream wall around the arch opening. This glowing magenta arch trim is the most distinctive visual signature of this studio — it MUST be visible and accurate.
+  The wall SURFACE inside the arch opening is the same smooth warm cream plaster as the back wall (#F2EBD9). The arch interior is NOT dark, NOT shadowed — it is a brightly lit, cream-coloured recess.
 
-── RIGHT SIDE (camera-right) ──
-A full-height vertical wall section of dark charcoal fluted wood panels at the far-right edge.
-Set into this fluted panel is a recessed vertical display shelf unit with three open shelves, subtly illuminated with warm backlighting. The shelves hold small luxury decorative objects (a slender white vase, stacked cream books, a brass ring sculpture).
-Mounted on the fluted panel adjacent to the shelves: a slender vertical tube sconce light emitting a warm amber ambient glow (3000K).
+══ ELEMENT 3: FSC LOGO (on the cream wall inside the arch) ══
+Centered horizontally in the upper section of the arch, approximately 55–70% up the arch height.
+  LOGO BAG ICON (top element): One LARGE magenta (#8B1B68) shopping bag, front and centre. Bold solid white capital letter "F" on its face — NO other text or logo on the bag. Behind-left: a smaller royal blue bag peeking out. Behind-right: a smaller lime-green bag peeking out. All bags have visible handles and volume.
+  LOGO WORDMARK (below the bag icon): "Forgiven" in bold, rounded, dark plum-magenta sans-serif lettering. Directly below: "Shopping Centre" in smaller refined lettering.
+  The logo is a physically mounted 3D wall sign with ~2cm depth, subtle drop shadow, warm specular highlights. NOT a flat 2D graphic.
 
-── FLOOR ──
-Continuous large-format polished tiles in warm cream/ivory marble across the entire studio floor plane. High-gloss surface finish with soft, warm specular reflections of the studio lighting.
+══ ELEMENT 4: LEFT SIDE (camera-left) ══
+Far-left edge: a full-height section of deep charcoal/near-black fluted vertical wood panels (#1A1A1A). These panels have crisp vertical grooves running their full height.
+In front of these panels: a tall cylindrical planter made of polished GOLD/BRASS metal (~60cm tall). Inside the planter: a lush dark-green tropical plant with large broad leaves (Monstera/Bird of Paradise). The plant is healthy, full, and large.
+On the fluted panel, behind/above the planter: a slender vertical TUBE SCONCE light, casting a warm amber glow (3000K) downward.
 
-── FOREGROUND PODIUM ──
-At the centre of the frame in the foreground, directly in front of the arch: a low circular cylindrical display pedestal (~55cm diameter, ~16cm height) made of smooth matte cream stone. The podium is always present and centered.
+══ ELEMENT 5: RIGHT SIDE (camera-right) ══
+Far-right edge: a full-height section of deep charcoal/near-black fluted vertical wood panels (#1A1A1A), matching the left side.
+Set INTO these panels: a RECESSED OPEN SHELF UNIT with three shelves, illuminated from behind with warm amber backlighting. Shelves hold luxury objects: top shelf — a small pink/dried floral arrangement; middle shelf — stacked cream books + a small gold object; bottom shelf — a brass/gold ring sculpture and small vase.
+On the fluted panel: a slender vertical TUBE SCONCE light, matching the left side sconce.
 
-── LIGHTING & ATMOSPHERE ──
-Warm, luminous, high-end luxury retail studio lighting (3000K-3200K). Soft directional key light from above, warm ambient fill, gentle specular highlights on the marble floor and brass planter. Premium commercial fashion photography aesthetic (Louis Vuitton / Dior flagship boutique feel).
+══ ELEMENT 6: FLOOR ══
+Continuous large-format POLISHED CREAM MARBLE tiles covering the entire studio floor. Warm cream/ivory tone (#F0E8D0). High-gloss surface with soft warm reflections of the studio lights and the arch magenta LED visible as a faint pink reflection on the marble.
+
+══ ELEMENT 7: FOREGROUND PODIUM ══
+At frame centre, in the foreground, directly in front of the arch: a LOW, WIDE circular disc pedestal made of smooth matte cream stone. Dimensions: approximately 55cm diameter, only 15–18cm tall. It is a flat, low platform — NOT a tall column or display stand. The podium sits on the marble floor at the very base of the arch.
+
+══ LIGHTING ══
+Warm, luminous studio lighting (3000K–3200K). Soft overhead key light. Warm amber sconces on both fluted panel sides. The magenta LED arch trim (#B0208D) casts a pink-magenta glow onto the surrounding cream wall. Gentle specular reflections on the marble floor and brass planter surface.
 `.trim();
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -78,11 +78,15 @@ Warm, luminous, high-end luxury retail studio lighting (3000K-3200K). Soft direc
 // ════════════════════════════════════════════════════════════════════════════
 const STUDIO_NEGATIVE = `
 ABSOLUTE PROHIBITIONS — ZERO TOLERANCE:
+✗ DO NOT generate a plain tan/beige arch with no LED trim — the arch MUST have the magenta LED glow (#B0208D).
+✗ DO NOT generate a tall rectangular display board, banner stand, or signage pillar in the centre — the ONLY centrepiece is the LOW CIRCULAR CREAM PODIUM.
+✗ DO NOT generate a plain, minimal, or simplified studio — ALL elements (fluted panels, brass planter, shelf unit, marble floor, magenta LED arch, podium) MUST be present.
+✗ DO NOT render any LV, Louis Vuitton monogram, or third-party logo inside the shopping bag on the wall — the bag face MUST show only a clean white capital letter "F".
 ✗ DO NOT place the model in the center of the frame blocking the logo or podium.
 ✗ DO NOT obscure, cover, or block the 3D Forgiven logo on the wall or the central arch.
 ✗ NO plain white background, NO plain grey backdrop, NO seamless paper roll.
-✗ NO alternative room — no hotel lobby, office, bedroom, outdoor location.
-✗ NO harsh glowing pink neon tubes outlining the arch. Use soft recessed architectural lighting.
+✗ NO alternative room — no hotel lobby, office, bedroom, outdoor location, bare warehouse.
+✗ NO harsh bright neon tubes outlining the arch — use soft, warm magenta LED cove lighting.
 ✗ NO oversized, cartoonish, or neon glowing logos on the wall.
 ✗ NO floating 2D watermark overlays or digital logo stamps in post-processing.
 ✗ NO recoloured garments. The product colour from the reference image is law.
@@ -248,18 +252,53 @@ export function buildPromptFromComposition(
 //  VTON STUDIO BLOCK — injected into the VTON wanPrompt as the FIRST block
 // ════════════════════════════════════════════════════════════════════════════
 export function buildVTONStudioBlock(sceneType: string): string {
-  const positioningDirective = `
-CRITICAL MODEL FRAMING & POSITIONING DIRECTIVE (FSC LOOKBOOK HERO STANDARD):
-• PROMINENT HERO MODEL SCALE: The model is tall, prominent, and clearly focused, occupying 65%–75% of the frame height.
-• MODEL POSITION: The model stands proudly beside the central podium — at 35% frame width on the left OR 65% frame width on the right (NOT pushed into the far corner or hidden behind plants).
-• PERFECT LIGHTING ON MODEL: Warm, bright 3200K key light directly illuminating the model and garment. Vibrant, crisp detail, natural skin tones, zero dark corner shadows on the model.
-• UNBLOCKED BACKGROUND BRANDING: Central arch, cream podium, and 3D Forgiven Shopping Centre logo on the back wall MUST remain 100% visible and unblocked in the background centre.
+
+  // ── FRAME LAYOUT CONTRACT ──────────────────────────────────────────────────
+  // This is the single most important rule. It controls spatial composition.
+  const frameLayoutContract = `
+FRAME LAYOUT CONTRACT — ABSOLUTE NON-NEGOTIABLE:
+This is a SPLIT-FRAME composition. The frame has two distinct zones:
+  LEFT/RIGHT ZONE (foreground): The HUMAN MODEL occupies this zone, standing beside and slightly in front of the central podium. The model is at either 30–38% frame width (left side) OR 62–70% frame width (right side). NEVER at 50% (dead centre).
+  CENTRE ZONE (background): The arch, back wall, cream podium, and 3D Forgiven logo occupy this zone as the unblocked background.
+
+CRITICAL POSITIONING RULES:
+✗ The model MUST NOT stand inside the arch opening or directly in front of the logo.
+✗ The model MUST NOT be centred at 50% frame width — that position belongs to the arch and logo.
+✗ The model MUST NOT block or overlap the cream circular podium that sits at frame centre.
+✓ The model stands OFF-CENTRE, beside the podium (not on it, not behind it).
+✓ The model's body faces slightly inward toward the podium — elegant editorial stance.
+✓ The model is FULL-BODY visible: head to toe including shoes, occupying 65%–75% of frame height.
+✓ Direct 3200K warm key light on the model. Zero dark shadows obscuring the model or garment.
+`.trim();
+
+  // ── LOGO LOCK ─────────────────────────────────────────────────────────────
+  // Explicit 3D architectural wall sign spec — prevents AI from rendering a flat 2D logo.
+  const logoLock = `
+FORGIVEN SHOPPING CENTRE WALL LOGO — 3D ARCHITECTURAL SIGNAGE (LOCKED):
+The official FSC logo is a PHYSICALLY MOUNTED 3D WALL SIGN embedded in the cream plaster wall inside the arch. It has real physical depth (~2cm extrusion from the wall surface), casts a subtle shadow, and catches warm specular highlights. It is NEVER a flat 2D graphic, NEVER a cartoon illustration, NEVER a digital watermark.
+
+The logo is composed of TWO separate 3D elements stacked vertically, mounted ABOVE the podium at roughly 55–70% of the arch height:
+
+ELEMENT 1 — THE BAG ICON (top):
+  • One LARGE magenta shopping bag (#8B1B68), front and centre. On its face: a crisp, solid, bold WHITE CAPITAL LETTER "F" — NOTHING ELSE on the bag face.
+  • Behind and to the left of the large bag: a smaller royal blue bag peeking out.
+  • Behind and to the right of the large bag: a smaller lime-green bag peeking out.
+  • All three bags are 3D physical objects with volume, handles, and depth.
+
+ELEMENT 2 — THE WORDMARK (directly below the bag icon, NO horizontal gap):
+  • Line 1: "Forgiven" — bold, rounded sans-serif, dark plum/magenta (#8B1B68), 3D extruded lettering.
+  • Line 2: "Shopping Centre" — smaller, refined, same dark lettering, centred beneath "Forgiven".
+  • The wordmark is STACKED VERTICALLY, NOT side-by-side with the bags.
+
+The entire logo lockup is centred horizontally in the arch and is NOT oversized (occupies ~20–25% of arch height).
 `.trim();
 
   return [
-    positioningDirective,
+    logoLock,          // ← FIRST: logo is priority #1 — must appear on the wall
+    frameLayoutContract,
     `BACKGROUND ENVIRONMENT — FSC SIGNATURE STUDIO (REPRODUCE EXACTLY):`,
     FSC_STUDIO_CANONICAL,
     STUDIO_NEGATIVE,
   ].join("\n\n");
 }
+

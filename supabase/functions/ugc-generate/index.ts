@@ -62,14 +62,18 @@ Return ONLY a valid JSON object in this format:
 }
 
 async function verifyClothingShape(apiKey: string, productImages: string[], generatedImageUrl: string) {
-  console.log("🔍 Running Clothing Shape Audit via Qwen VL...");
+  console.log("🔍 Running Clothing Shape + Colour Audit via Qwen VL...");
   try {
-    const prompt = `Compare the generated image with the product references.
-Check strictly for:
-1. Did a skirt become trousers or vice versa?
-2. Did long sleeves become short or missing?
-3. Is the silhouette fundamentally changed?
-Return ONLY JSON: {"pass": true, "reason": "Match"}`;
+    const prompt = `You are a strict fashion QA auditor. Compare the generated image (last image) against the original product reference (first image).
+
+Check ALL of the following:
+1. COLOUR CATEGORY: Is the dominant colour of the garment completely different? (e.g. light blue → black, white → red). A completely different colour is an IMMEDIATE FAIL.
+2. GARMENT TYPE: Did a dress become trousers, or a jacket become a vest? A completely different garment type is an IMMEDIATE FAIL.
+3. SLEEVE LENGTH: Did long sleeves become short sleeves or disappear entirely?
+4. SILHOUETTE: Is the overall shape and fit fundamentally changed?
+
+Return ONLY valid JSON — no markdown, no explanation outside JSON:
+{"pass": true|false, "reason": "Brief explanation"}`;
     const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation", {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -86,12 +90,13 @@ Return ONLY JSON: {"pass": true, "reason": "Match"}`;
     if (!res.ok) return { pass: true, reason: "" };
     const data = await res.json();
     const rawContent = data.output?.choices?.[0]?.message?.content?.[0]?.text || "";
-    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+    console.log(`[ClothingShapeAudit] Raw response: ${rawContent}`);
+    const jsonMatch = rawContent.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       const resData = JSON.parse(jsonMatch[0]);
       return { pass: resData.pass !== false, reason: resData.reason || "" };
     }
-  } catch(err) {}
+  } catch(err) { console.warn("[ClothingShapeAudit] Error:", err); }
   return { pass: true, reason: "" };
 }
 
@@ -192,13 +197,13 @@ export interface BaseStudioDNASpec {
 }
 
 export const BaseStudioDNA: BaseStudioDNASpec = {
-  architecturePrompt: `FLAGSHIP FSC LUXURY ARCHITECTURAL DESTINATION (Forgiven Shopping Centre, Lilongwe, Malawi): Modern African luxury retail architecture engineered to international luxury standards (Dior, Louis Vuitton, COS, Apple Flagship, Harrods Beauty). ${StudioSeed.archDimensions}. The arch is seamlessly outlined by a glowing integrated magenta LED accent light strip (${StudioSeed.ledSpecification}). Flanking both the far left and right edges are vertical black fluted architectural panels (#111111) equipped with warm vertical tube sconces. On the right wall: ${StudioSeed.shelvingPosition}. On the left floor: ${StudioSeed.planterPosition}. In front of the arch on the floor sits ${StudioSeed.podiumDimensions}. The flooring is ${StudioSeed.floorSpecification}. ${StudioSeed.prompt}`,
+  architecturePrompt: `FLAGSHIP FSC LUXURY ARCHITECTURAL DESTINATION (Forgiven Shopping Centre, Lilongwe, Malawi): Modern African luxury retail architecture engineered to international flagship boutique standards. ${StudioSeed.archDimensions}. The arch is seamlessly outlined by a glowing integrated magenta LED accent light strip (${StudioSeed.ledSpecification}). Flanking both the far left and right edges are vertical black fluted architectural panels (#111111) equipped with warm vertical tube sconces. On the right wall: ${StudioSeed.shelvingPosition}. On the left floor: ${StudioSeed.planterPosition}. In front of the arch on the floor sits ${StudioSeed.podiumDimensions}. The flooring is ${StudioSeed.floorSpecification}. ${StudioSeed.prompt}`,
 
   lightingPrompt: `Warm premium luxury commercial studio lighting (3000K-3500K). ${StudioSeed.lightingPositions}. Key light provides soft, directional illumination, gentle fill opens shadows naturally, warm vertical tube sconces glow softly, and the integrated magenta arch LED strip (#B0208D) casts a radiant neon-pink accent outline on the cream stone wall. Physically accurate shadow falloff, zero blown-out highlights, and natural specular reflections on marble and brass.`,
 
   materialsPrompt: "Authentic physical material finishes: micro-textured cream limestone plaster, honed travertine stone, polished cream Calacatta marble flooring with realistic natural veining and soft reflections, brushed brass metal fixtures, matte black fluted wooden panels (#111111), and organic tropical botanical greenery with real leaf veining.",
 
-  brandingPrompt: "PHYSICALLY MOUNTED 3D ARCHITECTURAL LOGO (FLAGSHIP RETAIL SIGNAGE): The official Forgiven Shopping Centre logo — a bold magenta (#B0208D) shopping bag icon containing a crisp white capital letter 'F', with 'Forgiven' written in bold magenta text directly below and 'Shopping Centre' in smaller magenta text beneath — is physically mounted onto the cream stone wall inside the signature arch as dimensional 3D acrylic and metal architectural lettering. The logo has real physical depth, sharp edges, casts a subtle natural drop shadow onto the textured cream stone wall behind it, and catches warm specular reflections from the studio sconces. It is permanently installed on the wall like a flagship retail boutique sign — NEVER floating, NEVER a digital watermark overlay, NEVER composited in post.",
+  brandingPrompt: "PHYSICALLY MOUNTED 3D ARCHITECTURAL LOGO (FLAGSHIP RETAIL SIGNAGE): The official Forgiven Shopping Centre logo — a bold magenta (#B0208D) shopping bag icon containing a crisp, solid, bold WHITE CAPITAL LETTER 'F' (CRITICAL: A clean white letter 'F' ONLY, NEVER any LV monogram or third-party logo!), with 'Forgiven' written in bold magenta text directly below and 'Shopping Centre' in smaller dark text beneath — is physically mounted onto the cream stone wall inside the signature arch as dimensional 3D acrylic and metal architectural lettering. The logo has real physical depth, sharp edges, casts a subtle natural drop shadow onto the textured cream stone wall behind it, and catches warm specular reflections from the studio sconces. It is permanently installed on the wall like a flagship retail boutique sign — NEVER floating, NEVER a digital watermark overlay, NEVER composited in post.",
 
   qualityRequirements: [
     "Signature arch (1.8m radius, 3.2m height) with integrated glowing magenta LED strip (#B0208D)",
@@ -399,7 +404,7 @@ export const CategoryDNARegistry: Record<string, CategoryDNASpec> = {
     defaultComposition: "OFF-CENTER EDITORIAL FULL BODY",
     framingPrompt: "Full-length head-to-toe shot showing complete outfit including footwear. Model is positioned strictly OFF-CENTER (LEFT or RIGHT of the arch). The FSC 3D logo in the center of the signature arch remains 100% unblocked.",
     productAdaptationPrompt: "Product → Model → Studio hierarchy. Garment is the hero. Immaculate tailoring, realistic fabric drape and weight, exact sleeve length, preserved neckline, exact silhouette.",
-    brandRetentionRule: "If product is a third-party designer item (e.g. Dior, Gucci, Louis Vuitton, Zara, Nike), preserve authentic manufacturer tags/logos on garment. FSC branding belongs strictly to the architecture and FSC packaging.",
+    brandRetentionRule: "If product is a third-party designer item, preserve authentic manufacturer tags/logos on the garment itself. FSC branding belongs strictly to the architectural wall logo and FSC packaging — NEVER on the garment.",
     stylingPrompt: "FASHION CATEGORY STYLING: Editorial movement, human presence, authentic garment behavior. Fabric drapes with real weight physics. Garment shows natural sitting wrinkles, fold lines, and real movement. Model's expression is confident but natural — Vogue editorial energy, not generic stock photo."
   },
   shoes: {
@@ -419,7 +424,7 @@ export const CategoryDNARegistry: Record<string, CategoryDNASpec> = {
     defaultComposition: "HERO LUXURY HANDBAG DISPLAY — SLIGHTLY LOW ANGLE",
     framingPrompt: "Slightly low camera hero angle for bag authority. Luxury handbag on the low circular cream stone podium or polished marble floor. FSC white shopping bag placed naturally beside it as styling prop.",
     productAdaptationPrompt: "Focus on leather grain scale, edge paint finish, metallic clasp hardware, handle drop distance, shoulder strap geometry, quilting pattern density, interior construction if partially visible. Contact shadow on marble.",
-    brandRetentionRule: "Preserve authentic bag brand (e.g. Louis Vuitton monogram, Chanel double-C clasp, Gucci GG canvas) on clasp and body. FSC branding on architectural wall sign and FSC gift box tag.",
+    brandRetentionRule: "Preserve authentic brand hardware (clasp, logo charm, canvas monogram) on the product bag itself. FSC branding belongs ONLY to the architectural wall logo and FSC shopping bag prop — NEVER overlaid onto the product.",
     stylingPrompt: "BAG CATEGORY STYLING: Handle or strap positioned naturally — not artificially propped. Hardware catches real specular highlights from key light. Leather surface shows authentic grain character and slight natural patina. Quilting stitches are counted and accurate."
   },
   jewellery: {
@@ -630,7 +635,8 @@ The Forgiven Shopping Centre logo must appear physically mounted inside the arch
 - Brand name line 2: 'Shopping Centre' in smaller magenta (#B0208D) text beneath 'Forgiven'
 - The logo lockup is always vertical: bag icon on top, 'Forgiven' below, 'Shopping Centre' below that
 - Physical Mounting: Mounted on the cream stone wall inside the arch as 3D dimensional lettering with real depth and natural drop shadows
-- THIRD-PARTY BRAND INTEGRITY: Third-party manufacturer logos on products (e.g. Rolex, Nike, Apple, Louis Vuitton, Gucci, Chanel, Samsung) MUST be preserved 100% authentic and untouched on the product. FSC branding belongs ONLY to the retail architecture and FSC shopping bags/packaging.`;
+- THIRD-PARTY BRAND INTEGRITY: Third-party manufacturer logos on products MUST be preserved 100% authentic and untouched on the product itself. FSC branding belongs ONLY to the retail architecture (the wall logo inside the arch) and FSC shopping bags/packaging.
+- CRITICAL LOGO RULE: The shopping bag icon mounted on the cream wall inside the arch MUST contain a clean, solid, bold WHITE CAPITAL LETTER "F" — NEVER any third-party monogram, NEVER any LV pattern, NEVER any other brand mark.`;
 
 // ----------------------------------------------------------------------------
 // MODULE K: CAMPAIGN DNA — Multi-Image Photoshoot Consistency Engine
@@ -2693,11 +2699,15 @@ async function runUnifiedVTON(
         name: "Fal.ai VTON",
         available: !!keys.falKey && !falBalanceExhausted,
         fn: async () => {
+          // Use primaryProductUrl (raw vendor photo) — NOT segmentedGarmentUrl.
+          // Photta ghost-mannequin segmentation mangles multi-piece outfits (e.g. wrap
+          // dresses with rose details, 2-piece sets with blazers). The raw product
+          // image preserves every colour, sleeve, and garment detail for Fal.ai to
           return await callFalAI(
             keys.falKey,
             personImageUrl,
-            segmentedGarmentUrl,
-            `${garmentDetails} — worn by a REAL HUMAN ${targetGender} ${targetEthnicity} model. DO NOT generate a mannequin. Preserve exact sleeve length. The clothes and accessories must fit the model PERFECTLY, with immaculate tailoring and realistic draping, no weird stretching. seed: ${seed}`
+            primaryProductUrl,
+            `${garmentDetails} — worn by a REAL HUMAN ${targetGender} ${targetEthnicity} model. DO NOT generate a mannequin. Preserve exact sleeve length, exact colour, exact design details. The clothes MUST match the reference image exactly. seed: ${seed}`
           );
         }
       },
@@ -2707,40 +2717,43 @@ async function runUnifiedVTON(
         fn: async () => {
           let strictnessPromptModifier = "";
           if (attempt === 2) {
-            strictnessPromptModifier = "CRITICAL: Under no circumstances alter or reinterpret the clothing. Reconstruct Image 2's garment with 100% pixel fidelity.";
+            strictnessPromptModifier = `CRITICAL: Under no circumstances alter or recolour the clothing. The garment MUST match Image 2's exact color (${garmentDetails}) and shape. DO NOT generate a black dress.`;
           } else if (attempt === 3) {
-            strictnessPromptModifier = "CRITICAL AUDIT NOTICE: Zero tolerance for modifications. Every stitch, neckline, pattern, and silhouette must match Image 2 exactly.";
+            strictnessPromptModifier = `CRITICAL AUDIT NOTICE: Zero tolerance for modifications or recolouring. Reconstruct Image 2's exact outfit (${garmentDetails}) with 100% fidelity.`;
           }
 
           const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
 
-          // STUDIO BLOCK IS ALWAYS FIRST — gives maximum conditioning weight to the studio architecture.
-          // Even though the studio image cannot be sent as a reference (both slots used by influencer+product),
-          // the detailed text description is sufficient for the model to reproduce the FSC Flagship Studio.
+          // MULTIMODAL VTON PROMPT STRUCTURE:
+          // [1] VIRTUAL TRY-ON MANDATE MUST BE FIRST — gives maximum token priority to Image 1 + Image 2 garment transfer.
+          //     This prevents the model from being distracted by studio details and defaulting to generic black clothing.
           const wanPrompt = [
-            // [1] STUDIO — maximum token priority: model reads this first
+            // [1] VIRTUAL TRY-ON MANDATE — PRIMARY TASK (MAXIMUM TOKEN PRIORITY)
+            `VIRTUAL TRY-ON MANDATE — PRIMARY TASK (CRITICAL):
+Image 1 is the REAL HUMAN MODEL (${targetGender} ${targetEthnicity}).
+Image 2 is the EXACT PRODUCT REFERENCE IMAGE (the garment to wear).
+YOUR MAIN MANDATE: Map the EXACT outfit from Image 2 onto the model from Image 1.
+• 100% EXACT COLOUR MATCH: Match the exact colour from Image 2 (${garmentDetails}). DO NOT recolour. If Image 2 is light blue, the model MUST wear light blue. DO NOT generate a black, grey, or generic dark outfit.
+• 100% EXACT OUTFIT RECONSTRUCTION: Transfer every piece (jackets, blazers, tops, trousers, dresses, sleeves, lapels, buttons, seams, fabric texture) from Image 2 onto the model with zero modifications.
+• Product Name: ${description}
+• Selected Variation: ${garmentDetails}`,
+
+            // [2] MODEL IDENTITY from Image 1
+            `MODEL IDENTITY: Use the EXACT person from Image 1 (${targetGender} ${targetEthnicity}). The face, skin tone, body shape, and height MUST be identical to Image 1. Do NOT generate a different person. REAL HUMAN — not a mannequin, not CGI.`,
+
+            // [3] BACKGROUND ENVIRONMENT — FSC SIGNATURE STUDIO & 3D LOGO
             buildVTONStudioBlock(scene || "studio"),
 
-            // [2] PRODUCT IDENTITY LOCK — RAW PRODUCT REFERENCE RECONSTRUCTION
-            `PRODUCT IDENTITY — IMMUTABLE SOURCE OF TRUTH: The product reference image (Image 2) is the ONLY valid source for this garment. Reconstruct THIS exact physical outfit shown in Image 2 with 100% pixel fidelity.`,
-            `  Product Name: ${description}`,
-            `  Selected Variation: ${garmentDetails}`,
-            `  EXACT OUTFIT RECONSTRUCTION: Transfer every piece of the outfit shown in Image 2 (jackets, blazers, dresses, tops, bottoms) onto the model. If Image 2 shows a 2-piece set with a jacket, the model MUST wear both pieces.`,
-            `  EXACT COLOUR & PATTERN: Do NOT recolour. Match every color, pattern, plaid, stripe, print, and accent from Image 2 exactly.`,
-            `  EXACT CONSTRUCTION & SLEEVE LENGTH: Match every stitch, seam, lapel, collar, neckline, sleeve length, cuff, button, zipper, label, silhouette, and fabric texture as shown in Image 2.`,
-            `  NO MANNEQUINS: Map the clothing from Image 2 onto the REAL HUMAN model (from Image 1) seamlessly.`,
-            `  PERFECT FIT: Immaculate tailoring and realistic fabric drape. No clipping, no warping.`,
-
-            // [3] MODEL IDENTITY from Image 1
-            `MODEL: Use the EXACT person from Image 1 (${targetGender} ${targetEthnicity}). The face, skin tone, body shape, and height MUST be identical to Image 1. Do NOT generate a different person. REAL HUMAN — not a mannequin, not CGI.`,
-
-            // [4] SHOT TYPE & HERO MODEL FRAMING
-            `SHOT TYPE: Full-length head-to-toe fashion editorial photograph. MUST show complete outfit including legs and shoes. Do NOT crop at waist or knees.`,
-            `HERO MODEL PLACEMENT & LIGHTING:`,
-            `  • The model stands proudly beside the central podium (at 35% frame width on the left OR 65% frame width on the right).`,
-            `  • PROMINENT SCALE: Hero model occupying 65%–75% of the total frame height. Tall, clear, elegant, and in crisp focus.`,
-            `  • BRIGHT WARM LIGHTING: Direct 3200K studio key light illuminating the model and outfit with vibrant detail, rich fabric texture, and natural skin glow. Zero dark corner shadows on model.`,
-            `  • UNBLOCKED BRANDING: The central arch, low cream podium, and 3D Forgiven wall logo remain 100% visible and unblocked in the background centre.`,
+            // [4] SHOT TYPE & HERO MODEL FRAMING — mirrors FRAME LAYOUT CONTRACT
+            `SHOT TYPE: Full-length head-to-toe fashion editorial photograph. MUST show the model's complete outfit including legs and shoes. Do NOT crop at waist or knees.`,
+            `HERO MODEL SPATIAL PLACEMENT (SPLIT-FRAME RULE):`,
+            `  • The model stands OFF-CENTRE — at 30–38% frame width on the LEFT side, OR 62–70% frame width on the RIGHT side.`,
+            `  • NEVER at 50% dead centre — the centre zone belongs to the arch, podium, and logo.`,
+            `  • The model stands BESIDE the cream circular podium (foreground), NOT inside the arch, NOT on the podium, NOT blocking the logo.`,
+            `  • The model's body faces slightly inward toward the podium — elegant editorial stance.`,
+            `  • PROMINENT SCALE: The model occupies 65%–75% of the total frame height. Tall, proud, in crisp sharp focus.`,
+            `  • BRIGHT WARM LIGHTING: Direct 3200K studio key light illuminating the model and outfit — vibrant fabric texture, natural glowing skin, zero dark corner shadows on the model.`,
+            `  • The central arch, cream podium, and 3D Forgiven wall logo remain FULLY VISIBLE and unobstructed in the background centre.`,
 
             // [5] STRICTNESS ESCALATION (on retry)
             strictnessPromptModifier,
@@ -2751,6 +2764,11 @@ async function runUnifiedVTON(
             // [7] OPTIONAL STYLING
             hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ``,
             makeup ? `MAKEUP: ${makeup}.` : ``,
+
+            // [8] FINAL MANDATORY CHECK — PRODUCT COLOUR + FSC WALL LOGO
+            `MANDATORY FINAL CHECK — PRODUCT COLOUR + FSC WALL LOGO MUST BE PRESENT:
+1. PRODUCT: The model MUST be wearing the exact garment from Image 2 (${garmentDetails}). Match colour, sleeves, and cut 100%.
+2. LOGO: The Forgiven Shopping Centre 3D logo MUST be visibly mounted on the cream wall inside the arch (large magenta bag with white "F", "Forgiven", "Shopping Centre").`,
 
             `Output: photorealistic commercial photograph indistinguishable from a real camera shot taken by a world-class fashion photographer.`
           ].filter(Boolean).join("\n\n");
@@ -2769,20 +2787,14 @@ async function runUnifiedVTON(
           const phottaType = getPhottaProductType(category, garmentDetails);
           console.log(`[Unified VTON] Photta product_type resolved to: ${phottaType}`);
           const res = await callPhottaAI(keys.phottaKey, segmentedGarmentUrl, phottaType, undefined, targetEthnicity, targetGender);
-          if (!res) throw new Error("Photta Try-On returned null");
           return res;
         }
       },
       {
         name: "IDM-VTON (Hugging Face Spaces)",
-        available: !!keys.hfToken,
+        available: true,
         fn: async () => {
-          return await callIDMVTON(
-            keys.hfToken,
-            personImageUrl,
-            segmentedGarmentUrl,
-            `${garmentColor} ${description}`
-          );
+          return await callIDMVTONSpaces(personImageUrl, segmentedGarmentUrl, category);
         }
       }
     ];
@@ -2805,7 +2817,7 @@ async function runUnifiedVTON(
           if (!shapeAudit.pass) {
             console.warn(`[Unified VTON] ❌ Clothing Shape Audit FAILED: ${shapeAudit.reason}`);
             lastReasoning = "Failed shape audit: " + shapeAudit.reason;
-            if (!bestResultUrl) {
+            if (!bestResultUrl || bestResultScore < 75) {
               bestResultUrl = resultUrl;
               bestResultScore = 75;
               console.log(`[Unified VTON] 📌 Candidate registered from Wan generation: ${engine.name}`);
@@ -2842,9 +2854,9 @@ async function runUnifiedVTON(
     }
   }
 
-  if (bestResultUrl && bestResultScore >= 70) {
+  if (bestResultUrl && bestResultScore >= 75) {
     console.warn(
-      `[Unified VTON] ⚠️ Serving candidate result (${bestResultScore}%) after retries. Reason: ${lastReasoning}`
+      `[Unified VTON] ⚠️ Serving best-effort candidate (${bestResultScore}%) after retries. Reason: ${lastReasoning}`
     );
     return bestResultUrl;
   }
