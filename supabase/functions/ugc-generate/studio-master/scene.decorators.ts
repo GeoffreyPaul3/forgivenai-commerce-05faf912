@@ -22,14 +22,14 @@ export const SceneDecoratorRegistry: Record<string, SceneDecorator> = {
     name: "FSC Signature Flagship Studio",
     targetZones: {}, // Pure flagship studio — zero decorator additions
     lightingModifier: null,
-    forbiddenContent: []
+    forbiddenContent: ['additional_logo', 'duplicate_logo', 'secondary_wall_logo', 'new_brand_signage', 'generated_wordmark']
   },
   studio: {
     id: "studio",
     name: "FSC Studio Environment",
     targetZones: {}, // Alias for flagship studio
     lightingModifier: null,
-    forbiddenContent: []
+    forbiddenContent: ['additional_logo', 'duplicate_logo', 'secondary_wall_logo', 'new_brand_signage', 'generated_wordmark']
   },
   christmas_studio: {
     id: "christmas_studio",
@@ -62,25 +62,24 @@ export const SceneDecoratorRegistry: Record<string, SceneDecorator> = {
     id: "black_friday_studio",
     name: "FSC Black Friday High-Contrast Studio",
     targetZones: {
-      [StudioZone.LIGHTING]: [
-        "Dramatic high-contrast commercial spotlight (4000K) from directly above hero position"
+      [StudioZone.FLOOR]: [
+        "Polished high-gloss black marble floor with sleek mirror reflections of the studio lights"
+      ],
+      [StudioZone.FOREGROUND]: [
+        "Sleek luxury matte-black gift boxes with metallic gold ribbons resting beside the podium base"
       ],
       [StudioZone.LED_STRIP]: [
-        "Intensified vivid magenta LED outline at 100% full brightness saturation"
-      ],
-      [StudioZone.FLOOR]: [
-        "Polished obsidian-black mirror marble floor reflections"
-      ],
-      [StudioZone.BACKGROUND]: [
-        "High-contrast dark moody atmosphere framing central arch"
+        "Vivid bright magenta LED arch outline trim glowing intensely"
       ]
     },
-    lightingModifier: "dramatic_high_contrast_4000K",
+    lightingModifier: "dramatic_commercial_spotlight_3500K",
     forbiddenContent: [
-      "soft warm cozy lighting",
-      "flowers or plants",
-      "pastel colors",
-      "cluttered discount banners"
+      "cheap discount banners",
+      "red sale tags",
+      "cluttered props",
+      "distorted wall text",
+      "wrinkled clothing",
+      "twin models"
     ]
   },
   luxury_white: {
@@ -166,6 +165,16 @@ export const SceneDecoratorRegistry: Record<string, SceneDecorator> = {
  * Defaults to 'fsc_signature' (flagship studio with no decorator additions) if scene is unknown.
  */
 export function resolveDecorator(sceneId: string = "fsc_signature"): SceneDecorator {
-  const normalized = (sceneId || "fsc_signature").toLowerCase().trim();
+  if (!sceneId) return SceneDecoratorRegistry["fsc_signature"];
+  const raw = sceneId.toLowerCase().trim();
+  const normalized = raw.replace(/[\s-]+/g, "_");
+
+  if (normalized.includes("christmas")) return SceneDecoratorRegistry["christmas_studio"];
+  if (normalized.includes("black_friday") || normalized.includes("blackfriday")) return SceneDecoratorRegistry["black_friday_studio"];
+  if (normalized.includes("luxury") || normalized.includes("white")) return SceneDecoratorRegistry["luxury_white"];
+  if (normalized.includes("lifestyle") || normalized.includes("home")) return SceneDecoratorRegistry["lifestyle_home"];
+  if (normalized.includes("outdoor")) return SceneDecoratorRegistry["outdoor_fashion"];
+  if (normalized.includes("minimal")) return SceneDecoratorRegistry["minimal_product_studio"];
+
   return SceneDecoratorRegistry[normalized] || SceneDecoratorRegistry["fsc_signature"];
 }

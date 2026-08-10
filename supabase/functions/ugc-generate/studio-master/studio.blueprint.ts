@@ -70,14 +70,28 @@ export const FSC_FLAGSHIP_STUDIO_URL = "https://wzncegnkhybtmybqftbv.supabase.co
  * Uploaded to Supabase Storage for use as an image reference in generations
  * where a slot is available (non-VTON product-only shots).
  *
- * Logo anatomy (for text-based descriptions):
- *  - Large magenta-purple (#8B1A8B) shopping bag, barrel/trapezoid shape, curved handle, white "F" on face
- *  - Behind-left: smaller royal blue shopping bag
- *  - Behind-right: smaller lime/yellow-green shopping bag
- *  - Below cluster: "Forgiven" in bold rounded sans-serif, same magenta-purple
+ * Official Logo Anatomy (Immutable Brand Asset):
+ *  - Primary magenta (#A72087) shopping bag body, curved handle, crisp white "F" on face
+ *  - Behind-left: secondary royal blue (#1A3E92) shopping bag shape
+ *  - Behind-right: lime-green accent shopping bag shape
+ *  - Below cluster: "Forgiven" in bold rounded sans-serif, primary magenta (#A72087)
  *  - Below that: "Shopping Centre" in smaller lighter-weight same colour, wider tracking
  */
 export const FSC_LOGO_URL = "https://wzncegnkhybtmybqftbv.supabase.co/storage/v1/object/public/ugc-assets/brand/fsc-logo.png";
+
+export const SINGLE_LOGO_RULE = {
+  id: "FSC_OFFICIAL_WALL_LOGO_001",
+  status: "IMMUTABLE",
+  source: "STUDIO_MASTER_REFERENCE",
+  maxPhysicalInstances: 1,
+  requiredPhysicalInstances: 1,
+  physicalLocation: "CENTER_OF_ARCH_INTERIOR_WALL",
+  behavior: "PRESERVE_EXISTING",
+  generationAllowed: false,
+  duplicationAllowed: false,
+  relocationAllowed: false,
+  redesignAllowed: false,
+};
 
 export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
   id = "FSC_FLAGSHIP_STUDIO_V1";
@@ -96,7 +110,7 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       id: StudioZone.LOGO,
       name: "FSC 3D Brand Logo",
       isLocked: true,
-      baseDescription: "3D mounted acrylic 'Forgiven Shopping Centre' brand logo (featuring the purple shopping bag icon with 'f') mounted directly on the wall INSIDE the central arch at chest/eye level, 100% crisp and unblocked.",
+      baseDescription: "SINGLE IMMUTABLE OFFICIAL WALL LOGO (PRESERVED FROM STUDIO MASTER): The official Forgiven Shopping Centre logo physically exists inside studio.jpeg on the rear wall inside the central arch. Preserve that exact single wall logo. AI generation of additional or duplicate logos is strictly FORBIDDEN.",
       spatialAnchor: "Center of architectural arch wall"
     },
     [StudioZone.PODIUM]: {
@@ -152,7 +166,7 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       id: StudioZone.SUBJECT,
       name: "Model / Creator Safe Zone",
       isLocked: false,
-      baseDescription: "STRICT POSITIONING: Model stands or sits strictly on the CAMERA-LEFT (Left Safe Zone) or CAMERA-RIGHT (Right Safe Zone) side of the podium. The model NEVER stands in the center blocking the logo.",
+      baseDescription: "STRICT POSITIONING: Model stands or sits strictly on the CAMERA-LEFT (Left Safe Zone) or CAMERA-RIGHT (Right Safe Zone) side of the podium. The model NEVER stands in the exact center of the arch.",
       spatialAnchor: "Midground camera left or right"
     },
     [StudioZone.PRODUCT]: {
@@ -263,19 +277,19 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       name: "Left Safe Zone",
       xRange: "15% - 40%",
       yRange: "0% - 100%",
-      note: "Model stands or sits strictly to the left of the podium, logo inside central arch remains 100% unobstructed"
+      note: "Model stands or sits strictly to the left of the podium, arch wall visible and unobstructed behind model"
     },
     {
       id: "right_of_center",
       name: "Right Safe Zone",
       xRange: "60% - 85%",
       yRange: "0% - 100%",
-      note: "Model stands or sits strictly to the right of the podium, preserving central arch and logo line"
+      note: "Model stands or sits strictly to the right of the podium, arch wall visible and unobstructed behind model"
     }
   ];
 
   brandVisibilityRules: BrandRule[] = [
-    { id: "logo_unblocked", rule: "FSC 3D brand logo mounted inside central arch MUST remain 100% visible and unblocked by subjects or props.", isMandatory: true },
+    { id: "single_logo_rule", rule: "EXACTLY ONE physical Forgiven Shopping Centre logo exists on the arch wall. Do NOT generate, duplicate, repeat, overlay, or add another logo.", isMandatory: true },
     { id: "arch_geometry", rule: "Central architectural arch with magenta LED outline must match flagship FSC studio sheet exactly.", isMandatory: true },
     { id: "podium_center", rule: "Cream travertine podium must remain centered on floor plane in front of arch.", isMandatory: true }
   ];
@@ -289,9 +303,10 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
   ];
 
   negativeRules = [
-    "DO NOT redesign, move, remove, or alter: central arch with magenta LED, Forgiven logo, cream travertine podium, Calacatta marble floor, dark fluted side panels.",
-    "DO NOT position model in exact center blocking Forgiven logo.",
-    "DO NOT omit the signature arch or generate a plain gray/white seamless backdrop."
+    "DO NOT redesign, move, remove, recreate, recolor, or alter: central arch with magenta LED, official Forgiven Shopping Centre logo, cream travertine podium, Calacatta marble floor, dark fluted side panels.",
+    "DO NOT position model in exact center of the arch.",
+    "DO NOT omit the signature arch or generate a plain gray/white seamless backdrop.",
+    "NO DUPLICATE LOGOS. NO SECOND LOGO. NO ADDITIONAL BRAND MARKS. NO REPEATED WORDMARK. NO OVERLAPPING LOGOS. NO STACKED LOGOS. NO EXTRA F SYMBOLS. NO EXTRA SHOPPING BAG ICONS. NO ADDITIONAL WALL SIGNAGE. NO GENERATED FORGIVEN LOGO. NO RECONSTRUCTED FORGIVEN LOGO. NO SECOND BRAND SIGN."
   ];
 
   compiledArchitecturalDescription(): string {

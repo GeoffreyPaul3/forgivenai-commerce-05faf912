@@ -29,7 +29,7 @@ export const ProductRuleRegistry: Record<string, ProductRule> = {
     allowsModel: true,
     compositionRules: [
       "FULL BODY SHOT: Must be a full-length head-to-toe shot showing complete outfit including legs and shoes.",
-      "Model positioned in Left or Right Safe Zone, unblocking central arch logo.",
+      "Model positioned in Left or Right Safe Zone, arch wall visible and unobstructed.",
       "Garment tailored perfectly to model with physical fabric drape."
     ]
   },
@@ -43,7 +43,7 @@ export const ProductRuleRegistry: Record<string, ProductRule> = {
     allowsModel: true,
     compositionRules: [
       "FULL BODY SHOT: Must be a full-length head-to-toe shot showing complete outfit including legs and shoes.",
-      "Model positioned in Left or Right Safe Zone, unblocking central arch logo.",
+      "Model positioned in Left or Right Safe Zone, arch wall visible and unobstructed.",
       "Garment tailored perfectly to model with physical fabric drape."
     ]
   },

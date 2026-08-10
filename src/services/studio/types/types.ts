@@ -10,6 +10,9 @@ export interface BrandDNA {
   secondaryColorHex: string;
   accentColorHex: string;
   logoDescription: string;
+  logoAsset?: string;
+  logoPath?: string;
+  logoUsage?: string;
   architectureHeritage: string;
   qualityStandard: string;
   prohibitedElements: string[];

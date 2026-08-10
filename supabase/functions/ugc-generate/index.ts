@@ -117,7 +117,13 @@ async function stockProtectionGate(supabaseClient: any, productId: string) {
 }
 
 async function applyBrandWatermark(supabaseClient: any, imageUrl: string): Promise<string> {
-  console.log("🎨 Studio wall already contains official 3D FSC Logo — skipping post-processing 2D watermark overlay.");
+  // ── IMMUTABLE SINGLE WALL LOGO DIRECTIVE ──────────────────────────────────
+  // The studio master reference image (studio.jpeg) physically owns the official
+  // wall-mounted Forgiven Shopping Centre logo.
+  // Skipping post-processing wall compositing to guarantee zero logo duplication
+  // or overlapping brand marks.
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("🎨 Studio master reference (studio.jpeg) physically owns the official wall logo — skipping post-processing wall overlay to prevent logo duplication.");
   return imageUrl;
 }
 
@@ -2168,14 +2174,16 @@ async function callImageAI(
   references: { type: 'influencer' | 'product' | 'studio' | 'logo', url: string }[],
   supabaseClient?: any
 ) {
+  // PRIORITY ORDER: [0] STUDIO MASTER -> [1] PERSON / INFLUENCER -> [2] PRODUCT
+  // studioRef (studio.jpeg) physically owns the official wall logo.
+  // Do NOT pass logoRef PNG as an independent reference image alongside studio.jpeg,
+  // preventing the renderer from interpreting the logo as a second object to place.
   const studioRef = references.find(r => r.type === 'studio') || {
     type: 'studio' as const,
     url: FSC_FLAGSHIP_STUDIO_URL
   };
-  const productRef  = references.find(r => r.type === 'product');
   const influencerRef = references.find(r => r.type === 'influencer');
-  // Logo ref: used as Image 2 on pure studio shots (no product, no influencer)
-  const logoRef = references.find(r => r.type === 'logo') || { type: 'logo' as const, url: FSC_LOGO_URL };
+  const productRef  = references.find(r => r.type === 'product');
 
   // Guarantee Wan API minimum 240×240 for all reference images
   if (supabaseClient) {
@@ -2188,45 +2196,23 @@ async function callImageAI(
   const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" };
 
   // --- Strategy 1: Multi-image reference generation ---
-  // wan2.7-image-pro and qwen-image-2.0-pro explicitly support up to 2 reference images.
   const refImageModels = ["wan2.7-image-pro", "qwen-image-2.0-pro", "qwen-image-2.0"];
 
   for (const model of refImageModels) {
     try {
-      //
-      // IMAGE SLOT ALLOCATION — Priority rules (2-slot maximum):
-      //
-      //  VTON (influencer + product): [influencer, product]
-      //    → Studio architecture reproduced via text prompt (buildVTONStudioBlock)
-      //
-      //  Product-only shot:           [studio, product]
-      //    → AI sees the real studio image + product; logo reproduced via text
-      //
-      //  Influencer-only shot:        [studio, influencer]
-      //    → AI sees the real studio image + person; logo reproduced via text
-      //
-      //  Studio-only shot (no refs):  [studio, logo]
-      //    → AI receives BOTH the studio image AND the real FSC logo image as
-      //      direct visual references, giving maximum logo reproduction fidelity.
-      //
       const content: any[] = [];
-      if (influencerRef && productRef) {
-        // VTON mode — both slots committed to person + garment
-        content.push({ image: influencerRef.url });
-        content.push({ image: productRef.url });
-      } else if (productRef) {
-        // Product shot — studio image as visual anchor
-        if (studioRef?.url) content.push({ image: studioRef.url });
-        content.push({ image: productRef.url });
-      } else if (influencerRef) {
-        // Person shot — studio image as visual anchor
-        if (studioRef?.url) content.push({ image: studioRef.url });
-        content.push({ image: influencerRef.url });
-      } else {
-        // Pure studio / baseline — send studio + logo for maximum brand fidelity
-        if (studioRef?.url) content.push({ image: studioRef.url });
-        if (logoRef?.url)   content.push({ image: logoRef.url });
+
+      // Always lead with Studio Master [0]
+      if (studioRef?.url) {
+        content.push({ image: studioRef.url });
       }
+
+      if (influencerRef) {
+        content.push({ image: influencerRef.url });
+      } else if (productRef) {
+        content.push({ image: productRef.url });
+      }
+
       content.push({ text: prompt });
 
       console.log(`[callImageAI] Trying ${model} with ${content.length - 1} reference image(s)...`);
@@ -2241,7 +2227,7 @@ async function callImageAI(
         },
         parameters: {
           n: 1,
-          size: "1024*1536"  // portrait aspect ratio for fashion
+          size: "1024*1536"
         }
       };
 
@@ -2258,48 +2244,18 @@ async function callImageAI(
       }
 
       const data = await res.json();
-
-      // Check for task_id (async response)
-      const taskId = data.output?.task_id;
-      if (taskId) {
-        let attempts = 0;
-        while (attempts < 30) {
-          attempts++;
-          await new Promise(r => setTimeout(r, 4000));
-          const pollRes = await fetch(`https://dashscope-intl.aliyuncs.com/api/v1/tasks/${taskId}`, { headers });
-          if (!pollRes.ok) continue;
-          const pollData = await pollRes.json();
-          const status = pollData.output?.task_status;
-          if (status === "SUCCEEDED") {
-            // Image generation result may be in choices or results
-            const url = pollData.output?.results?.[0]?.url
-              || pollData.output?.choices?.[0]?.message?.content?.find((c: any) => c.image)?.image;
-            if (url) { console.log(`[callImageAI] ${model} SUCCEEDED (async)`); return url; }
-          }
-          if (status === "FAILED") {
-            console.warn(`[callImageAI] ${model} task FAILED:`, JSON.stringify(pollData));
-            break;
-          }
+      const choice = data.output?.choices?.[0]?.message?.content;
+      if (Array.isArray(choice)) {
+        for (const item of choice) {
+          if (item.image) return item.image;
         }
-        continue;
       }
-
-      // Synchronous response — extract image URL from choices
-      const imageUrl = data.output?.choices?.[0]?.message?.content?.find((c: any) => c.image)?.image
-        || data.output?.results?.[0]?.url;
-
-      if (imageUrl) {
-        console.log(`[callImageAI] ${model} SUCCEEDED (sync): ${imageUrl.substring(0, 80)}`);
-        return imageUrl;
-      }
-
-      console.warn(`[callImageAI] ${model} returned OK but no image URL found:`, JSON.stringify(data).substring(0, 300));
-    } catch (e) {
-      console.warn(`[callImageAI] ${model} threw:`, e);
+    } catch (e: any) {
+      console.warn(`[callImageAI] ${model} error:`, e.message || e);
     }
   }
 
-  // --- Strategy 2: Image editing models ---
+// --- Strategy 2: Image editing models ---
   // qwen-image-edit-max takes a base image and instruction; perfect for "dress this person in this garment"
   const editModels = ["qwen-image-edit-max", "qwen-image-edit-plus-2025-12-15"];
   const baseImageUrl = influencerRef?.url || productRef?.url;

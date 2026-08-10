@@ -14,6 +14,7 @@
  */
 
 import { SceneComposition } from "./composition.engine.ts";
+import { resolveDecorator } from "./scene.decorators.ts";
 
 export interface PromptBuilderExtras {
   referenceAnalysis?: {
@@ -47,11 +48,12 @@ A large, wide architectural arch centered on the back wall. The arch has a smoot
   MAGENTA LED TRIM: The entire inner edge of the arch (both sides and the curved top) has a BRIGHT PINK-MAGENTA (#B0208D) glowing LED strip inset. This creates a vivid magenta halo/glow on the cream wall around the arch opening. This glowing magenta arch trim is the most distinctive visual signature of this studio — it MUST be visible and accurate.
   The wall SURFACE inside the arch opening is the same smooth warm cream plaster as the back wall (#F2EBD9). The arch interior is NOT dark, NOT shadowed — it is a brightly lit, cream-coloured recess.
 
-══ ELEMENT 3: FSC LOGO (on the cream wall inside the arch) ══
-Centered horizontally in the upper section of the arch, approximately 55–70% up the arch height.
-  LOGO BAG ICON (top element): One LARGE magenta (#8B1B68) shopping bag, front and centre. Bold solid white capital letter "F" on its face — NO other text or logo on the bag. Behind-left: a smaller royal blue bag peeking out. Behind-right: a smaller lime-green bag peeking out. All bags have visible handles and volume.
-  LOGO WORDMARK (below the bag icon): "Forgiven" in bold, rounded, dark plum-magenta sans-serif lettering. Directly below: "Shopping Centre" in smaller refined lettering.
-  The logo is a physically mounted 3D wall sign with ~2cm depth, subtle drop shadow, warm specular highlights. NOT a flat 2D graphic.
+══ ELEMENT 3: OFFICIAL FSC LOGO (PRESERVE FROM STUDIO MASTER) ══
+The studio master reference image (studio.jpeg) already contains the official Forgiven Shopping Centre wall-mounted logo inside the central arch.
+  PRESERVE EXISTING LOGO: Preserve that exact wall logo from studio.jpeg as ONE physical architectural element.
+  SINGLE INSTANCE: EXACTLY ONE logo exists inside the central arch.
+  NO RECREATION: Do NOT generate, redraw, reconstruct, reinterpret, duplicate, repeat, mirror, stack, overlay, or add another logo.
+  NO SECOND WORDMARK: Do NOT render duplicate text fragments, extra "Forgiven" wordmarks, or secondary shopping bag icons.
 
 ══ ELEMENT 4: LEFT SIDE (camera-left) ══
 Far-left edge: a full-height section of deep charcoal/near-black fluted vertical wood panels (#1A1A1A). These panels have crisp vertical grooves running their full height.
@@ -69,7 +71,6 @@ Continuous large-format POLISHED CREAM MARBLE tiles covering the entire studio f
 ══ ELEMENT 7: FOREGROUND PODIUM ══
 At frame centre, in the foreground, directly in front of the arch: a LOW, WIDE circular disc pedestal made of smooth matte cream stone. Dimensions: approximately 55cm diameter, only 15–18cm tall. It is a flat, low platform — NOT a tall column or display stand. The podium sits on the marble floor at the very base of the arch.
 
-══ LIGHTING ══
 Warm, luminous studio lighting (3000K–3200K). Soft overhead key light. Warm amber sconces on both fluted panel sides. The magenta LED arch trim (#B0208D) casts a pink-magenta glow onto the surrounding cream wall. Gentle specular reflections on the marble floor and brass planter surface.
 `.trim();
 
@@ -78,17 +79,21 @@ Warm, luminous studio lighting (3000K–3200K). Soft overhead key light. Warm am
 // ════════════════════════════════════════════════════════════════════════════
 const STUDIO_NEGATIVE = `
 ABSOLUTE PROHIBITIONS — ZERO TOLERANCE:
+✗ NO DUPLICATE LOGOS. NO SECOND LOGO. NO ADDITIONAL BRAND MARKS. NO REPEATED WORDMARK. NO OVERLAPPING LOGOS. NO STACKED LOGOS. NO EXTRA F SYMBOLS. NO EXTRA SHOPPING BAG ICONS. NO ADDITIONAL WALL SIGNAGE. NO GENERATED FORGIVEN LOGO. NO RECONSTRUCTED FORGIVEN LOGO. NO SECOND BRAND SIGN.
+✗ DO NOT generate two models, twin models, or duplicate figures — EXACTLY ONE SINGLE HUMAN MODEL in the frame.
+✗ DO NOT render random acronyms, text fragments, or gibberish on the wall.
+✗ DO NOT generate wrinkled, creased, rumpled, or saggy clothing — the garment MUST be 100% freshly ironed, pressed, tailored, and pristine.
 ✗ DO NOT generate a plain tan/beige arch with no LED trim — the arch MUST have the magenta LED glow (#B0208D).
 ✗ DO NOT generate a tall rectangular display board, banner stand, or signage pillar in the centre — the ONLY centrepiece is the LOW CIRCULAR CREAM PODIUM.
 ✗ DO NOT generate a plain, minimal, or simplified studio — ALL elements (fluted panels, brass planter, shelf unit, marble floor, magenta LED arch, podium) MUST be present.
 ✗ DO NOT render any LV, Louis Vuitton monogram, or third-party logo inside the shopping bag on the wall — the bag face MUST show only a clean white capital letter "F".
 ✗ DO NOT place the model in the center of the frame blocking the logo or podium.
 ✗ DO NOT obscure, cover, or block the 3D Forgiven logo on the wall or the central arch.
+✗ NO logo redesign, NO fake logo, NO altered logo, NO missing Shopping Centre text, NO distorted shopping bag, NO duplicate logo, NO floating 2D watermark overlays.
 ✗ NO plain white background, NO plain grey backdrop, NO seamless paper roll.
 ✗ NO alternative room — no hotel lobby, office, bedroom, outdoor location, bare warehouse.
 ✗ NO harsh bright neon tubes outlining the arch — use soft, warm magenta LED cove lighting.
 ✗ NO oversized, cartoonish, or neon glowing logos on the wall.
-✗ NO floating 2D watermark overlays or digital logo stamps in post-processing.
 ✗ NO recoloured garments. The product colour from the reference image is law.
 ✗ NO mannequins. Real human models only.
 ✗ NOT a 3D render. NOT CGI. NOT illustration. NOT painting. REAL PHOTOGRAPH.
@@ -108,6 +113,7 @@ MANDATORY:
 ✓ EXACT construction — every seam, button, zipper, strap, embroidery, label.
 ✓ EXACT material — satin looks like satin (sheen, drape). Denim looks like denim (texture).
 ✓ EXACT hardware — metal tone, clasp design, zip pull, buckle shape.
+✓ IMPECCABLY IRONED & PERFECTLY FITTED — even if the vendor product reference has wrinkles or creases, the generated garment on the model MUST be 100% freshly pressed, professionally ironed, crisp, tailored, and perfectly fitted with smooth pristine fabric. ZERO wrinkles, ZERO creases.
 `.trim();
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -167,10 +173,10 @@ function renderPositioning(sc: SceneComposition): string {
   return [
     `SHOT TYPE: Full-body editorial fashion photograph. FULL LENGTH — head to toe including shoes.`,
     `CRITICAL MODEL FRAMING & POSITIONING (FSC LOOKBOOK HERO STANDARD):`,
-    `  • PROMINENT HERO MODEL SCALE: The model is tall, prominent, and clearly focused, occupying 65%–75% of the total frame height.`,
-    `  • MODEL POSITION (BESIDE PODIUM): The model stands proudly beside the central podium — at 35% frame width on the left OR 65% frame width on the right (NOT pushed into the far corner or hidden behind plants).`,
+    `  • EXACTLY ONE SINGLE HUMAN MODEL: Standing in the frame (65%-75% height). DO NOT generate two models. DO NOT generate twin figures.`,
+    `  • MODEL POSITION (BESIDE PODIUM): The model stands proudly beside the central podium at 65% frame width on the right (NOT pushed into the far corner or hidden behind plants).`,
     `  • PERFECT LIGHTING ON MODEL: Warm, luminous 3200K key light directly illuminating the model and garment. Vibrant, crisp detail, natural skin tones, zero dark corner shadows on the model.`,
-    `  • UNBLOCKED BACKGROUND BRANDING: Because the model stands beside the podium (at 35% or 65% width), the central arch, cream podium, and 3D Forgiven wall logo remain 100% visible and unblocked in the background centre.`,
+    `  • UNBLOCKED BACKGROUND BRANDING: Because the model stands beside the podium at 65% width, the central arch, cream podium, and 3D Forgiven wall logo remain 100% visible and unblocked in the background centre.`,
     compositionRules.length > 0 ? `  • Additional rules: ${compositionRules.join(" ")}` : ``,
     `CAMERA: ${sc.cameraProfile.promptDescription}`,
   ].filter(Boolean).join("\n");
@@ -188,7 +194,7 @@ export function buildPromptFromComposition(
   // Header with explicit composition rule upfront
   blocks.push(
     `Photorealistic professional fashion editorial photograph for Forgiven Shopping Centre (FSC) flagship studio shoot. ` +
-    `HERO MODEL COMPOSITION: Prominent model (65%-75% height) standing beside the central podium (at 35% or 65% width) in bright warm studio key light. Central arch, 3D Forgiven wall logo, and cream podium remain 100% unblocked in the background centre. ` +
+    `HERO MODEL COMPOSITION: Prominent model (65%-75% height) standing beside the central podium at 65% width in bright warm studio key light. Central arch, 3D Forgiven wall logo, and cream podium remain 100% unblocked in the background centre. ` +
     `Output must be indistinguishable from a real medium-format fashion photography shot.`
   );
 
@@ -248,57 +254,77 @@ export function buildPromptFromComposition(
   return blocks.filter(Boolean).join("\n\n");
 }
 
+/**
+ * Renders scene-specific decorator additions (e.g. Christmas tree for Christmas Studio,
+ * gold ribbons for Black Friday, etc.) on top of the canonical studio.
+ */
+function renderVTONSceneDecorator(sceneType: string): string | null {
+  const dec = resolveDecorator(sceneType);
+  if (!dec || dec.id === "fsc_signature" || dec.id === "studio") {
+    return null; // FSC Signature Studio is default — pure flagship studio, zero decorator additions
+  }
+
+  const zoneAdditions: string[] = [];
+  for (const [zone, items] of Object.entries(dec.targetZones)) {
+    if (items && items.length > 0) {
+      zoneAdditions.push(`  • ${zone.toUpperCase()}: ${items.join(", ")}`);
+    }
+  }
+
+  if (zoneAdditions.length === 0 && !dec.lightingModifier) return null;
+
+  const lines = [
+    `══ SCENE THEME DECORATIONS — ${dec.name.toUpperCase()} ══`,
+    `This generation uses the "${dec.name}" theme. Add the following thematic decorations and props into the studio environment (the permanent FSC studio arch, cream wall, 3D Forgiven logo, and cream podium MUST remain intact as the base structure):`,
+    ...zoneAdditions,
+  ];
+
+  if (dec.lightingModifier) {
+    lines.push(`  • SCENE LIGHTING ATMOSPHERE: ${dec.lightingModifier}`);
+  }
+
+  if (dec.forbiddenContent && dec.forbiddenContent.length > 0) {
+    lines.push(`  • SCENE PROHIBITIONS: Avoid ${dec.forbiddenContent.join(", ")}`);
+  }
+
+  return lines.join("\n");
+}
+
 // ════════════════════════════════════════════════════════════════════════════
-//  VTON STUDIO BLOCK — injected into the VTON wanPrompt as the FIRST block
+//  VTON STUDIO BLOCK — injected into the VTON wanPrompt
 // ════════════════════════════════════════════════════════════════════════════
 export function buildVTONStudioBlock(sceneType: string): string {
 
-  // ── FRAME LAYOUT CONTRACT ──────────────────────────────────────────────────
-  // This is the single most important rule. It controls spatial composition.
-  const frameLayoutContract = `
-FRAME LAYOUT CONTRACT — ABSOLUTE NON-NEGOTIABLE:
-This is a SPLIT-FRAME composition. The frame has two distinct zones:
-  LEFT/RIGHT ZONE (foreground): The HUMAN MODEL occupies this zone, standing beside and slightly in front of the central podium. The model is at either 30–38% frame width (left side) OR 62–70% frame width (right side). NEVER at 50% (dead centre).
-  CENTRE ZONE (background): The arch, back wall, cream podium, and 3D Forgiven logo occupy this zone as the unblocked background.
-
-CRITICAL POSITIONING RULES:
-✗ The model MUST NOT stand inside the arch opening or directly in front of the logo.
-✗ The model MUST NOT be centred at 50% frame width — that position belongs to the arch and logo.
-✗ The model MUST NOT block or overlap the cream circular podium that sits at frame centre.
-✓ The model stands OFF-CENTRE, beside the podium (not on it, not behind it).
-✓ The model's body faces slightly inward toward the podium — elegant editorial stance.
-✓ The model is FULL-BODY visible: head to toe including shoes, occupying 65%–75% of frame height.
-✓ Direct 3200K warm key light on the model. Zero dark shadows obscuring the model or garment.
-`.trim();
-
-  // ── LOGO LOCK ─────────────────────────────────────────────────────────────
-  // Explicit 3D architectural wall sign spec — prevents AI from rendering a flat 2D logo.
+  // ── SINGLE IMMUTABLE BRAND LOGO LOCK (PRESERVE EXISTING) ─────────────────
   const logoLock = `
-FORGIVEN SHOPPING CENTRE WALL LOGO — 3D ARCHITECTURAL SIGNAGE (LOCKED):
-The official FSC logo is a PHYSICALLY MOUNTED 3D WALL SIGN embedded in the cream plaster wall inside the arch. It has real physical depth (~2cm extrusion from the wall surface), casts a subtle shadow, and catches warm specular highlights. It is NEVER a flat 2D graphic, NEVER a cartoon illustration, NEVER a digital watermark.
-
-The logo is composed of TWO separate 3D elements stacked vertically, mounted ABOVE the podium at roughly 55–70% of the arch height:
-
-ELEMENT 1 — THE BAG ICON (top):
-  • One LARGE magenta shopping bag (#8B1B68), front and centre. On its face: a crisp, solid, bold WHITE CAPITAL LETTER "F" — NOTHING ELSE on the bag face.
-  • Behind and to the left of the large bag: a smaller royal blue bag peeking out.
-  • Behind and to the right of the large bag: a smaller lime-green bag peeking out.
-  • All three bags are 3D physical objects with volume, handles, and depth.
-
-ELEMENT 2 — THE WORDMARK (directly below the bag icon, NO horizontal gap):
-  • Line 1: "Forgiven" — bold, rounded sans-serif, dark plum/magenta (#8B1B68), 3D extruded lettering.
-  • Line 2: "Shopping Centre" — smaller, refined, same dark lettering, centred beneath "Forgiven".
-  • The wordmark is STACKED VERTICALLY, NOT side-by-side with the bags.
-
-The entire logo lockup is centred horizontally in the arch and is NOT oversized (occupies ~20–25% of arch height).
+BRAND GOVERNANCE — IMMUTABLE STUDIO BRANDING:
+The studio master reference image (studio.jpeg) already contains the official Forgiven Shopping Centre wall-mounted logo.
+PRESERVE THAT EXISTING LOGO EXACTLY AS SHOWN IN THE STUDIO MASTER REFERENCE.
+It is a single physical architectural element of the studio.
+• PRESERVE EXISTING LOGO: Preserve the single official wall logo from studio.jpeg.
+• DO NOT generate, redraw, reconstruct, reinterpret, duplicate, repeat, mirror, stack, overlay, move, resize, or add another Forgiven Shopping Centre logo.
+• EXACTLY ONE LOGO: There must be EXACTLY ONE physical Forgiven Shopping Centre logo on the studio wall.
+• NO SECOND SIGNAGE: Do NOT create additional wordmarks, shopping-bag logos, F symbols, or brand signage.
+• IMMUTABLE WALL ASSET: The existing wall logo is part of the immutable studio architecture.
 `.trim();
+
+  // ── FRAME LAYOUT CONTRACT ──────────────────────────────────────────────────
+  const frameLayoutContract = `
+HERO MODEL SPATIAL PLACEMENT CONTRACT:
+• EXACTLY ONE SINGLE HUMAN MODEL standing in the frame (occupying 65%-75% height). DO NOT generate two models. DO NOT generate twin figures.
+• POSITION: The model stands OFF-CENTRE on the RIGHT side of the podium (65% frame width), standing beside the low cream circular podium.
+• The central arch and low cream circular podium remain visible and unblocked in the background centre.
+`.trim();
+
+  const sceneOverlay = renderVTONSceneDecorator(sceneType);
 
   return [
-    logoLock,          // ← FIRST: logo is priority #1 — must appear on the wall
+    logoLock,
     frameLayoutContract,
     `BACKGROUND ENVIRONMENT — FSC SIGNATURE STUDIO (REPRODUCE EXACTLY):`,
     FSC_STUDIO_CANONICAL,
+    sceneOverlay,
     STUDIO_NEGATIVE,
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 }
 

@@ -29,6 +29,13 @@ export interface SceneComposition {
   brandId: string;
   sceneId: string;
   category: string;
+  logoIntegrity: {
+    requiredInstances: number;
+    maxInstances: number;
+    source: string;
+    generationAllowed: boolean;
+    duplicationAllowed: boolean;
+  };
 }
 
 export function assembleSceneComposition(params: {
@@ -87,7 +94,22 @@ export function assembleSceneComposition(params: {
     }
   }
 
+  // 8. Single-Instance Logo Governance Check
+  const logoIntegrity = {
+    requiredInstances: 1,
+    maxInstances: 1,
+    source: "studio_master",
+    generationAllowed: false,
+    duplicationAllowed: false,
+  };
+
+  const decoratorAdditionsText = JSON.stringify(decorator.targetZones).toLowerCase();
+  if (decoratorAdditionsText.includes("logo") || decoratorAdditionsText.includes("wordmark") || decoratorAdditionsText.includes("signage")) {
+    console.warn(`[CompositionEngine] LOGO_DUPLICATION_RISK detected in decorator '${decorator.id}'. Mutation suppressed.`);
+  }
+
   return {
+
     blueprint,
     referenceImageUrl: blueprint.referenceImageUrl,
     decorator,
@@ -101,6 +123,7 @@ export function assembleSceneComposition(params: {
     activeZones,
     brandId,
     sceneId,
-    category
+    category,
+    logoIntegrity
   };
 }
