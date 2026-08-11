@@ -3498,53 +3498,37 @@ Deno.serve(async (req) => {
     }
 
     if (action === "generate-script") {
-      const { productName, productCategory, productPrice, currency, scriptAngle = "viral_hook" } = body;
-
-      const angleGuidelines: Record<string, string> = {
-        viral_hook: "VIRAL PATTERN INTERRUPT: Open with a bold, controversial, or shocking pattern interrupt. (e.g. 'Stop buying [X] until you see this...', 'I can't believe nobody is talking about this...'). Focus on immediate curiosity.",
-        problem_solution: "PROBLEM & SECRET REVEAL: Open with a relatable pain point or outfit frustration, then reveal this product as the holy grail solution that feels like a cheat code.",
-        aesthetic_unboxing: "AESTHETIC & GRWM VIBE: Open with an ultra-aesthetic visual, whispery/chill vibe or energetic GRWM opening. Emphasize texture, fit, confidence, and compliments.",
-        honest_review: "RAW & HONEST CREATOR REVIEW: Open like an un-sponsored, brutally honest test ('Okay so I ordered this to see if the hype was real...'). Build instant trust and authenticity.",
-        fomo_drop: "URGENCY & FOMO DROP: Open with high energy excitement about an exclusive drop or viral item that keeps selling out ('If this is still in stock when you watch this, run...').",
-      };
-
-      const selectedGuideline = angleGuidelines[scriptAngle] || angleGuidelines.viral_hook;
-
-      const prompt = `You are a world-class viral TikTok/Reels Creative Director and master direct-response UGC copywriter.
-Your mission is to write a high-retention, high-converting 15-30s UGC video script engineered to go viral for:
+      const { productName, productCategory, productPrice, currency } = body;
+      const prompt = `You are an elite TikTok/Reels UGC creator and direct-response copywriter for a premium fashion brand.
+Your goal is to write a highly dynamic, viral, and high-converting 15-30s video script for this product:
 Product: "${productName}"
 Category: ${productCategory}
 Price: ${currency} ${productPrice}
-Creative Angle: ${selectedGuideline}
 
-VIRAL CONTENT FORMULA (MUST FOLLOW STRICTLY):
-1. THE HOOK (0-3s): Must stop the scroll within 1 second. Use psychological pattern interrupts, curiosity gaps, or visceral emotional hooks. Avoid boring intros like "Hey guys".
-2. RETENTION ENGINE (3-12s): High-density value or visual proof. Fast pacing (2-3s scene changes). Highlight sensory details, fit, material quality, or transformation.
-3. CONVERSION SPIKE (12-20s): Show the product in action/wear. Add social proof ("I've gotten so many compliments", "my friends literally stole mine").
-4. URGENT CTA (20-25s): Clear, natural direct action with FOMO (e.g. "Tap shop now before this batch sells out again").
+SCRIPT WRITING RULES:
+1. THE HOOK (0-3s): Must be a pattern-interrupt. Use bold statements, relatable pain points, or shocking visuals to stop the scroll immediately.
+2. THE BODY (3-15s): Fast pacing. Focus on emotional desire, styling versatility, or an exclusive 'secret' vibe. Use natural, conversational Gen-Z/Millennial creator language (not corporate marketing speak). 
+3. THE CTA (15-20s): Create urgency or FOMO (e.g., "selling out fast", "link in bio before it's gone"). Tell them exactly what to do.
+4. PACING: Keep scenes short (2-4 seconds max). Visuals must be highly dynamic (zooms, quick cuts, text pop-ups).
 
-SCRIPT FORMAT REQUIREMENTS:
-- Use natural, conversational creator language (authentic, relatable, non-cringey).
-- Provide vivid visual & camera movement directions (e.g., "Macro close-up of fabric texture", "Quick whip pan to full outfit", "Creator leans into camera").
-- Provide punchy, high-impact on-screen text overlays (max 4-5 words per scene) to lock retention for silent viewers.
-
-Return ONLY a valid JSON object matching this exact schema:
+Return ONLY a valid JSON object. DO NOT include any other text, explanations, or markdown code blocks outside the JSON.
+The JSON must follow this EXACT schema:
 {
-  "title": "Catchy viral video title",
-  "hook": "Scroll-stopping opening hook (first 3 seconds)",
+  "title": "A catchy, viral title",
+  "hook": "Strong opening hook (first 3 seconds)",
   "scenes": [
     {
       "scene": 1,
       "duration": "3s",
-      "direction": "Specific camera movement, lighting, or physical action direction",
-      "dialogue": "Exact spoken line (conversational & energetic)",
-      "text_overlay": "Punchy on-screen text caption (3-5 words max)"
+      "direction": "Detailed visual direction for the camera/creator (e.g., 'Fast zoom in on face', 'Quick transition stepping into the shoes')",
+      "dialogue": "The exact, natural-sounding words the creator speaks",
+      "text_overlay": "Punchy on-screen text overlay (max 5 words)"
     }
   ],
-  "cta": "Urgent, high-converting call to action",
-  "hashtags": ["#viral", "#fashionfinds", "#ugc", "#musthave"]
+  "cta": "Strong final call to action",
+  "hashtags": ["#fashion", "#musthave", "#style"]
 }
-Ensure there are 4-5 dynamic scenes in total.`;
+Ensure there are 4-6 scenes in total.`;
 
       const data = await callTextAI(QWEN_API_KEY, prompt);
       const content = data.choices?.[0]?.message?.content || "";
