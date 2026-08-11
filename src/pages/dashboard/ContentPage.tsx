@@ -792,6 +792,7 @@ function UGCStudio() {
   const [uploadedPreview, setUploadedPreview] = useState("");
   const [script, setScript] = useState("");
   const [scriptData, setScriptData] = useState<any>(null);
+  const [scriptAngle, setScriptAngle] = useState("viral_hook");
   const [isUGC, setIsUGC] = useState(true); // Default to True for "Real UGC"
   const [generatingAvatar, setGeneratingAvatar] = useState(false);
   const [generatingScript, setGeneratingScript] = useState(false);
@@ -876,7 +877,14 @@ function UGCStudio() {
     setGeneratingScript(true);
     try {
       const { data, error } = await supabase.functions.invoke("ugc-generate", {
-        body: { action: "generate-script", productName: selectedProd.name, productCategory: selectedProd.category, productPrice: selectedProd.price, currency: selectedProd.currency },
+        body: {
+          action: "generate-script",
+          productName: selectedProd.name,
+          productCategory: selectedProd.category,
+          productPrice: selectedProd.price,
+          currency: selectedProd.currency,
+          scriptAngle,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -1469,9 +1477,26 @@ function UGCStudio() {
                     </div>
                   </div>
                 )}
-                <Button onClick={generateScript} disabled={generatingScript || !selectedProd} className="w-full gap-2">
-                  {generatingScript ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  Generate AI Script
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-1.5 block flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-primary" /> Viral Copywriting Strategy
+                  </label>
+                  <Select value={scriptAngle} onValueChange={setScriptAngle}>
+                    <SelectTrigger className="w-full text-xs">
+                      <SelectValue placeholder="Select viral formula..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="viral_hook">🔥 Viral Pattern Interrupt (Shock & Curiosity)</SelectItem>
+                      <SelectItem value="problem_solution">💡 Problem & Secret Reveal (Holy Grail Solution)</SelectItem>
+                      <SelectItem value="aesthetic_unboxing">📦 Aesthetic & GRWM Vibe (Visual & Texture Flex)</SelectItem>
+                      <SelectItem value="honest_review">🌟 Raw & Honest Review (Un-sponsored Creator Test)</SelectItem>
+                      <SelectItem value="fomo_drop">⚡ Urgency & FOMO Drop (Flash Selling Out)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={generateScript} disabled={generatingScript || !selectedProd} className="w-full gap-2 font-bold shadow-md">
+                  {generatingScript ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-primary-foreground" />}
+                  {generatingScript ? "Drafting Viral Script..." : "Generate Viral AI Script"}
                 </Button>
                 <Textarea
                   placeholder="Script will appear here... You can also write your own."
