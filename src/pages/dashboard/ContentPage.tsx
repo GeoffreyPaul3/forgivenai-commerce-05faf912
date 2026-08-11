@@ -38,6 +38,7 @@ import ReactMarkdown from "react-markdown";
 import type { Tables } from "@/integrations/supabase/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { VariationSelector } from "@/components/VariationSelector";
+import { UGCVideoGallery, UGC_GALLERY_QUERY_KEY } from "@/components/ugc/UGCVideoGallery";
 // Removed legacy videoAssembler import as per True Motion Engine upgrade
 
 type Content = Tables<"content">;
@@ -1031,6 +1032,36 @@ function UGCStudio() {
       if (resultUrls.length > 0) {
         setVideoUrl(resultUrls[0]);
         setMultipleVideoUrls(resultUrls);
+
+        // Graceful persistence to database content table
+        try {
+          const insertPayloads = resultUrls.map((url, idx) => ({
+            type: "ugc",
+            title: `UGC Video — ${selectedProd?.name || "Product"}${resultUrls.length > 1 ? ` (${idx + 1}/${resultUrls.length})` : ""}`,
+            media_url: url,
+            product_id: selectedProduct && !selectedProduct.startsWith("live_") ? selectedProduct : null,
+            status: "published",
+            body: script || null,
+            metadata: {
+              is_ugc_video: true,
+              is_ugc_mode: isUGC,
+              product_name: selectedProd?.name || null,
+              product_category: selectedProd?.category || null,
+              avatar_gender: avatarGender,
+              avatar_ethnicity: avatarEthnicity,
+              avatar_setting: avatarSetting,
+              fidelity_score: videoFidelityScore,
+              avatar_url: currentAvatar || null,
+              generated_at: new Date().toISOString(),
+            },
+          }));
+
+          await supabase.from("content").insert(insertPayloads);
+          queryClient.invalidateQueries({ queryKey: UGC_GALLERY_QUERY_KEY });
+        } catch (persistErr) {
+          console.warn("Could not persist generated UGC video to database content table:", persistErr);
+        }
+
         toast({ title: `🎬 ${resultUrls.length} UGC Video(s) Created!`, description: "Your videos are ready to download." });
       }
     } catch (err: any) {
@@ -1620,6 +1651,9 @@ function UGCStudio() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── UGC Video Gallery ── */}
+      <UGCVideoGallery />
     </div>
   );
 }
