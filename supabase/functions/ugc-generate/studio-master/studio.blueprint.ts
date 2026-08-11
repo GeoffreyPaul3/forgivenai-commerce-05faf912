@@ -207,7 +207,7 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       name: "Full Body Fashion (85mm)",
       height_mm: 1100,
       focalLength_mm: 85,
-      promptDescription: "85mm prime lens full-length fashion shot from waist height, vertical 9:16 aspect ratio, head-to-toe framing."
+      promptDescription: "50mm/85mm full-length editorial fashion photograph, vertical 9:16 aspect ratio, complete head-to-toe framing showing the model from top of head down to shoes resting on the marble floor with zero leg cropping."
     },
     macro_90mm: {
       id: "macro_90mm",

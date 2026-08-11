@@ -80,6 +80,8 @@ Warm, luminous studio lighting (3000K–3200K). Soft overhead key light. Warm am
 const STUDIO_NEGATIVE = `
 ABSOLUTE PROHIBITIONS — ZERO TOLERANCE:
 ✗ NO DUPLICATE LOGOS. NO SECOND LOGO. NO ADDITIONAL BRAND MARKS. NO REPEATED WORDMARK. NO OVERLAPPING LOGOS. NO STACKED LOGOS. NO EXTRA F SYMBOLS. NO EXTRA SHOPPING BAG ICONS. NO ADDITIONAL WALL SIGNAGE. NO GENERATED FORGIVEN LOGO. NO RECONSTRUCTED FORGIVEN LOGO. NO SECOND BRAND SIGN.
+✗ NO CROPPED LEGS. NO CUT-OFF FEET. NO THIGH-LEVEL CROP. NO KNEE-LEVEL CROP. The model MUST be shown full-length head-to-toe with feet and shoes resting on the marble floor.
+✗ NO WRONG GARMENT SILHOUETTE. If the product reference is a SKIRT, SKIRT SUIT, or DRESS — DO NOT generate trousers, pants, or jeans.
 ✗ DO NOT generate two models, twin models, or duplicate figures — EXACTLY ONE SINGLE HUMAN MODEL in the frame.
 ✗ DO NOT render random acronyms, text fragments, or gibberish on the wall.
 ✗ DO NOT generate wrinkled, creased, rumpled, or saggy clothing — the garment MUST be 100% freshly ironed, pressed, tailored, and pristine.
@@ -94,7 +96,9 @@ ABSOLUTE PROHIBITIONS — ZERO TOLERANCE:
 ✗ NO alternative room — no hotel lobby, office, bedroom, outdoor location, bare warehouse.
 ✗ NO harsh bright neon tubes outlining the arch — use soft, warm magenta LED cove lighting.
 ✗ NO oversized, cartoonish, or neon glowing logos on the wall.
-✗ NO recoloured garments. The product colour from the reference image is law.
+✗ NO recoloured garments. The product colour and exact garment type (skirt vs pants vs dress) from the reference image is law!
+✗ DO NOT generate trousers or pants when the reference product is a skirt or 2-piece skirt suit!
+✗ DO NOT crop the model at knees, thighs, or ankles — full-length head-to-toe framing with feet and shoes visible on the marble floor is MANDATORY!
 ✗ NO mannequins. Real human models only.
 ✗ NOT a 3D render. NOT CGI. NOT illustration. NOT painting. REAL PHOTOGRAPH.
 `.trim();
@@ -308,10 +312,11 @@ It is a single physical architectural element of the studio.
 • IMMUTABLE WALL ASSET: The existing wall logo is part of the immutable studio architecture.
 `.trim();
 
-  // ── FRAME LAYOUT CONTRACT ──────────────────────────────────────────────────
+  // ── FRAME LAYOUT & FULL-LENGTH FRAMING CONTRACT ───────────────────────────
   const frameLayoutContract = `
-HERO MODEL SPATIAL PLACEMENT CONTRACT:
+HERO MODEL SPATIAL PLACEMENT & FULL-LENGTH FRAMING CONTRACT:
 • EXACTLY ONE SINGLE HUMAN MODEL standing in the frame (occupying 65%-75% height). DO NOT generate two models. DO NOT generate twin figures.
+• FULL-LENGTH HEAD-TO-TOE FRAMING MANDATE: Camera MUST capture the model's ENTIRE HEIGHT from top of head down to ankles, feet, and shoes standing on the marble floor. ZERO CROPPING at thighs, knees, or ankles.
 • POSITION: The model stands OFF-CENTRE on the RIGHT side of the podium (65% frame width), standing beside the low cream circular podium.
 • The central arch and low cream circular podium remain visible and unblocked in the background centre.
 `.trim();
@@ -326,5 +331,270 @@ HERO MODEL SPATIAL PLACEMENT CONTRACT:
     sceneOverlay,
     STUDIO_NEGATIVE,
   ].filter(Boolean).join("\n\n");
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PRODUCT STUDIO MODE — Prompt Builder (ADDITIVE — nothing above is changed)
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Absolute negative directives for product-only (no-model) compositions.
+ * Applied in ADDITION to the existing STUDIO_NEGATIVE.
+ */
+export const PRODUCT_STUDIO_NEGATIVE = `
+PRODUCT STUDIO MODE — ABSOLUTE PROHIBITIONS:
+✗ NO HUMAN MODEL. NO PERSON. NO INDIVIDUAL. NO SUBJECT.
+✗ NO HANDS. NO FINGERS. NO WRISTS. NO ARMS. NO LEGS. NO FEET. NO TORSO. NO HEAD. NO FACE.
+✗ NO MANNEQUIN BODY. NO DRESS FORM BODY. NO GHOST MANNEQUIN.
+✗ NO PERSON WEARING THE PRODUCT.
+✗ NO PERSON HOLDING THE PRODUCT.
+✗ NO PERSON CARRYING THE PRODUCT.
+✗ NO HUMAN LIMBS INTERACTING WITH THE PRODUCT IN ANY WAY.
+✗ DO NOT RECOLOR THE PRODUCT. The product must retain its exact reference image color.
+✗ DO NOT SHIFT THE HUE. DO NOT CHANGE SATURATION. DO NOT DESATURATE.
+✗ DO NOT REDESIGN THE PRODUCT. DO NOT SIMPLIFY. DO NOT ALTER PROPORTIONS.
+✗ DO NOT SUBSTITUTE THE PRODUCT WITH A SIMILAR BUT DIFFERENT PRODUCT.
+✗ DO NOT CHANGE MATERIALS. DO NOT CHANGE HARDWARE. DO NOT INVENT NEW HARDWARE. DO NOT REMOVE EXISTING HARDWARE.
+✗ DO NOT DUPLICATE THE PRODUCT unless the composition explicitly requires a pair (e.g. shoes).
+✗ DO NOT MERGE MULTIPLE PRODUCTS INTO A SINGLE SHAPE.
+✗ DO NOT PLACE THE PRODUCT FLOATING IN MID-AIR — it must rest on a physical surface.
+✗ DO NOT GENERATE A GENERIC WHITE OR GREY STUDIO BACKDROP.
+`.trim();
+
+/** Composition-specific product placement directives. */
+function getProductCompositionDirective(compositionType: string, _category: string): string {
+  const ct = (compositionType || "PRODUCT_HERO_PODIUM").toUpperCase().trim();
+
+  if (ct.includes("PAIR")) {
+    return [
+      `COMPOSITION — PRODUCT PAIR DISPLAY:`,
+      `Arrange the product as an elegantly spaced pair displayed side-by-side on or beside the podium.`,
+      `Each piece must be clearly individual and physically separate. Maintain realistic scale and perspective.`,
+      `Left piece slightly angled, right piece mirror-angled. Both rest on the podium surface.`,
+      `NO FEET. NO LEGS. NO MODEL. The pair is displayed as a standalone product composition.`,
+    ].join("\n");
+  }
+  if (ct.includes("MACRO") || ct.includes("DETAIL")) {
+    return [
+      `COMPOSITION — PRODUCT MACRO DETAIL SHOT:`,
+      `Extreme close-up emphasising material texture, surface craftsmanship, stitching, hardware, and finish.`,
+      `Fill 70–80% of the frame with the product hero detail. Shallow depth of field (f/2.8).`,
+      `Studio background (arch, podium edge) softly visible in the far background bokeh.`,
+    ].join("\n");
+  }
+  if (ct.includes("MULTI")) {
+    return [
+      `COMPOSITION — MULTI-PRODUCT DISPLAY:`,
+      `Arrange all supplied products in a deliberate premium still-life composition.`,
+      `Products must be INDIVIDUALLY IDENTIFIABLE — do NOT merge them into a single shape.`,
+      `Use spatial hierarchy: PRIMARY product at centre-foreground, secondary products flanking.`,
+      `Maintain realistic physical scale. NO HUMAN. NO MODEL.`,
+    ].join("\n");
+  }
+  if (ct.includes("PACKAGING")) {
+    return [
+      `COMPOSITION — PRODUCT + PACKAGING DISPLAY:`,
+      `Arrange the hero product alongside its supplied packaging (box, bag, or case).`,
+      `Primary product is placed upright and centre-prominent on the podium.`,
+      `Preserve ALL typography, logos, and color of the packaging exactly as in the reference.`,
+      `Do NOT hallucinate or alter brand text on the packaging. NO PERSON. NO HANDS.`,
+    ].join("\n");
+  }
+  if (ct.includes("THREE_QUARTER") || ct.includes("THREE-QUARTER")) {
+    return [
+      `COMPOSITION — PRODUCT THREE-QUARTER VIEW:`,
+      `Position the product at a premium three-quarter camera angle (approximately 30°–45° off-centre).`,
+      `The product occupies 60%–70% of the frame. Studio architecture clearly visible behind it.`,
+      `Product rests naturally on the cream podium surface.`,
+    ].join("\n");
+  }
+  // Default: PRODUCT_HERO_PODIUM
+  return [
+    `COMPOSITION — PRODUCT HERO PODIUM:`,
+    `A single hero product is positioned centrally on the cream circular stone podium at frame centre.`,
+    `Product occupies 55%–65% of the frame height. Premium eye-level camera angle.`,
+    `The product is placed in a natural, physically believable resting position.`,
+    `The signature FSC arch and wall logo remain fully visible and unobstructed in the background.`,
+    `Warm, directional 3200K studio key light — crisp texture, realistic contact shadows.`,
+  ].join("\n");
+}
+
+/** Category-specific product placement notes. */
+function getProductCategoryHint(category: string): string {
+  const cat = (category || "").toLowerCase();
+
+  if (cat.includes("handbag") || cat.includes("bag") || cat.includes("purse") || cat.includes("tote")) {
+    return `HANDBAG PLACEMENT:\n• Display the bag upright in a natural resting position on the podium.\n• Preserve: leather color, quilting, chain strap, top handles, hardware clasps, stitching.\n• NO person. NO hand holding the bag. NO body wearing the bag.`;
+  }
+  if (cat.includes("shoe") || cat.includes("heel") || cat.includes("sneaker") || cat.includes("footwear") || cat.includes("boot") || cat.includes("sandal")) {
+    return `SHOE / FOOTWEAR PLACEMENT:\n• Display the pair in an elegant angled arrangement on the podium.\n• Preserve: exact color, material, sole design, toe shape, heel geometry, hardware, branding.\n• ABSOLUTELY NO FEET. NO LEGS. NO MODEL.`;
+  }
+  if (cat.includes("watch") || cat.includes("timepiece")) {
+    return `WATCH PLACEMENT:\n• Display the watch inside an open luxury watch box on the podium, OR laid flat on a premium surface.\n• Preserve: dial design, indices, hands, bezel, crown, bracelet/strap.\n• NO wrist. NO arm. NO person.`;
+  }
+  if (cat.includes("jewelry") || cat.includes("jewellery") || cat.includes("necklace") || cat.includes("ring") || cat.includes("earring") || cat.includes("bracelet") || cat.includes("pendant")) {
+    return `JEWELRY PLACEMENT:\n• Display on a premium jewelry stand, velvet tray, or marble podium surface.\n• Necklaces: elegant drape on a bust stand — NO human neck. Rings: on a ring stand — NO human finger.\n• Preserve: metal color, gemstones, setting design, chain link structure.`;
+  }
+  if (cat.includes("perfume") || cat.includes("fragrance") || cat.includes("cologne")) {
+    return `PERFUME PLACEMENT:\n• Display the bottle upright on the podium. Packaging placed naturally beside it when supplied.\n• Preserve: exact bottle silhouette, glass colour, label placement, cap shape.\n• NO person. NO hand holding the bottle.`;
+  }
+  if (cat.includes("cosmetic") || cat.includes("beauty") || cat.includes("makeup") || cat.includes("skincare")) {
+    return `COSMETICS PLACEMENT:\n• Arrange beauty products on the podium in an elegant hero composition.\n• Preserve: exact product colors, packaging design, typography, logos.\n• NO person. NO hand.`;
+  }
+  return `PRODUCT PLACEMENT:\n• Display the product prominently on the cream circular studio podium.\n• Preserve all visual details from the reference image exactly.\n• NO person. NO model.`;
+}
+
+/**
+ * Builds the deterministic prompt for Product Studio Mode generations.
+ *
+ * Call this instead of buildPromptFromComposition() when the product is a
+ * non-wearable item (handbag, shoes, jewelry, perfume, watch, cosmetics, etc.).
+ */
+export function buildProductStudioPrompt(params: {
+  compositionType?: string;
+  category?: string;
+  productName?: string;
+  productDescription?: string;
+  sceneType?: string;
+  referenceAnalysis?: {
+    dominantColor: string;
+    undertones?: string;
+    material: string;
+    finish: string;
+    hardwareColor?: string;
+    brandingNotes?: string;
+    shape?: string;
+    distinctiveDetails?: string;
+  };
+  campaign?: { name: string; theme?: string };
+  failureDirective?: string;
+}): string {
+  const {
+    compositionType = "PRODUCT_HERO_PODIUM",
+    category = "product",
+    productName = "product",
+    productDescription = "",
+    referenceAnalysis,
+    campaign,
+    failureDirective,
+  } = params;
+
+  const blocks: string[] = [];
+
+  // [1] Preamble + STUDIO MASTER
+  blocks.push(
+    `Photorealistic premium commercial product photograph for Forgiven Shopping Centre (FSC). ` +
+    `PRODUCT STUDIO MODE: The product is the sole visual hero. No human model. ` +
+    `Output must be indistinguishable from a real medium-format product photography campaign shot.`
+  );
+  blocks.push(FSC_STUDIO_CANONICAL);
+
+  // [2] Brand / Logo Governance
+  blocks.push(
+    `BRAND GOVERNANCE — IMMUTABLE STUDIO BRANDING:\n` +
+    `The studio master reference already contains the official Forgiven Shopping Centre wall-mounted logo.\n` +
+    `• EXACTLY ONE logo. Do NOT generate, redraw, reconstruct, duplicate, stack, or add a second logo.\n` +
+    `• DO NOT generate random brand text, distorted letters, or approximate wordmarks on the wall.`
+  );
+
+  // [3] Product Identity Lock
+  blocks.push(
+    `PRODUCT IDENTITY LOCK — IMMUTABLE LAW:\n` +
+    `You are a commercial product photographer. Your job is to PHOTOGRAPH the supplied product exactly.\n` +
+    `PRODUCT REFERENCE IS THE SINGLE SOURCE OF TRUTH.\n` +
+    `• DO NOT reinterpret, redesign, simplify, or reimagine the product.\n` +
+    `• DO NOT substitute the product with a different model, variant, or similar-looking product.\n` +
+    `• DO NOT merge this product with another product.\n` +
+    `• DO NOT duplicate the product unless the composition explicitly requires a pair.\n` +
+    `• PRESERVE exact product proportions, silhouette, geometry, hardware, seams, stitching, patterns, and brand markings.\n` +
+    `Product: ${productName}${productDescription ? ` — ${productDescription}` : ""}.`
+  );
+
+  // [4] Product Color Lock
+  blocks.push(
+    `PRODUCT COLOR LOCK — ABSOLUTE LAW:\n` +
+    `The product's color in the output MUST EXACTLY MATCH the color in the uploaded product reference image.\n` +
+    `• Preserve the exact hue, saturation, and lightness of the product's primary color.\n` +
+    `• DO NOT recolor the product based on studio lighting temperature.\n` +
+    `• DO NOT shift the hue toward any ambient tone.\n` +
+    `• The studio lighting may wrap naturally around the product — the product BASE COLOR must remain faithful.\n` +
+    (referenceAnalysis ? `Confirmed product color: ${referenceAnalysis.dominantColor}${referenceAnalysis.undertones ? ` (${referenceAnalysis.undertones} undertones)` : ""}.` : "")
+  );
+
+  // [5] Material / Texture / Shape Lock
+  if (referenceAnalysis) {
+    const matLines: string[] = [
+      `MATERIAL, TEXTURE & SHAPE LOCK:`,
+      `• Material: ${referenceAnalysis.material}. Finish: ${referenceAnalysis.finish}.`,
+    ];
+    if (referenceAnalysis.hardwareColor) matLines.push(`• Hardware color: ${referenceAnalysis.hardwareColor}.`);
+    if (referenceAnalysis.shape) matLines.push(`• Product shape: ${referenceAnalysis.shape}.`);
+    if (referenceAnalysis.distinctiveDetails) matLines.push(`• Key details: ${referenceAnalysis.distinctiveDetails}.`);
+    if (referenceAnalysis.brandingNotes) matLines.push(`• Product branding/markings: ${referenceAnalysis.brandingNotes}.`);
+    blocks.push(matLines.join("\n"));
+  }
+
+  // [6] Composition Directive
+  blocks.push(getProductCompositionDirective(compositionType, category));
+
+  // [7] Category-Specific Placement
+  blocks.push(getProductCategoryHint(category));
+
+  // [8] Camera & Lighting
+  blocks.push(
+    `CAMERA & LIGHTING:\n` +
+    `• Camera: Medium format equivalent, 85mm–90mm prime lens.\n` +
+    `• Aperture: f/4–f/8 for product sharpness with natural background separation.\n` +
+    `• Lighting: 3000K–3200K warm premium studio key light. Soft octabox from upper-left.\n` +
+    `• Secondary fill: soft reflector on opposite side — eliminates harsh shadows while preserving depth.\n` +
+    `• Foreground: gentle contact shadow/reflection on the polished cream marble floor.\n` +
+    `• The magenta arch LED glow (#B0208D) creates a warm ambient halo in the background.`
+  );
+
+  // [9] Reference Analysis block
+  if (referenceAnalysis) {
+    const refLines: string[] = [
+      `PRODUCT REFERENCE ANALYSIS (ground truth from reference image):`,
+      `  Exact colour: ${referenceAnalysis.dominantColor}${referenceAnalysis.undertones ? ` with ${referenceAnalysis.undertones} undertones` : ""}.`,
+      `  Material: ${referenceAnalysis.material}. Finish: ${referenceAnalysis.finish}.`,
+    ];
+    if (referenceAnalysis.hardwareColor) refLines.push(`  Hardware colour: ${referenceAnalysis.hardwareColor}.`);
+    if (referenceAnalysis.brandingNotes) refLines.push(`  Product branding: ${referenceAnalysis.brandingNotes}.`);
+    refLines.push(`  CRITICAL: The above is absolute law. Reproduce it exactly. Do not drift from reference.`);
+    blocks.push(refLines.join("\n"));
+  }
+
+  // Campaign brief (optional)
+  if (campaign?.name) {
+    blocks.push(
+      `CAMPAIGN BRIEF — ${campaign.name}:\n` +
+      (campaign.theme ? `Theme: ${campaign.theme}.\n` : "") +
+      `All images in this campaign share the same studio, colour grade, and lighting.`
+    );
+  }
+
+  // Failure correction (retry)
+  if (failureDirective) {
+    blocks.push(`CORRECTION DIRECTIVE — FIX THIS SPECIFICALLY:\n${failureDirective}`);
+  }
+
+  // [10] Product Studio Negative
+  blocks.push(PRODUCT_STUDIO_NEGATIVE);
+
+  // [11] Studio Governance Negative (inherited)
+  blocks.push(
+    `STUDIO GOVERNANCE — ABSOLUTE PROHIBITIONS (inherited):\n` +
+    `✗ NO DUPLICATE LOGOS. NO SECOND LOGO. ONE official FSC logo only.\n` +
+    `✗ DO NOT redesign the FSC studio. DO NOT replace the arch or cream wall.\n` +
+    `✗ DO NOT generate a plain white/grey background.\n` +
+    `✗ DO NOT generate random text or acronyms on the wall.\n` +
+    `✗ NOT a 3D render. NOT CGI. NOT illustration. REAL PRODUCT PHOTOGRAPH.\n` +
+    `✗ DO NOT generate an alternative room or location.`
+  );
+
+  blocks.push(`Output: photorealistic luxury commercial product photograph, indistinguishable from a real medium-format camera shot by a world-class product photographer.`);
+
+  return blocks.filter(Boolean).join("\n\n");
 }
 

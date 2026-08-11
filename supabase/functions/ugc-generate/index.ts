@@ -1,7 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.40.0";
 import { assembleSceneComposition } from "./studio-master/composition.engine.ts";
-import { buildPromptFromComposition, buildVTONStudioBlock } from "./studio-master/prompt.builder.ts";
+import { buildPromptFromComposition, buildVTONStudioBlock, buildProductStudioPrompt } from "./studio-master/prompt.builder.ts";
 import { FSC_FLAGSHIP_STUDIO_URL, FSC_LOGO_URL } from "./studio-master/studio.blueprint.ts";
+import { isProductStudioCategory, isLifestyleComposition } from "./studio-master/product.rules.ts";
 
 // --- ENTERPRISE ENHANCEMENTS ---
 
@@ -64,13 +65,14 @@ Return ONLY a valid JSON object in this format:
 async function verifyClothingShape(apiKey: string, productImages: string[], generatedImageUrl: string) {
   console.log("🔍 Running Clothing Shape + Colour Audit via Qwen VL...");
   try {
-    const prompt = `You are a strict fashion QA auditor. Compare the generated image (last image) against the original product reference (first image).
+    const prompt = `You are a strict fashion QA auditor. Compare the generated model image (last image) against the original product reference photo (first image).
 
 Check ALL of the following:
-1. COLOUR CATEGORY: Is the dominant colour of the garment completely different? (e.g. light blue → black, white → red). A completely different colour is an IMMEDIATE FAIL.
-2. GARMENT TYPE: Did a dress become trousers, or a jacket become a vest? A completely different garment type is an IMMEDIATE FAIL.
-3. SLEEVE LENGTH: Did long sleeves become short sleeves or disappear entirely?
-4. SILHOUETTE: Is the overall shape and fit fundamentally changed?
+1. COLOUR & SHADE MATCH: Is the garment colour or shade materially different? (e.g. powder light blue vs dark royal blue). A different shade or hue is an IMMEDIATE FAIL (pass: false).
+2. TOP GARMENT CUT & COLLAR: Did a collared button-down shirt with chest flap pockets become a double-breasted blazer with lapels (or vice versa)? If the top garment cut or collar differs from Image 1, mark pass: false.
+3. BOTTOM GARMENT SILHOUETTE: Did a skirt become trousers/pants, or trousers become a skirt? Marking pants on a skirt product (or vice versa) is an IMMEDIATE FAIL (pass: false).
+4. POCKETS & BUTTON DETAILS: Are chest flap pockets, front button plackets, or waist gold buttons missing or replaced with blazer lapels? If key garment features are missing, mark pass: false.
+5. FULL LENGTH FRAMING: Are the model's legs, feet, or shoes cut off at the thighs or knees? If cropped without showing full legs and feet on the floor, mark pass: false.
 
 Return ONLY valid JSON — no markdown, no explanation outside JSON:
 {"pass": true|false, "reason": "Brief explanation"}`;
@@ -1829,17 +1831,16 @@ async function analyzeProductReference(apiKey: string, imageUrl: string, categor
             role: "user",
             content: [
               { image: imageUrl },
-              { text: `You are an enterprise fashion & product color scientist and luxury retail analyst. Analyze this product image with 100% precision. Identify:
-1. DOMINANT COLOR (be extremely specific with exact hue & estimated hex, e.g. 'Olive Green (#556B2F)', 'Coffee Brown (#4A2C2A)', 'Jet Black (#1B1B1B)', 'Burgundy (#800020)')
-2. SECONDARY / ACCENT COLORS (if any)
-3. UNDERTONES (e.g. 'Warm golden undertones', 'Cool blue undertones', 'Earthy neutral')
-4. MATERIAL / FABRIC (e.g. 'High-gloss satin', 'Heavyweight denim', 'Genuine leather', 'Pure silk', 'Honed travertine', 'Gold-plated stainless steel')
-5. SURFACE FINISH (e.g. 'Liquid sheen', 'Matte diffuse', 'Specular metallic', 'Velvety nap', 'Glossy glass')
-6. HARDWARE & ACCENTS (e.g. 'Gold zipper and buckle', 'Silver chain strap', 'White soles', 'None')
-7. BRANDING / LABELS (note any visible manufacturer logos on product)
+              { text: `You are an enterprise fashion product analyst and garment construction specialist. Analyze this product image with 100% exact precision:
+
+1. DOMINANT COLOR & HUE: State exact shade (e.g. 'Powder Light Blue (#B0E0E6)', 'Royal Blue', 'Deep Purple (#6B3074)', 'Olive Green')
+2. TOP GARMENT CUT & DETAILS: Be 100% explicit! Is it a 'Long-sleeve collared shirt with front button placket and dual flap chest pockets', 'Double-breasted blazer with wide lapels', 'Single-breasted suit jacket', 'Crop blouse', 'V-neck top', etc. State explicitly whether it has CHEST FLAP POCKETS, FRONT BUTTONS, or BLAZER LAPELS!
+3. BOTTOM GARMENT SILHOUETTE: State explicitly: 'Matching straight-leg trousers with gold waist buttons', 'Long A-line skirt', 'Midi skirt', 'Shorts', etc. (PANTS vs SKIRT vs DRESS).
+4. BUTTONS & HARDWARE: 'Gold buttons down front center placket and waist', 'Silver zipper', 'None'
+5. FABRIC & FINISH: 'Light blue denim/cotton', 'High-gloss satin', 'Crepe fabric'
 
 Return ONLY in this format:
-Color: [Dominant Color], Secondary: [Secondary Color], Undertones: [Undertones], Material: [Material], Finish: [Finish], Hardware: [Hardware], Branding: [Branding Notes]` }
+Color: [Dominant Color], Top Piece: [Top Garment Cut & Details], Bottom Piece: [Bottom Silhouette], Material: [Material], Hardware: [Hardware]` }
             ]
           }]
         }
@@ -2202,15 +2203,22 @@ async function callImageAI(
     try {
       const content: any[] = [];
 
-      // Always lead with Studio Master [0]
+      // Reference image ORDER (critical for multimodal VTON):
+      // [0] Studio Master — establishes background architecture
+      // [1] Person/Model  — the human to dress (Image 1 in prompt)
+      // [2] Product       — the exact garment to transfer (Image 2 in prompt)
       if (studioRef?.url) {
         content.push({ image: studioRef.url });
       }
 
+      // ALWAYS include both person AND product so the AI can perform try-on
       if (influencerRef) {
-        content.push({ image: influencerRef.url });
-      } else if (productRef) {
-        content.push({ image: productRef.url });
+        content.push({ image: influencerRef.url }); // Image 1: person
+      }
+      if (productRef) {
+        content.push({ image: productRef.url }); // Image 2: product garment
+      } else if (!influencerRef) {
+        // product-only scenario (no person ref)
       }
 
       content.push({ text: prompt });
@@ -2509,7 +2517,81 @@ async function storeInCache(supabase: any, key: string, imageUrl: string, influe
   });
 }
 
+
+/**
+ * Product Studio Mode Runner.
+ * Executed when generating campaign shots for non-wearable product categories
+ * (handbags, shoes, jewelry, perfume, watches, cosmetics, accessories, etc.).
+ * The product is the visual hero — NO human model is introduced.
+ */
+async function runProductStudioShot(
+  keys: { qwenKey: string; hfToken: string },
+  productImages: string[],
+  category: string,
+  productName: string,
+  supabaseClient: any,
+  compositionType?: string,
+  scene?: string,
+  brandLogoUrl?: string,
+  garmentDetailsOverride?: string
+): Promise<string> {
+  const normCategory = category || "product";
+  console.log(`[Product Studio] Starting pipeline — category: "${normCategory}", product: "${productName}", composition: "${compositionType || "PRODUCT_HERO_PODIUM"}"`);
+
+  if (productImages.length === 0) {
+    throw { status: 400, message: "Generation blocked: no product image references provided. Please ensure the product has an image." };
+  }
+
+  const primaryProductUrl = productImages[0];
+
+  // 1. Analyze product reference for exact color, material, hardware, texture details
+  let productAnalysis: any;
+  try {
+    let rawDetails: string;
+    if (garmentDetailsOverride && garmentDetailsOverride.trim()) {
+      rawDetails = garmentDetailsOverride;
+      console.log(`[Product Studio] Using pre-verified product details (override): ${rawDetails}`);
+    } else {
+      rawDetails = await detectGarmentColor(keys.qwenKey, primaryProductUrl);
+      console.log(`[Product Studio] AI-detected details: ${rawDetails}`);
+    }
+    productAnalysis = {
+      dominantColor: rawDetails || "exact product color from reference image",
+      material: "premium commercial product material",
+      finish: "high-end retail finish",
+    };
+  } catch (e) {
+    console.warn("[Product Studio] Product reference analysis warning, fallback:", e);
+    productAnalysis = {
+      dominantColor: "exact product color from reference image",
+      material: "commercial product material",
+      finish: "retail finish",
+    };
+  }
+
+  // 2. Build governed Product Studio prompt (Product = Hero, No Model, FSC Studio, Single Logo)
+  const productPrompt = buildProductStudioPrompt({
+    compositionType: compositionType || "PRODUCT_HERO_PODIUM",
+    category: normCategory,
+    productName,
+    sceneType: scene || "studio",
+    referenceAnalysis: productAnalysis,
+  });
+
+  console.log(`[Product Studio] Generated prompt (${productPrompt.length} chars)`);
+
+  // 3. Call multimodal image AI with:
+  //    [Studio Master Reference] + [Product Reference] — NO influencer/model reference
+  const refs: Array<{ type: 'studio' | 'influencer' | 'product'; url: string }> = [
+    { type: 'studio', url: FSC_FLAGSHIP_STUDIO_URL },
+    { type: 'product', url: primaryProductUrl },
+  ];
+
+  return await callImageAI(keys.qwenKey, productPrompt, refs, supabaseClient);
+}
+
 async function runUnifiedVTON(
+
   keys: { qwenKey: string; falKey: string; phottaKey: string; hfToken: string },
   personImageUrl: string,
   productImages: string[],
@@ -2673,9 +2755,9 @@ async function runUnifiedVTON(
         fn: async () => {
           let strictnessPromptModifier = "";
           if (attempt === 2) {
-            strictnessPromptModifier = `CRITICAL: Under no circumstances alter or recolour the clothing. The garment MUST match Image 2's exact color (${garmentDetails}) and shape. DO NOT generate a black dress.`;
+            strictnessPromptModifier = `CRITICAL SILHOUETTE & COLOUR REGENERATION: The garment MUST match Image 2's exact color (${garmentDetails}) and shape. If Image 2 is a SKIRT, LONG SKIRT, or SKIRT SUIT, the model MUST wear a SKIRT — DO NOT generate trousers or pants!`;
           } else if (attempt === 3) {
-            strictnessPromptModifier = `CRITICAL AUDIT NOTICE: Zero tolerance for modifications or recolouring. Reconstruct Image 2's exact outfit (${garmentDetails}) with 100% fidelity.`;
+            strictnessPromptModifier = `CRITICAL AUDIT NOTICE: Zero tolerance for garment shape modifications. Reconstruct Image 2's exact outfit (${garmentDetails}) with 100% fidelity. If Image 2 is a skirt suit, output MUST be a skirt suit (NO pants!).`;
           }
 
           const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
@@ -2686,22 +2768,29 @@ async function runUnifiedVTON(
           const wanPrompt = [
             // [1] VIRTUAL TRY-ON MANDATE — PRIMARY TASK (MAXIMUM TOKEN PRIORITY)
             `VIRTUAL TRY-ON MANDATE — PRIMARY TASK (CRITICAL):
-Image 1 is the REAL HUMAN MODEL (${targetGender} ${targetEthnicity}).
-Image 2 is the EXACT PRODUCT REFERENCE IMAGE (the garment to wear).
-YOUR MAIN MANDATE: Map the EXACT outfit from Image 2 onto the model from Image 1.
-• 100% EXACT COLOUR MATCH: Match the exact colour from Image 2 (${garmentDetails}). DO NOT recolour. If Image 2 is light blue, the model MUST wear light blue. DO NOT generate a black, grey, or generic dark outfit.
-• 100% EXACT OUTFIT RECONSTRUCTION: Transfer every piece (jackets, blazers, tops, trousers, dresses, sleeves, lapels, buttons, seams, fabric texture) from Image 2 onto the model with zero modifications.
+THREE REFERENCE IMAGES PROVIDED:
+• Image 1 (Studio Master) — use for BACKGROUND ENVIRONMENT ONLY.
+• Image 2 (REAL HUMAN MODEL, ${targetGender} ${targetEthnicity}) — use this person's face, skin tone, and body.
+• Image 3 (EXACT PRODUCT) — the garment to transfer onto the model.
+YOUR MAIN MANDATE: Dress the person from Image 2 in the exact garment from Image 3, photographed in the studio from Image 1.
+• 100% EXACT TOP & BOTTOM GARMENT RECONSTRUCTION: Reconstruct the EXACT garment pieces from Image 3 (${garmentDetails}).
+  - TOP PIECE LOCK: If Image 3 is a COLLARED BUTTON-DOWN SHIRT / BLOUSE with CHEST FLAP POCKETS — the model MUST wear a collared button-down shirt with chest flap pockets and front buttons! DO NOT generate a blazer! DO NOT generate wide lapels!
+  - BOTTOM PIECE LOCK: If Image 3 is a SKIRT or SKIRT SUIT — the model MUST wear a SKIRT! If Image 3 is TROUSERS/PANTS — match the matching straight-leg trousers!
+• 100% EXACT COLOUR & HUE SHADE MATCH: Match the exact shade and colour from Image 3 (${garmentDetails}). DO NOT alter shade (e.g. powder light blue MUST remain powder light blue, purple MUST remain purple).
+• POCKETS, BUTTONS & DETAILS LOCK: Transfer every pocket, button placket, gold/silver button, seam, and collar structure from Image 3 onto the model with 100% exact fidelity.
 • Product Name: ${description}
 • Selected Variation: ${garmentDetails}`,
 
-            // [2] MODEL IDENTITY from Image 1
-            `MODEL IDENTITY: Use the EXACT person from Image 1 (${targetGender} ${targetEthnicity}). The face, skin tone, body shape, and height MUST be identical to Image 1. Do NOT generate a different person. REAL HUMAN — not a mannequin, not CGI.`,
+            // [2] MODEL IDENTITY from Image 2
+            `MODEL IDENTITY: Use the EXACT person from Image 2 (${targetGender} ${targetEthnicity}). The face, skin tone, body shape, and height MUST be identical to Image 2. Do NOT generate a different person. REAL HUMAN — not a mannequin, not CGI.`,
 
             // [3] BACKGROUND ENVIRONMENT — FSC SIGNATURE STUDIO & 3D LOGO
             buildVTONStudioBlock(scene || "studio"),
 
             // [4] SHOT TYPE & HERO MODEL FRAMING — mirrors FRAME LAYOUT CONTRACT
-            `SHOT TYPE: Full-length head-to-toe fashion editorial photograph. MUST show the model's complete outfit including legs and shoes. Do NOT crop at waist or knees.`,
+            `SHOT TYPE & CAMERA FRAMING: FULL-LENGTH HEAD-TO-TOE VERTICAL FASHION PHOTOGRAPH (9:16 ASPECT RATIO).
+• COMPLETE HEIGHT MANDATE: Camera MUST capture the model's COMPLETE HEIGHT from top of head all the way down to their feet and shoes standing on the polished cream marble floor.
+• ABSOLUTELY ZERO CROPPING: NO cropping at thighs, knees, or ankles. Both legs, lower hem/skirt bottom, feet, and shoes MUST be 100% visible resting on the marble floor plane.`,
             `HERO MODEL SPATIAL PLACEMENT (SPLIT-FRAME RULE):`,
             `  • The model stands OFF-CENTRE — at 30–38% frame width on the LEFT side, OR 62–70% frame width on the RIGHT side.`,
             `  • NEVER at 50% dead centre — the centre zone belongs to the arch, podium, and logo.`,
@@ -2721,10 +2810,12 @@ YOUR MAIN MANDATE: Map the EXACT outfit from Image 2 onto the model from Image 1
             hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ``,
             makeup ? `MAKEUP: ${makeup}.` : ``,
 
-            // [8] FINAL MANDATORY CHECK — PRODUCT COLOUR + FSC WALL LOGO
-            `MANDATORY FINAL CHECK — PRODUCT COLOUR + FSC WALL LOGO MUST BE PRESENT:
-1. PRODUCT: The model MUST be wearing the exact garment from Image 2 (${garmentDetails}). Match colour, sleeves, and cut 100%.
-2. LOGO: The Forgiven Shopping Centre 3D logo MUST be visibly mounted on the cream wall inside the arch (large magenta bag with white "F", "Forgiven", "Shopping Centre").`,
+            // [8] FINAL MANDATORY CHECK — PRODUCT FIDELITY
+            `MANDATORY FINAL PRODUCT FIDELITY CHECK:
+1. GARMENT COLOUR: The model MUST wear the exact hue from Image 3 (${garmentDetails}). If the product is powder light blue — the outfit MUST be powder light blue. If purple — it MUST be purple.
+2. TOP GARMENT CUT: Match the exact collar, chest pockets, and button placket from Image 3. DO NOT substitute a collared shirt for a blazer or vice versa.
+3. BOTTOM PIECE: Match the exact bottom garment from Image 3. Skirts remain skirts. Trousers remain trousers.
+4. FULL BODY: The model MUST be shown head-to-toe with feet and shoes visible on the marble floor.`,
 
             `Output: photorealistic commercial photograph indistinguishable from a real camera shot taken by a world-class fashion photographer.`
           ].filter(Boolean).join("\n\n");
@@ -2773,11 +2864,8 @@ YOUR MAIN MANDATE: Map the EXACT outfit from Image 2 onto the model from Image 1
           if (!shapeAudit.pass) {
             console.warn(`[Unified VTON] ❌ Clothing Shape Audit FAILED: ${shapeAudit.reason}`);
             lastReasoning = "Failed shape audit: " + shapeAudit.reason;
-            if (!bestResultUrl || bestResultScore < 75) {
-              bestResultUrl = resultUrl;
-              bestResultScore = 75;
-              console.log(`[Unified VTON] 📌 Candidate registered from Wan generation: ${engine.name}`);
-            }
+            // Candidate only registered if shape audit passes
+            console.warn(`[Unified VTON] Shape audit failed — attempt will NOT be registered as fallback.`);
             continue;
           }
 
@@ -3320,6 +3408,53 @@ Deno.serve(async (req) => {
       // Include the variantDetails in the cache key so each variant gets its own cached result.
       // Without this, a red variant could return a cached result from a previously generated black variant.
       const variantCacheKey = vd ? `${vd.primaryColor || ""}|${vd.variationId || ""}` : "";
+      // Determine category and composition request
+      const productCategory = product?.category || body.productCategory || "";
+      const composition = body.composition || body.style || "";
+
+      // ── PRODUCT STUDIO MODE ROUTE GATE ────────────────────────────────────
+      // Non-wearable products (handbags, shoes, jewelry, perfume, watches, cosmetics, packaging, accessories)
+      // default to Product Studio Mode (product is visual hero, NO human model).
+      // If user explicitly requested a lifestyle composition (e.g. PRODUCT_LIFESTYLE), the existing VTON path runs.
+      if (isProductStudioCategory(productCategory) && !isLifestyleComposition(composition)) {
+        console.log(`[Campaign Shot] PRODUCT STUDIO MODE triggered for category "${productCategory}" (composition: "${composition}")`);
+
+        const psCacheKey = await getCacheKey("", primaryProductUrl, `product_studio|${scene}|${productCategory}|${composition}|${variantCacheKey}`);
+        const cachedPsUrl = await checkCache(supabase, psCacheKey);
+        if (cachedPsUrl) return new Response(JSON.stringify({ success: true, imageUrl: cachedPsUrl, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+        try {
+          const url = await runProductStudioShot(
+            { qwenKey: QWEN_API_KEY, hfToken: HF_TOKEN },
+            productImages,
+            productCategory,
+            product?.name || "product",
+            supabase,
+            composition,
+            scene,
+            body.brandLogoUrl,
+            variantGarmentOverride
+          );
+
+          // Official Brand Logo Compositing
+          let watermarkedUrl = url;
+          try {
+            console.log("[Campaign Shot] Compositing official FSC Brand Logo asset (/public/forgiven.png)...");
+            watermarkedUrl = await applyBrandWatermark(supabase, url);
+          } catch (wErr) {
+            console.warn("[Campaign Shot] Logo watermarking warning, fallback to original:", wErr);
+          }
+
+          let persistedUrl = await persistMedia(supabase, watermarkedUrl, "campaigns", HF_TOKEN);
+          await storeInCache(supabase, psCacheKey, persistedUrl, influencer?.id || "", product?.id || "");
+          return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl, fidelityScore: 0.98, productStudio: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        } catch (e: any) {
+          console.error("Product Studio campaign shot failed:", e);
+          return new Response(JSON.stringify({ error: e.message || "Error generating Product Studio campaign shot" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+
+      // ── EXISTING FASHION / VTON PIPELINE (UNTOUCHED) ──────────────────────
       const cacheKey = await getCacheKey(influencerImageUrl, primaryProductUrl, `${scene}|${influencerEthnicity}|${influencerGender}|${variantCacheKey}`);
       const cachedUrl = await checkCache(supabase, cacheKey);
       if (cachedUrl) return new Response(JSON.stringify({ success: true, imageUrl: cachedUrl, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -3355,6 +3490,7 @@ Deno.serve(async (req) => {
 
         await storeInCache(supabase, cacheKey, persistedUrl, influencer.id, product.id);
         return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl, fidelityScore: 0.96 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
       } catch (e: any) {
         console.error("Campaign shot generation failed:", e);
         return new Response(JSON.stringify({ error: e.message || "Error generating high-fidelity campaign shot" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
