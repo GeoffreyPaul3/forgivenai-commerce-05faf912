@@ -176,8 +176,9 @@ export const StaffPositionsManagement: React.FC = () => {
           <div className="py-6 text-center text-xs text-muted-foreground">Loading position assignments...</div>
         ) : userPositions.length === 0 ? (
           <div className="py-8 text-center text-xs text-muted-foreground font-body">
-            No custom position assignments yet. Unassigned Admins automatically inherit <strong>Managing Director</strong> access.
+            No custom position assignments yet. Unassigned Admins have <strong>Restricted Access</strong> (no executive/manager authority) until a position is assigned.
           </div>
+
         ) : (
           <div className="divide-y divide-border/50">
             {userPositions.map((up: any) => (

@@ -68,23 +68,20 @@ export async function fetchUserPermissionContext(forceRefresh = false): Promise<
       });
     }
 
-    // Backward compatibility guarantee: If user is admin and has no positions, grant all permissions and assign default Managing Director context
-    if (isAdmin && (positions.length === 0 || permissionSet.size === 0)) {
-      const { data: allPerms } = await supabase.from("permissions").select("code");
-      (allPerms || []).forEach((p: any) => permissionSet.add(p.code));
-      permissionSet.add("all.manage");
-
-      if (positions.length === 0) {
-        positions = [
-          {
-            id: "default-md-id",
-            code: "managing_director",
-            name: "Managing Director",
-            description: "Default full executive authority for Admin identity",
-          },
-        ];
-      }
+    // Unassigned Admin Policy: If user is admin but has NO assigned positions, default to Restricted / Unassigned access.
+    // Full authority (Managing Director) is only granted when explicitly assigned via Staff Positions Management.
+    if (isAdmin && positions.length === 0) {
+      positions = [
+        {
+          id: "unassigned-admin-id",
+          code: "unassigned",
+          name: "Unassigned Admin",
+          description: "Pending position assignment. Access restricted to baseline navigation.",
+        },
+      ];
+      // Do NOT grant all.manage or full permissions. Permission set remains restricted.
     }
+
 
     const context: UserPermissionContext = {
       userId: user.id,
