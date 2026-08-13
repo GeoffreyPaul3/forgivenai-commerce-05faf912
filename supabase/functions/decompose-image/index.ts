@@ -158,14 +158,26 @@ Return ONLY valid JSON, no markdown, no explanation:
     let variants: any[] = [];
 
     try {
-      const { Image } = await import("https://deno.land/x/imagescript@1.2.15/mod.ts");
-      
-      const imgRes = await fetch(imageUrl);
-      if (!imgRes.ok) throw new Error("Failed to fetch source image for cropping");
-      const imgBuffer = new Uint8Array(await imgRes.arrayBuffer());
-      const baseImage = await Image.decode(imgBuffer);
-      const W = baseImage.width;
-      const H = baseImage.height;
+      let baseImage: any = null;
+      try {
+        const JimpModule = await import("https://esm.sh/jimp@0.22.12");
+        const Jimp = JimpModule.default || JimpModule;
+        const imgRes = await fetch(imageUrl);
+        if (!imgRes.ok) throw new Error("Failed to fetch source image for cropping");
+        const imgBuffer = new Uint8Array(await imgRes.arrayBuffer());
+        baseImage = await Jimp.read(imgBuffer as any);
+      } catch (jimpErr) {
+        console.warn("Jimp primary load failed, trying fallback decode:", jimpErr);
+        const { Image } = await import("https://deno.land/x/imagescript@1.2.15/mod.ts");
+        const imgRes = await fetch(imageUrl);
+        const imgBuffer = new Uint8Array(await imgRes.arrayBuffer());
+        baseImage = await Image.decode(imgBuffer);
+      }
+
+      if (!baseImage) throw new Error("Failed to decode base image for cropping");
+
+      const W = baseImage.bitmap ? baseImage.bitmap.width : baseImage.width;
+      const H = baseImage.bitmap ? baseImage.bitmap.height : baseImage.height;
 
       console.log(`Image dimensions: ${W}x${H}, cropping ${physicalCount} sections from arrangement: ${arrangement}`);
 
@@ -177,16 +189,13 @@ Return ONLY valid JSON, no markdown, no explanation:
         const n = Math.max(1, count);
         
         if (arrangement.startsWith("front_back_")) {
-          // 2-row grid: top row = front views, bottom row = back views
-          // We take ONLY the top half (front views) and split into N equal columns
-          // Here count is total physical garments (e.g. 6), meaning 3 columns (N=3)
           const cols = Math.max(1, Math.floor(n / 2));
           const topH = Math.floor(H / 2);
           const colW = Math.floor(W / cols);
           return Array.from({ length: cols }, (_, i) => ({
             x: i * colW,
             y: 0,
-            w: i === cols - 1 ? W - i * colW : colW, // last column takes remainder
+            w: i === cols - 1 ? W - i * colW : colW,
             h: topH,
           }));
         }
@@ -212,11 +221,9 @@ Return ONLY valid JSON, no markdown, no explanation:
         }
 
         if (arrangement.startsWith("grid_")) {
-          // e.g., grid_2x2 or grid_3x2
           const parts = arrangement.split('_')[1].split('x');
           const rows = parseInt(parts[0]) || 2;
           const cols = parseInt(parts[1]) || 2;
-          
           const rowH = Math.floor(H / rows);
           const colW = Math.floor(W / cols);
           const grids = [];
@@ -233,38 +240,11 @@ Return ONLY valid JSON, no markdown, no explanation:
           return grids.slice(0, n);
         }
 
-        // Fallback
         return [{ x: 0, y: 0, w: W, h: H }];
       }
 
       const sections = getCropSections(arrangement, physicalCount, W, H);
       console.log(`Generated ${sections.length} crop sections`);
-
-      // Color Family Deduplication Map
-      const COLOR_FAMILIES: Record<string, string[]> = {
-        black:    ["black", "jet black", "jet", "ebony", "onyx", "charcoal black"],
-        white:    ["white", "ivory white", "ivory", "cream", "off-white", "pearl"],
-        red:      ["red", "cherry red", "cherry", "scarlet", "crimson", "ruby"],
-        blue:     ["blue", "cobalt blue", "cobalt", "navy", "royal blue", "sapphire", "denim", "midnight blue", "sky blue"],
-        green:    ["green", "olive green", "olive", "army green", "dark olive", "forest green", "sage", "hunter green", "moss", "khaki green"],
-        brown:    ["brown", "camel brown", "camel", "tan", "beige", "khaki", "sand", "mocha", "taupe", "coffee"],
-        pink:     ["pink", "dusty rose", "rose", "blush", "mauve", "fuchsia", "hot pink", "coral pink"],
-        purple:   ["purple", "violet", "lavender", "plum", "lilac", "grape"],
-        orange:   ["orange", "rust", "terracotta", "burnt orange", "amber"],
-        gray:     ["gray", "grey", "charcoal", "silver", "ash", "slate", "steel"],
-        burgundy: ["burgundy", "burgundy wine", "wine", "maroon", "oxblood", "bordeaux"],
-        yellow:   ["yellow", "mustard", "gold", "lemon", "golden"],
-      };
-      
-      function getColorFamily(color: string): string {
-        const c = (color || "").toLowerCase().trim();
-        for (const [family, aliases] of Object.entries(COLOR_FAMILIES)) {
-          if (aliases.some(alias => c.includes(alias) || alias.includes(c))) return family;
-        }
-        return c; // fallback
-      }
-
-      const seenColorFamilies = new Set<string>();
 
       for (let i = 0; i < sections.length; i++) {
         const section = sections[i];
@@ -274,28 +254,41 @@ Return ONLY valid JSON, no markdown, no explanation:
 
         if (section.w > 20 && section.h > 20) {
           try {
-            const clone = baseImage.clone();
-            const cropped = clone.crop(section.x, section.y, section.w, section.h);
-            
-            // Ensure minimum 256x256 resolution for AI model requirements (e.g., Wan API requires >= 240x240)
-            if (cropped.width < 256 || cropped.height < 256) {
-              const scale = Math.max(256 / cropped.width, 256 / cropped.height);
-              const targetW = Math.max(256, Math.round(cropped.width * scale));
-              const targetH = Math.max(256, Math.round(cropped.height * scale));
-              cropped.resize(targetW, targetH);
-              console.log(`[Decompose] Upscaled crop section ${i + 1} from ${section.w}x${section.h} to ${targetW}x${targetH} to satisfy minimum resolution requirements.`);
+            let croppedBuffer: Uint8Array | null = null;
+            if (baseImage.bitmap) {
+              // Jimp path
+              const clone = baseImage.clone();
+              clone.crop(section.x, section.y, section.w, section.h);
+              if (clone.bitmap.width < 256 || clone.bitmap.height < 256) {
+                const scale = Math.max(256 / clone.bitmap.width, 256 / clone.bitmap.height);
+                const targetW = Math.max(256, Math.round(clone.bitmap.width * scale));
+                const targetH = Math.max(256, Math.round(clone.bitmap.height * scale));
+                clone.resize(targetW, targetH);
+              }
+              croppedBuffer = await clone.getBufferAsync("image/png");
+            } else {
+              // ImageScript path
+              const clone = baseImage.clone();
+              const cropped = clone.crop(section.x, section.y, section.w, section.h);
+              if (cropped.width < 256 || cropped.height < 256) {
+                const scale = Math.max(256 / cropped.width, 256 / cropped.height);
+                const targetW = Math.max(256, Math.round(cropped.width * scale));
+                const targetH = Math.max(256, Math.round(cropped.height * scale));
+                cropped.resize(targetW, targetH);
+              }
+              croppedBuffer = await cropped.encode(1);
             }
 
-            const croppedBuffer = await cropped.encode(1); // PNG
+            if (croppedBuffer) {
+              const fileName = `decomposed/${crypto.randomUUID()}.png`;
+              const { error: uploadError } = await supabase.storage
+                .from("ugc-assets")
+                .upload(fileName, croppedBuffer, { contentType: "image/png" });
 
-            const fileName = `decomposed/${crypto.randomUUID()}.png`;
-            const { error: uploadError } = await supabase.storage
-              .from("ugc-assets")
-              .upload(fileName, croppedBuffer, { contentType: "image/png" });
-
-            if (!uploadError) {
-              croppedUrl = supabase.storage.from("ugc-assets").getPublicUrl(fileName).data.publicUrl;
-              console.log(`Cropped variation ${i + 1} (${itemMeta.name}): x=${section.x} y=${section.y} w=${section.w} h=${section.h} → ${croppedUrl}`);
+              if (!uploadError) {
+                croppedUrl = supabase.storage.from("ugc-assets").getPublicUrl(fileName).data.publicUrl;
+                console.log(`Cropped variation ${i + 1} (${itemMeta.name}): x=${section.x} y=${section.y} w=${section.w} h=${section.h} → ${croppedUrl}`);
+              }
             }
           } catch (cropErr) {
             console.warn(`Crop failed for section ${i + 1}:`, cropErr);
@@ -326,15 +319,28 @@ Return ONLY valid JSON, no markdown, no explanation:
         });
       }
       
-      // Update analysisResult for cache compatibility based on the deduplicated variants
       analysisResult.distinctColorCount = variants.length;
       analysisResult.garments = variants.map(v => v.details);
-      // ─────────────────────────────────────────────────────────────────────────────
 
     } catch (e) {
-      console.error("ImageScript cropping failed:", e);
-      // Fallback: single variant with the full image
-      variants.push({ url: imageUrl, details: analysisResult.garments?.[0] || {} });
+      console.error("Cropping engine failed — falling back to Qwen-analysis-only variants:", e);
+      if (detectedItems.length > 0) {
+        variants = detectedItems.map((item: any, i: number) => ({
+          url: imageUrl,
+          details: {
+            variationId: i + 1,
+            name: `${item.name} ${item.garmentType || "Garment"}`,
+            primaryColor: item.name,
+            garmentType: item.garmentType || "Garment",
+            confidence: item.confidence || 90,
+            view: "Front",
+          }
+        }));
+        analysisResult.distinctColorCount = variants.length;
+        analysisResult.garments = variants.map((v: any) => v.details);
+      } else {
+        variants.push({ url: imageUrl, details: analysisResult.garments?.[0] || {} });
+      }
     }
 
     // Update product metadata (non-breaking — only sets is_composite and variant_images)

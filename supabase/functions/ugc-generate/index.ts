@@ -1464,7 +1464,7 @@ async function generateTrueMotionVideo(apiKey: string, imageUrl: string, prompt:
   throw new Error("Kling timeout");
 }
 
-async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string, dialogueText: string = "", durationSec: number = 15) {
+async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string, dialogueText: string = "", durationSec: number = 5) {
   console.log(`Calling Alibaba Wanx Video (wan2.1-i2v-turbo) - FSC Fashion Director Engine (${durationSec}s)...`);
 
   // Build lipsync section only when dialogue is provided
@@ -1472,7 +1472,20 @@ async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string, d
     ? `\n\nLIPSYNC DIRECTION:\nThe model is speaking directly to camera. Dialogue: "${dialogueText.trim()}"\nPerform natural conversational facial expressions and realistic mouth movement while speaking the dialogue. Maintain direct eye contact with the camera. Do not exaggerate facial movement or expressions.`
     : `\n\nThe model performs silently — fully focused on professional fashion showcase movement.`;
 
-  const fashionMotionPrompt = `PROFESSIONAL FASHION VIDEO — FSC BRAND CAMPAIGN:\n\nMODEL PERFORMANCE (MANDATORY — follow exactly):\n1. CATWALK WALK: Confident heel-to-toe stride toward camera. Shoulders back, chin up, hips naturally swaying. Professional runway posture.\n2. CONTROLLED TURN: Elegant 180-degree or 360-degree fashion turn revealing the garment from all angles. Fabric flows and moves naturally.\n3. GARMENT SHOWCASE: Model's hands naturally gesture toward or adjust the garment — showcasing fabric quality, fit, and design details. Close-up fabric reveal.\n4. EDITORIAL POSE: Natural editorial finish pose — direct camera confidence, subtle smile, professional composure.${dialogueSection}\n\nProduct context: ${prompt}\n\nCAMERA & FILMING:\nVertical 9:16 portrait format. Warm lifestyle golden-hour lighting. Subtle handheld camera movement. Rack-focus pulls between model face and garment details. Fashion editorial cuts.\n\nABSOLUTE NEGATIVE CONSTRAINTS — MODEL MUST NOT DO ANY OF THE FOLLOWING:\nNo jumping. No stunts. No acrobatics. No random dancing. No TikTok dances. No martial-art-like movements. No throwing objects. No running. No falling. No repeated uncontrolled spinning. No robotic movement. No exaggerated gestures. No morphing clothing. No changing garment color or design. No distorted face. No distorted hands. No duplicate limbs. No teleporting. No sudden unexplained pose changes.\n\nDEFAULT BEHAVIOR: Controlled, elegant, believable professional fashion model performance only.`;
+  const motionContext = prompt.trim();
+  const fashionMotionPrompt = `PROFESSIONAL FASHION VIDEO — FSC BRAND CAMPAIGN:
+
+SCENE MOTION DIRECTIVE:
+${motionContext}
+${dialogueSection}
+
+FASHION PERFORMANCE CONTROLS:
+Natural professional fashion model movement. Confident runway walk, smooth subtle turn, and elegant editorial pose. Fabric moves naturally with body motion. Maintain direct camera eye contact.
+
+ABSOLUTE NEGATIVE CONSTRAINTS — MODEL MUST NOT DO ANY OF THE FOLLOWING:
+No jumping. No stunts. No acrobatics. No random dancing. No TikTok dances. No martial-art-like movements. No throwing objects. No running. No falling. No repeated uncontrolled spinning. No robotic movement. No exaggerated gestures. No morphing clothing. No changing garment color or design. No distorted face. No distorted hands. No duplicate limbs. No teleporting. No sudden unexplained pose changes.
+
+DEFAULT BEHAVIOR: Controlled, elegant, believable professional fashion model performance only.`;
   
   const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis", {
     method: "POST",
@@ -2835,7 +2848,7 @@ YOUR MAIN MANDATE: Dress the person from Image 2 in the exact garment from Image
         name: "IDM-VTON (Hugging Face Spaces)",
         available: true,
         fn: async () => {
-          return await callIDMVTONSpaces(personImageUrl, segmentedGarmentUrl, category);
+          return await callIDMVTON(keys.hfToken || "", personImageUrl, segmentedGarmentUrl, garmentDetails || category);
         }
       }
     ];
@@ -3134,17 +3147,28 @@ Deno.serve(async (req) => {
           }
         } else {
           let url;
-          if (body.useExactPhoto && referenceImage) {
+          // useExactPhoto is ONLY honoured when:
+          //  - The reference is a true user upload (base64 data URI), AND
+          //  - The user has NOT explicitly specified an ethnicity override.
+          // If an ethnicity is specified (e.g. "african"), always generate via AI so the
+          // selection is actually respected — not silently skipped by returning an old avatar.
+          const isUserUploadedBase64 = referenceImage && referenceImage.startsWith("data:");
+          const hasEthnicityOverride = !!(body.ethnicity);
+          if (body.useExactPhoto && isUserUploadedBase64 && !hasEthnicityOverride) {
             url = referenceImage;
             console.log(`[generate-avatar] Using uploaded exact photo directly without AI generation.`);
           } else {
             // Creating a baseline influencer identity portrait (no product selected)
+            // Always respects the user's chosen gender + ethnicity selection.
             const modelDesc = `Stunningly beautiful high-fashion supermodel. Striking editorial facial features.`;
-            const identityDesc = `GENDER: ${gender}. ETHNICITY/SKIN TONE: ${ethnicity} ${skinTone}.`;
+            const identityDesc = `GENDER: ${gender}. ETHNICITY/SKIN TONE: ${ethnicity} ${skinTone}. The model MUST have clearly ${ethnicity} facial features, skin tone, and appearance — this is mandatory.`;
             const styleDesc = `${hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ""} ${makeup ? `MAKEUP: ${makeup}.` : ""}`;
             const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
             const prompt = `High-end fashion portrait. ${modelDesc} ${identityDesc} ${styleDesc} SETTING: ${setting || "studio"}. ${anatomyPrompt}`;
-            url = await callImageAI(QWEN_API_KEY, prompt, referenceImage ? [{ type: 'influencer' as const, url: referenceImage }] : [], supabase);
+            console.log(`[generate-avatar] Generating fresh AI portrait for ${gender} ${ethnicity} (useExactPhoto=${body.useExactPhoto}, isBase64=${isUserUploadedBase64}, ethnicityOverride=${hasEthnicityOverride}).`);
+            // Only pass referenceImage as a style hint when it's an actual uploaded file, not a previously-generated avatar URL
+            const styleHints = isUserUploadedBase64 ? [{ type: 'influencer' as const, url: referenceImage! }] : [];
+            url = await callImageAI(QWEN_API_KEY, prompt, styleHints, supabase);
           }
           let persistedUrl = await persistMedia(supabase, url, "avatars");
           return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -3268,7 +3292,11 @@ Deno.serve(async (req) => {
 
         // --- STAGE 3: REAL MOTION GENERATION ---
         console.log("Stage 3: Generating Real AI Video Motion...");
-        const videoPrompt = `${avatarEthnicity} ${avatarGender} professional fashion model wearing ${productName}. ${productDescription || productName}. ${enterprisePrompt.prompt}`;
+        const customMotion = body.wanxMotionPrompt || body.fashionDirection || body.sceneMotion || "";
+        const motionDirective = customMotion 
+          ? customMotion 
+          : `A ${avatarEthnicity || "female"} ${avatarGender || "model"} professional fashion model walking forward in a smooth catwalk stride, gently turning to showcase ${productName}, ending with a natural editorial pose.`;
+        const videoPrompt = `Professional fashion showcase video. Model: ${avatarEthnicity || "female"} ${avatarGender || "model"}. Outfit: ${productName} (${productDescription || productName}). Motion: ${motionDirective}. Smooth, elegant runway camera movement, high fashion editorial lighting.`;
         
         try {
           if (FAL_KEY) {
@@ -3288,7 +3316,7 @@ Deno.serve(async (req) => {
           } catch (veoError) {
             console.warn("Veo failed, falling back to Wanx...", veoError);
             if (QWEN_API_KEY) {
-              videoUrl = await callWanxVideo(QWEN_API_KEY, masterFrameUrl, videoPrompt, scriptText || "", body.duration || 15);
+              videoUrl = await callWanxVideo(QWEN_API_KEY, masterFrameUrl, videoPrompt, scriptText || "", Math.min(5, Math.max(3, body.duration || 5)));
             } else {
               throw new Error("All high-motion engines failed.");
             }
@@ -3609,7 +3637,7 @@ Produce exactly 5 scenes. Music style: ${musicStyle}. Content goal: ${contentGoa
         } catch (veoError) {
           console.warn("Veo failed, falling back to Wanx...", veoError);
           if (QWEN_API_KEY) {
-            videoUrl = await callWanxVideo(QWEN_API_KEY, imageUrl, prompt, "", body.duration || 15);
+            videoUrl = await callWanxVideo(QWEN_API_KEY, imageUrl, prompt, "", Math.min(5, Math.max(3, body.duration || 5)));
           } else {
             throw new Error("Video engines unavailable.");
           }
