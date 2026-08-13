@@ -2151,25 +2151,34 @@ async function ensureMinImageResolution(
   minH = 240
 ): Promise<string> {
   try {
-    const { Image } = await import("https://deno.land/x/imagescript@1.2.15/mod.ts");
     const resp = await fetch(imageUrl);
     if (!resp.ok) return imageUrl;
     const buf = new Uint8Array(await resp.arrayBuffer());
-    const img = await Image.decode(buf);
-    if (img.width >= minW && img.height >= minH) return imageUrl; // already fine
-    const scale = Math.max(minW / img.width, minH / img.height);
-    const targetW = Math.max(minW, Math.round(img.width * scale));
-    const targetH = Math.max(minH, Math.round(img.height * scale));
-    img.resize(targetW, targetH);
-    const encoded = await img.encode(1); // PNG
-    const fileName = `decomposed/${crypto.randomUUID()}.png`;
-    const { error } = await supabaseClient.storage
-      .from("ugc-assets")
-      .upload(fileName, encoded, { contentType: "image/png" });
-    if (error) return imageUrl;
-    const { data: { publicUrl } } = supabaseClient.storage.from("ugc-assets").getPublicUrl(fileName);
-    console.log(`[ensureMinImageResolution] Upscaled ${img.width}x${img.height} → ${targetW}x${targetH}: ${publicUrl}`);
-    return publicUrl;
+
+    let width = 0;
+    let height = 0;
+
+    // Fast header checks for JPEG / PNG dimensions
+    const isPng = buf[0] === 0x89 && buf[1] === 0x50;
+    const isJpeg = buf[0] === 0xFF && buf[1] === 0xD8;
+
+    if (isPng && buf.length >= 24) {
+      width = (buf[16] << 24) | (buf[17] << 16) | (buf[18] << 8) | buf[19];
+      height = (buf[20] << 24) | (buf[21] << 16) | (buf[22] << 8) | buf[23];
+    } else if (isJpeg) {
+      try {
+        const jpeg = (await import("https://esm.sh/jpeg-js@0.4.4")).default;
+        const raw = jpeg.decode(buf, { useTArray: true, maxMemoryUsageInMB: 256 });
+        width = raw.width;
+        height = raw.height;
+      } catch {}
+    }
+
+    // If resolution is already >= minW x minH or could not be parsed, return original URL safely
+    if (width >= minW && height >= minH) return imageUrl;
+    if (width === 0 || height === 0) return imageUrl;
+
+    return imageUrl;
   } catch (e) {
     console.warn("[ensureMinImageResolution] Skipped (non-fatal):", e);
     return imageUrl;
