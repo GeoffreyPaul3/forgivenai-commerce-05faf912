@@ -803,8 +803,11 @@ function UGCStudio() {
   const [scriptPlatform, setScriptPlatform] = useState<"tiktok" | "instagram_reels" | "youtube_shorts">("tiktok");
   const [scriptMusicStyle, setScriptMusicStyle] = useState("afrobeats");
   const [scriptContentGoal, setScriptContentGoal] = useState("new_arrival");
+  const [audioTrackUrl, setAudioTrackUrl] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoElementRef = useRef<HTMLVideoElement>(null);
+  const audioElementRef = useRef<HTMLAudioElement>(null);
 
   const { data: allProducts } = useAllProducts();
   const selectedProd = allProducts?.find((p: any) => p.id === selectedProduct);
@@ -988,6 +991,7 @@ function UGCStudio() {
         if (!submitData?.pending) {
           if (submitData?.videoUrl) {
             resultUrls.push(submitData.videoUrl);
+            if (submitData?.audioUrl) setAudioTrackUrl(submitData.audioUrl);
           }
           continue;
         }
@@ -1028,6 +1032,7 @@ function UGCStudio() {
 
           if (statusData?.status === "COMPLETED" && statusData?.videoUrl) {
             resultUrls.push(statusData.videoUrl);
+            if (statusData?.audioUrl) setAudioTrackUrl(statusData.audioUrl);
             jobCompleted = true;
           } else if (statusData?.status === "FAILED") {
             throw new Error(statusData.error || "Video generation failed on Fal.ai");
@@ -1772,9 +1777,40 @@ function UGCStudio() {
                     </div>
                   )}
 
-                  <div className="aspect-[9/16] max-h-[500px] rounded-xl overflow-hidden border border-border bg-charcoal mx-auto shadow-2xl">
-                    <video src={videoUrl} controls autoPlay loop className="w-full h-full object-contain" />
+                  <div className="aspect-[9/16] max-h-[500px] rounded-xl overflow-hidden border border-border bg-charcoal mx-auto shadow-2xl relative">
+                    <video
+                      ref={videoElementRef}
+                      src={videoUrl}
+                      controls
+                      autoPlay
+                      loop
+                      onPlay={() => { if (audioElementRef.current && audioTrackUrl) audioElementRef.current.play().catch(() => {}); }}
+                      onPause={() => { if (audioElementRef.current) audioElementRef.current.pause(); }}
+                      onSeeking={() => { if (audioElementRef.current && videoElementRef.current) audioElementRef.current.currentTime = videoElementRef.current.currentTime; }}
+                      onSeeked={() => { if (audioElementRef.current && videoElementRef.current) audioElementRef.current.currentTime = videoElementRef.current.currentTime; }}
+                      onRateChange={() => { if (audioElementRef.current && videoElementRef.current) audioElementRef.current.playbackRate = videoElementRef.current.playbackRate; }}
+                      className="w-full h-full object-contain"
+                    />
+                    {audioTrackUrl && (
+                      <audio
+                        ref={audioElementRef}
+                        src={audioTrackUrl}
+                        preload="auto"
+                        loop
+                        className="hidden"
+                      />
+                    )}
                   </div>
+                  {audioTrackUrl && (
+                    <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-medium">
+                        <Volume2 className="w-4 h-4 text-emerald-500 animate-pulse" /> Audio track synchronized with model performance
+                      </span>
+                      <a href={audioTrackUrl} download="ugc-audio.mp3" target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold">
+                        Download Audio
+                      </a>
+                    </div>
+                  )}
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Button onClick={() => {
                       const a = document.createElement("a");
@@ -1782,9 +1818,9 @@ function UGCStudio() {
                       a.download = `ugc-${selectedProd?.name?.replace(/\s+/g, "-") || "video"}.mp4`;
                       a.click();
                     }} className="flex-1 gap-2 h-12" size="lg">
-                      <Download className="w-4 h-4" /> Download MP4
+                      <Download className="w-4 h-4" /> Download Video MP4
                     </Button>
-                    <Button variant="outline" onClick={() => { setVideoUrl(""); setMultipleVideoUrls([]); }} className="h-12 gap-2">
+                    <Button variant="outline" onClick={() => { setVideoUrl(""); setAudioTrackUrl(""); setMultipleVideoUrls([]); }} className="h-12 gap-2">
                       <RefreshCw className="w-4 h-4" /> Regenerate
                     </Button>
                   </div>

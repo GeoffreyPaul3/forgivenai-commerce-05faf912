@@ -1464,8 +1464,8 @@ async function generateTrueMotionVideo(apiKey: string, imageUrl: string, prompt:
   throw new Error("Kling timeout");
 }
 
-async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string, dialogueText: string = "") {
-  console.log("Calling Alibaba Wanx Video (wan2.1-i2v-turbo) - FSC Fashion Director Engine...");
+async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string, dialogueText: string = "", durationSec: number = 15) {
+  console.log(`Calling Alibaba Wanx Video (wan2.1-i2v-turbo) - FSC Fashion Director Engine (${durationSec}s)...`);
 
   // Build lipsync section only when dialogue is provided
   const dialogueSection = dialogueText.trim()
@@ -1484,7 +1484,7 @@ async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string, d
         prompt: fashionMotionPrompt
       },
       parameters: { 
-        duration: 5,
+        duration: durationSec,
         size: "720*1280",
       }
     }),
@@ -3288,7 +3288,7 @@ Deno.serve(async (req) => {
           } catch (veoError) {
             console.warn("Veo failed, falling back to Wanx...", veoError);
             if (QWEN_API_KEY) {
-              videoUrl = await callWanxVideo(QWEN_API_KEY, masterFrameUrl, videoPrompt, scriptText || "");
+              videoUrl = await callWanxVideo(QWEN_API_KEY, masterFrameUrl, videoPrompt, scriptText || "", body.duration || 15);
             } else {
               throw new Error("All high-motion engines failed.");
             }
@@ -3609,7 +3609,7 @@ Produce exactly 5 scenes. Music style: ${musicStyle}. Content goal: ${contentGoa
         } catch (veoError) {
           console.warn("Veo failed, falling back to Wanx...", veoError);
           if (QWEN_API_KEY) {
-            videoUrl = await callWanxVideo(QWEN_API_KEY, imageUrl, prompt);
+            videoUrl = await callWanxVideo(QWEN_API_KEY, imageUrl, prompt, "", body.duration || 15);
           } else {
             throw new Error("Video engines unavailable.");
           }
