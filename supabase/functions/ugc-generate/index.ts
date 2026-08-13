@@ -1464,21 +1464,15 @@ async function generateTrueMotionVideo(apiKey: string, imageUrl: string, prompt:
   throw new Error("Kling timeout");
 }
 
-async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string) {
-  console.log("Calling Alibaba Wanx Video (wan2.1-i2v-plus) - Fashion Catwalk Engine...");
-  const fashionMotionPrompt = `HIGH-ENERGY FASHION CATWALK & UGC PERFORMANCE:
+async function callWanxVideo(apiKey: string, imageUrl: string, prompt: string, dialogueText: string = "") {
+  console.log("Calling Alibaba Wanx Video (wan2.1-i2v-turbo) - FSC Fashion Director Engine...");
 
-The model confidently strides toward the camera on a runway — heel-to-toe catwalk walk, hips swaying rhythmically, shoulders back, chin up. She then:
-- Performs a full 360-degree catwalk spin showing every angle of the garment
-- Touches and shows off the fabric, collar, and sleeves with her hands
-- Gives a direct, charismatic smile and wink to camera (breaking the fourth wall like a real creator)
-- Does a slight hair-flip and adjusts outfit naturally
-- Natural lip movement as if speaking to the audience about the product
+  // Build lipsync section only when dialogue is provided
+  const dialogueSection = dialogueText.trim()
+    ? `\n\nLIPSYNC DIRECTION:\nThe model is speaking directly to camera. Dialogue: "${dialogueText.trim()}"\nPerform natural conversational facial expressions and realistic mouth movement while speaking the dialogue. Maintain direct eye contact with the camera. Do not exaggerate facial movement or expressions.`
+    : `\n\nThe model performs silently — fully focused on professional fashion showcase movement.`;
 
-Product context: ${prompt}
-
-Filming style: Vertical 9:16 portrait iPhone footage, slight handheld shake, fast dynamic cuts, closeup on garment details, cinematic rack-focus, warm golden-hour lifestyle lighting.
-Negative: static pose, slideshow, still, robotic movement, distorted face, morphing clothes, blurry.`;
+  const fashionMotionPrompt = `PROFESSIONAL FASHION VIDEO — FSC BRAND CAMPAIGN:\n\nMODEL PERFORMANCE (MANDATORY — follow exactly):\n1. CATWALK WALK: Confident heel-to-toe stride toward camera. Shoulders back, chin up, hips naturally swaying. Professional runway posture.\n2. CONTROLLED TURN: Elegant 180-degree or 360-degree fashion turn revealing the garment from all angles. Fabric flows and moves naturally.\n3. GARMENT SHOWCASE: Model's hands naturally gesture toward or adjust the garment — showcasing fabric quality, fit, and design details. Close-up fabric reveal.\n4. EDITORIAL POSE: Natural editorial finish pose — direct camera confidence, subtle smile, professional composure.${dialogueSection}\n\nProduct context: ${prompt}\n\nCAMERA & FILMING:\nVertical 9:16 portrait format. Warm lifestyle golden-hour lighting. Subtle handheld camera movement. Rack-focus pulls between model face and garment details. Fashion editorial cuts.\n\nABSOLUTE NEGATIVE CONSTRAINTS — MODEL MUST NOT DO ANY OF THE FOLLOWING:\nNo jumping. No stunts. No acrobatics. No random dancing. No TikTok dances. No martial-art-like movements. No throwing objects. No running. No falling. No repeated uncontrolled spinning. No robotic movement. No exaggerated gestures. No morphing clothing. No changing garment color or design. No distorted face. No distorted hands. No duplicate limbs. No teleporting. No sudden unexplained pose changes.\n\nDEFAULT BEHAVIOR: Controlled, elegant, believable professional fashion model performance only.`;
   
   const res = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis", {
     method: "POST",
@@ -3274,7 +3268,7 @@ Deno.serve(async (req) => {
 
         // --- STAGE 3: REAL MOTION GENERATION ---
         console.log("Stage 3: Generating Real AI Video Motion...");
-        const videoPrompt = `${avatarEthnicity} ${avatarGender} creator wearing ${productName}. ${productDescription || productName}. ${enterprisePrompt.prompt}`;
+        const videoPrompt = `${avatarEthnicity} ${avatarGender} professional fashion model wearing ${productName}. ${productDescription || productName}. ${enterprisePrompt.prompt}`;
         
         try {
           if (FAL_KEY) {
@@ -3294,7 +3288,7 @@ Deno.serve(async (req) => {
           } catch (veoError) {
             console.warn("Veo failed, falling back to Wanx...", veoError);
             if (QWEN_API_KEY) {
-              videoUrl = await callWanxVideo(QWEN_API_KEY, masterFrameUrl, videoPrompt);
+              videoUrl = await callWanxVideo(QWEN_API_KEY, masterFrameUrl, videoPrompt, scriptText || "");
             } else {
               throw new Error("All high-motion engines failed.");
             }
@@ -3498,43 +3492,93 @@ Deno.serve(async (req) => {
     }
 
     if (action === "generate-script") {
-      const { productName, productCategory, productPrice, currency } = body;
-      const prompt = `You are an elite TikTok/Reels UGC creator and direct-response copywriter for a premium fashion brand.
-Your goal is to write a highly dynamic, viral, and high-converting 15-30s video script for this product:
+      const {
+        productName, productCategory, productPrice, currency,
+        platform = "tiktok",
+        musicStyle = "afrobeats",
+        contentGoal = "new_arrival"
+      } = body;
+
+      // Platform-specific creative directives
+      const platformDirectives: Record<string, string> = {
+        tiktok: "Platform: TikTok. Prioritize: ultra-strong first-second scroll-stop, conversational Gen-Z/Millennial language, trend-aware pacing, relatable humor or honesty, fastest possible cuts.",
+        instagram_reels: "Platform: Instagram Reels. Prioritize: premium visual aesthetic, fashion/editorial feel, aspirational polished language, slightly slower editorial pacing, luxury tone.",
+        youtube_shorts: "Platform: YouTube Shorts. Prioritize: stronger storytelling arc, clearer product explanation, slight contextual setup before reveal, strong audience retention hook throughout.",
+      };
+      const platformDirective = platformDirectives[platform] || platformDirectives["tiktok"];
+
+      const prompt = `You are a Senior Fashion Social Media Creative Director and Performance Marketing Copywriter for a premium fashion retail brand (Forgiven Shopping Centre, Lilongwe, Malawi).
+
+Generate a complete viral short-form video script for the following product:
 Product: "${productName}"
 Category: ${productCategory}
 Price: ${currency} ${productPrice}
+Platform: ${platform}
+Music Style: ${musicStyle}
+Content Goal: ${contentGoal}
 
-SCRIPT WRITING RULES:
-1. THE HOOK (0-3s): Must be a pattern-interrupt. Use bold statements, relatable pain points, or shocking visuals to stop the scroll immediately.
-2. THE BODY (3-15s): Fast pacing. Focus on emotional desire, styling versatility, or an exclusive 'secret' vibe. Use natural, conversational Gen-Z/Millennial creator language (not corporate marketing speak). 
-3. THE CTA (15-20s): Create urgency or FOMO (e.g., "selling out fast", "link in bio before it's gone"). Tell them exactly what to do.
-4. PACING: Keep scenes short (2-4 seconds max). Visuals must be highly dynamic (zooms, quick cuts, text pop-ups).
+${platformDirective}
 
-Return ONLY a valid JSON object. DO NOT include any other text, explanations, or markdown code blocks outside the JSON.
-The JSON must follow this EXACT schema:
+CREATIVE BRIEF:
+You are directing a real professional fashion content creator. The video must feel like premium, platform-native fashion content that organically sells the product — never a corporate advertisement. The PRODUCT is the hero. The model is the performer. The script is the director.
+
+HOOK STRATEGY — choose the most powerful for this specific product:
+Options: curiosity | problem-solution | transformation tease | unexpected claim | fashion confession | price/value shock | POV opener | trend participation | relatable fashion problem
+
+SCENE STRUCTURE (exactly 5 scenes):
+Scene 1 — HOOK (2-3s): Pattern-interrupt. Stop the scroll within the first second. Do NOT open with 'Hey guys'.
+Scene 2 — REVEAL (2-3s): Natural product or fashion reveal. First look at the item on the model.
+Scene 3 — SHOWCASE (3-4s): Fashion showcase. Model moves confidently. Highlight key garment/product features.
+Scene 4 — BENEFIT/DETAIL (2-3s): Styling versatility, fabric quality, genuine value point, or honest social proof only.
+Scene 5 — CTA (2-3s): Natural call-to-action. Platform-appropriate. Urgency only if legitimately supported.
+
+FASHION MOTION RULES (for wanxMotionPrompt field — CRITICAL):
+The wanxMotionPrompt describes EXACTLY what the model physically does in that scene. Must use REALISTIC PROFESSIONAL FASHION BEHAVIOR ONLY.
+✅ ALLOWED: professional runway walk, confident catwalk stride, controlled 360-degree spin, garment reveal turn, fabric showcase movement, editorial pose, direct-to-camera presentation, close-up detail reveal, slow push-in on garment, model walking toward camera, model turning to reveal garment, natural hair or fabric movement, over-shoulder glance, jewelry detail reveal, handbag presentation, shoe showcase, perfume reveal, outfit adjustment
+❌ STRICTLY FORBIDDEN in wanxMotionPrompt: jumping, stunts, acrobatics, random dancing, TikTok trend dances, martial-art-like movements, throwing objects, running, falling, repeated uncontrolled spinning, exaggerated gestures, unnatural body contortions, morphing clothing, changing garment color or design
+
+MARKETING INTEGRITY:
+- Never fabricate sales numbers, customer counts, reviews, scarcity, or availability
+- Use urgency only if legitimately supported by context
+- Natural conversational language only — no corporate marketing speak
+- CTAs: 'Shop now', 'Tap the link in bio', 'Check your size', 'Send us a WhatsApp', 'View the full collection' (choose appropriate)
+
+Return ONLY a valid JSON object. No markdown. No explanation. No code block wrapper.
+Exact required schema:
 {
-  "title": "A catchy, viral title",
-  "hook": "Strong opening hook (first 3 seconds)",
+  "title": "Catchy viral video title",
+  "hook": "First 1-3 second scroll-stopping statement",
+  "platform": "${platform}",
+  "musicPrompt": "Music direction: genre, energy level, BPM range, mood, and key moment cues (example: beat drop at product reveal, soft build during showcase)",
+  "lipSyncScript": "Complete concatenated spoken dialogue from ALL scenes in sequence — only the words the model actually speaks aloud, nothing else",
   "scenes": [
     {
       "scene": 1,
       "duration": "3s",
-      "direction": "Detailed visual direction for the camera/creator (e.g., 'Fast zoom in on face', 'Quick transition stepping into the shoes')",
-      "dialogue": "The exact, natural-sounding words the creator speaks",
-      "text_overlay": "Punchy on-screen text overlay (max 5 words)"
+      "direction": "Visual production direction for this scene (same intent as fashionDirection — preserved for system compatibility)",
+      "fashionDirection": "Detailed production note: what the model does physically, how the camera moves, what the viewer sees, what emotion is conveyed",
+      "wanxMotionPrompt": "Concise 5-10 word motion directive for AI video model — realistic fashion behavior only (example: confident runway walk toward camera)",
+      "dialogue": "Exact words the model speaks aloud — short, punchy, lipsync-ready, maximum 15 words per scene",
+      "lipSyncCue": "Complete verbatim TTS-ready spoken line for this scene",
+      "musicCue": "What the music is doing in this scene (example: beat builds, drop hits, soft melody, silence for effect)",
+      "text_overlay": "On-screen caption text (maximum 5 words)"
     }
   ],
-  "cta": "Strong final call to action",
+  "cta": "Final call-to-action line",
   "hashtags": ["#fashion", "#musthave", "#style"]
 }
-Ensure there are 4-6 scenes in total.`;
+Produce exactly 5 scenes. Music style: ${musicStyle}. Content goal: ${contentGoal}.`;
 
-      const data = await callTextAI(QWEN_API_KEY, prompt);
+      const data = await callTextAI(QWEN_API_KEY, prompt, "qwen-plus");
       const content = data.choices?.[0]?.message?.content || "";
       const jsonMatch = content.match(/\{[\s\S]*\}/);
-      const scriptData = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-      return new Response(JSON.stringify({ success: true, scriptData }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      let scriptData = null;
+      try {
+        scriptData = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+      } catch (parseErr) {
+        console.warn("[generate-script] JSON parse error:", parseErr);
+      }
+      return new Response(JSON.stringify({ success: true, scriptData, rawContent: content }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "generate-tts") {

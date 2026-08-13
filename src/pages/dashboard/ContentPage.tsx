@@ -800,6 +800,9 @@ function UGCStudio() {
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoFidelityScore, setVideoFidelityScore] = useState<number | null>(null);
   const [multipleVideoUrls, setMultipleVideoUrls] = useState<string[]>([]);
+  const [scriptPlatform, setScriptPlatform] = useState<"tiktok" | "instagram_reels" | "youtube_shorts">("tiktok");
+  const [scriptMusicStyle, setScriptMusicStyle] = useState("afrobeats");
+  const [scriptContentGoal, setScriptContentGoal] = useState("new_arrival");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -876,7 +879,16 @@ function UGCStudio() {
     setGeneratingScript(true);
     try {
       const { data, error } = await supabase.functions.invoke("ugc-generate", {
-        body: { action: "generate-script", productName: selectedProd.name, productCategory: selectedProd.category, productPrice: selectedProd.price, currency: selectedProd.currency },
+        body: {
+          action: "generate-script",
+          productName: selectedProd.name,
+          productCategory: selectedProd.category,
+          productPrice: selectedProd.price,
+          currency: selectedProd.currency,
+          platform: scriptPlatform,
+          musicStyle: scriptMusicStyle,
+          contentGoal: scriptContentGoal,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -956,7 +968,7 @@ function UGCStudio() {
           variantDetails: variant.details,
           isUGC,
           setting: avatarSetting,
-          scriptText: script
+          scriptText: scriptData?.lipSyncScript || script
         };
 
         if (uploadedFile && uploadedFile.type.startsWith("image/")) {
@@ -1006,7 +1018,7 @@ function UGCStudio() {
               productName: selectedProd.name,
               voiceId: body.voiceId,
               musicPrompt: body.musicPrompt,
-              scriptText: script,
+              scriptText: scriptData?.lipSyncScript || script,
               setting: avatarSetting,
             }
           });
@@ -1456,10 +1468,11 @@ function UGCStudio() {
         {step === 3 && (
           <motion.div key="step3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+              <div className="rounded-xl border border-border bg-card p-6 space-y-5">
                 <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
-                  <FileText className="w-5 h-5" /> Video Script
+                  <FileText className="w-5 h-5 text-primary" /> Social Media Director Script
                 </h3>
+                
                 {selectedProd && (
                   <div className="rounded-lg bg-muted/50 p-3 flex items-center gap-3">
                     {selectedProd.images?.[0] && <img src={selectedProd.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />}
@@ -1469,34 +1482,164 @@ function UGCStudio() {
                     </div>
                   </div>
                 )}
-                <Button onClick={generateScript} disabled={generatingScript || !selectedProd} className="w-full gap-2">
+
+                {/* ── Platform Selector ── */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground font-heading uppercase tracking-wider">Target Platform</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "tiktok", label: "TikTok", icon: "🎵" },
+                      { id: "instagram_reels", label: "Reels", icon: "📸" },
+                      { id: "youtube_shorts", label: "Shorts", icon: "▶️" },
+                    ].map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setScriptPlatform(p.id as any)}
+                        className={`px-3 py-2 rounded-lg text-xs font-medium border flex items-center justify-center gap-1.5 transition-all ${
+                          scriptPlatform === p.id
+                            ? "border-primary bg-primary/10 text-primary font-bold shadow-sm"
+                            : "border-border bg-muted/20 text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <span>{p.icon}</span> {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Music Style Selector ── */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground font-heading uppercase tracking-wider">Music Direction</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: "afrobeats", label: "Afrobeats 🪘" },
+                      { id: "amapiano", label: "Amapiano 🎹" },
+                      { id: "y2k_pop", label: "Y2K Pop ✨" },
+                      { id: "drill_trap", label: "Drill/Trap 🔥" },
+                      { id: "lofi_fashion", label: "Lo-Fi 🌙" },
+                      { id: "luxury_editorial", label: "Luxury 💎" },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setScriptMusicStyle(m.id)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                          scriptMusicStyle === m.id
+                            ? "border-primary bg-primary text-primary-foreground font-semibold"
+                            : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Content Goal Selector ── */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground font-heading uppercase tracking-wider">Campaign Goal</label>
+                  <Select value={scriptContentGoal} onValueChange={setScriptContentGoal}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select goal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new_arrival">New Arrival / Drop 🚀</SelectItem>
+                      <SelectItem value="product_launch">Flagship Product Launch 🔥</SelectItem>
+                      <SelectItem value="fashion_inspiration">Styling & Inspiration ✨</SelectItem>
+                      <SelectItem value="promotional">Special Offer / Sale 🏷️</SelectItem>
+                      <SelectItem value="brand_awareness">Brand Awareness 🌟</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button onClick={generateScript} disabled={generatingScript || !selectedProd} className="w-full gap-2 font-semibold">
                   {generatingScript ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  Generate AI Script
+                  Generate Viral Marketing Script
                 </Button>
+
                 <Textarea
-                  placeholder="Script will appear here... You can also write your own."
+                  placeholder="Script markdown or custom dialogue will appear here..."
                   value={script}
                   onChange={e => setScript(e.target.value)}
-                  className="min-h-[200px] font-body text-sm"
+                  className="min-h-[160px] font-body text-xs"
                 />
               </div>
-              <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-                <h3 className="font-heading text-lg font-semibold">Script Preview</h3>
-                {script ? (
-                  <div className="rounded-lg border border-border bg-muted/30 p-4 max-h-[400px] overflow-y-auto">
-                    <div className="prose prose-sm max-w-none font-body prose-headings:font-heading prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground">
-                      <ReactMarkdown>{script}</ReactMarkdown>
+
+              <div className="rounded-xl border border-border bg-card p-6 space-y-4 flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
+                      <Film className="w-5 h-5 text-primary" /> Director's Scene Brief
+                    </h3>
+                    {scriptData?.platform && (
+                      <Badge variant="outline" className="text-xs uppercase tracking-wider">
+                        {scriptData.platform}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {scriptData?.scenes ? (
+                    <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+                      {scriptData.musicPrompt && (
+                        <div className="p-2.5 rounded-lg bg-primary/5 border border-primary/20 text-xs text-primary flex items-center gap-2">
+                          <Volume2 className="w-4 h-4 shrink-0" />
+                          <span className="font-medium line-clamp-2"><strong>Music:</strong> {scriptData.musicPrompt}</span>
+                        </div>
+                      )}
+                      
+                      {scriptData.scenes.map((scene: any, idx: number) => (
+                        <div key={idx} className="p-3 rounded-lg border border-border bg-muted/20 space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between font-heading font-semibold text-primary">
+                            <span>Scene {scene.scene || idx + 1} ({scene.duration || "3s"})</span>
+                            {scene.text_overlay && (
+                              <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">
+                                📝 {scene.text_overlay}
+                              </Badge>
+                            )}
+                          </div>
+                          {scene.fashionDirection && (
+                            <p className="text-muted-foreground italic font-body text-[11px]">
+                              🎬 <strong>Action:</strong> {scene.fashionDirection}
+                            </p>
+                          )}
+                          {scene.wanxMotionPrompt && (
+                            <p className="text-emerald-600 dark:text-emerald-400 font-mono text-[10px]">
+                              ⚡ <strong>Motion Prompt:</strong> {scene.wanxMotionPrompt}
+                            </p>
+                          )}
+                          {scene.dialogue && (
+                            <p className="font-semibold text-foreground font-body">
+                              💬 &quot;{scene.dialogue}&quot;
+                            </p>
+                          )}
+                        </div>
+                      ))}
+
+                      {scriptData.cta && (
+                        <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 font-semibold flex items-center gap-2">
+                          <Zap className="w-4 h-4 shrink-0" />
+                          <span><strong>CTA:</strong> {scriptData.cta}</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-border bg-muted/20 p-8 text-center">
-                    <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
-                    <p className="text-xs text-muted-foreground">Generate or write a script</p>
-                  </div>
-                )}
+                  ) : script ? (
+                    <div className="rounded-lg border border-border bg-muted/30 p-4 max-h-[400px] overflow-y-auto">
+                      <div className="prose prose-sm max-w-none font-body prose-headings:font-heading prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground">
+                        <ReactMarkdown>{script}</ReactMarkdown>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border bg-muted/20 p-8 text-center">
+                      <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
+                      <p className="text-xs text-muted-foreground">Select options & generate script</p>
+                    </div>
+                  )}
+                </div>
+
                 {script && (
-                  <Button onClick={() => setStep(4)} className="w-full gap-2">
-                    Continue to Frames <ChevronRight className="w-4 h-4" />
+                  <Button onClick={() => setStep(4)} className="w-full gap-2 font-semibold">
+                    Continue to Render <ChevronRight className="w-4 h-4" />
                   </Button>
                 )}
               </div>
