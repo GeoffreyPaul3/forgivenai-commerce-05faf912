@@ -1,10 +1,106 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import jpeg from "https://esm.sh/jpeg-js@0.4.4";
+import { PNG } from "https://esm.sh/pngjs@6.0.0/browser";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+async function decodeImageToRGBA(imgBuffer: Uint8Array): Promise<{ width: number; height: number; data: Uint8Array }> {
+  // Check magic bytes for format identification
+  const isPng = imgBuffer[0] === 0x89 && imgBuffer[1] === 0x50;
+  const isJpeg = imgBuffer[0] === 0xFF && imgBuffer[1] === 0xD8;
+
+  if (isPng) {
+    try {
+      const png = PNG.sync.read(imgBuffer);
+      return { width: png.width, height: png.height, data: new Uint8Array(png.data) };
+    } catch (e) {
+      console.warn("PNG decode failed, trying JPEG/WebP fallbacks:", e);
+    }
+  }
+  
+  if (isJpeg) {
+    try {
+      const raw = jpeg.decode(imgBuffer, { useTArray: true, maxMemoryUsageInMB: 512 });
+      if (raw && raw.data && raw.width && raw.height) {
+        return { width: raw.width, height: raw.height, data: new Uint8Array(raw.data) };
+      }
+    } catch (e) {
+      console.warn("JPEG decode failed, trying PNG/WebP fallbacks:", e);
+    }
+  }
+
+  // WebP decode via @jsquash/webp or fallback PNG/JPEG sync
+  try {
+    const decodeWebpModule = await import("https://esm.sh/@jsquash/webp@1.2.0/decode.js");
+    const decodeWebp = decodeWebpModule.default || decodeWebpModule;
+    const raw = await decodeWebp(imgBuffer);
+    if (raw && raw.data && raw.width && raw.height) {
+      return { width: raw.width, height: raw.height, data: new Uint8Array(raw.data) };
+    }
+  } catch (webpErr) {
+    console.warn("WebP decode attempt failed:", webpErr);
+  }
+
+  // Generic fallbacks
+  try {
+    const png = PNG.sync.read(imgBuffer);
+    return { width: png.width, height: png.height, data: new Uint8Array(png.data) };
+  } catch {}
+
+  try {
+    const raw = jpeg.decode(imgBuffer, { useTArray: true, maxMemoryUsageInMB: 512 });
+    if (raw && raw.data && raw.width && raw.height) {
+      return { width: raw.width, height: raw.height, data: new Uint8Array(raw.data) };
+    }
+  } catch {}
+
+  throw new Error("Could not decode image pixels (unsupported format or corrupted file)");
+}
+
+function cropRGBA(srcData: Uint8Array, srcW: number, srcH: number, x: number, y: number, w: number, h: number): { data: Uint8Array; width: number; height: number } {
+  const startX = Math.max(0, Math.min(Math.floor(x), srcW - 1));
+  const startY = Math.max(0, Math.min(Math.floor(y), srcH - 1));
+  const cropW = Math.max(1, Math.min(Math.floor(w), srcW - startX));
+  const cropH = Math.max(1, Math.min(Math.floor(h), srcH - startY));
+
+  const dstData = new Uint8Array(cropW * cropH * 4);
+  for (let row = 0; row < cropH; row++) {
+    const srcOffset = ((startY + row) * srcW + startX) * 4;
+    const dstOffset = (row * cropW) * 4;
+    dstData.set(srcData.subarray(srcOffset, srcOffset + cropW * 4), dstOffset);
+  }
+  return { data: dstData, width: cropW, height: cropH };
+}
+
+function resizeRGBA(srcData: Uint8Array, srcW: number, srcH: number, dstW: number, dstH: number): Uint8Array {
+  const dstData = new Uint8Array(dstW * dstH * 4);
+  const xRatio = srcW / dstW;
+  const yRatio = srcH / dstH;
+
+  for (let y = 0; y < dstH; y++) {
+    for (let x = 0; x < dstW; x++) {
+      const px = Math.floor(x * xRatio);
+      const py = Math.floor(y * yRatio);
+      const srcIdx = (py * srcW + px) * 4;
+      const dstIdx = (y * dstW + x) * 4;
+      dstData[dstIdx] = srcData[srcIdx];         // R
+      dstData[dstIdx + 1] = srcData[srcIdx + 1]; // G
+      dstData[dstIdx + 2] = srcData[srcIdx + 2]; // B
+      dstData[dstIdx + 3] = srcData[srcIdx + 3]; // A
+    }
+  }
+  return dstData;
+}
+
+function encodeRGBAToPNG(data: Uint8Array, width: number, height: number): Uint8Array {
+  const png = new PNG({ width, height });
+  png.data = data;
+  return new Uint8Array(PNG.sync.write(png));
+}
 
 async function persistMedia(supabaseClient: any, mediaUrl: string, folder: string) {
   try {
@@ -70,7 +166,6 @@ serve(async (req) => {
     const supabase = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
 
     // 1. Robust Cache Invalidation
-    // Generate a SHA-256 hash of the productId + imageUrl combination
     const hashData = new TextEncoder().encode(`${productId || 'no-id'}_${imageUrl}`);
     const hashBuffer = await crypto.subtle.digest("SHA-256", hashData);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -158,31 +253,16 @@ Return ONLY valid JSON, no markdown, no explanation:
     let variants: any[] = [];
 
     try {
-      let baseImage: any = null;
-      try {
-        const JimpModule = await import("https://esm.sh/jimp@0.22.12");
-        const Jimp = JimpModule.default || JimpModule;
-        const imgRes = await fetch(imageUrl);
-        if (!imgRes.ok) throw new Error("Failed to fetch source image for cropping");
-        const imgBuffer = new Uint8Array(await imgRes.arrayBuffer());
-        baseImage = await Jimp.read(imgBuffer as any);
-      } catch (jimpErr) {
-        console.warn("Jimp primary load failed, trying fallback decode:", jimpErr);
-        const { Image } = await import("https://deno.land/x/imagescript@1.2.15/mod.ts");
-        const imgRes = await fetch(imageUrl);
-        const imgBuffer = new Uint8Array(await imgRes.arrayBuffer());
-        baseImage = await Image.decode(imgBuffer);
-      }
+      const imgRes = await fetch(imageUrl);
+      if (!imgRes.ok) throw new Error("Failed to fetch source image for cropping");
+      const imgBuffer = new Uint8Array(await imgRes.arrayBuffer());
 
-      if (!baseImage) throw new Error("Failed to decode base image for cropping");
-
-      const W = baseImage.bitmap ? baseImage.bitmap.width : baseImage.width;
-      const H = baseImage.bitmap ? baseImage.bitmap.height : baseImage.height;
+      const rawImage = await decodeImageToRGBA(imgBuffer);
+      const W = rawImage.width;
+      const H = rawImage.height;
 
       console.log(`Image dimensions: ${W}x${H}, cropping ${physicalCount} sections from arrangement: ${arrangement}`);
 
-      // ── Algorithmic Equal-Division Cropping ──────────────────────────────────────
-      
       type CropBox = { x: number; y: number; w: number; h: number };
 
       function getCropSections(arrangement: string, count: number, W: number, H: number): CropBox[] {
@@ -254,41 +334,26 @@ Return ONLY valid JSON, no markdown, no explanation:
 
         if (section.w > 20 && section.h > 20) {
           try {
-            let croppedBuffer: Uint8Array | null = null;
-            if (baseImage.bitmap) {
-              // Jimp path
-              const clone = baseImage.clone();
-              clone.crop(section.x, section.y, section.w, section.h);
-              if (clone.bitmap.width < 256 || clone.bitmap.height < 256) {
-                const scale = Math.max(256 / clone.bitmap.width, 256 / clone.bitmap.height);
-                const targetW = Math.max(256, Math.round(clone.bitmap.width * scale));
-                const targetH = Math.max(256, Math.round(clone.bitmap.height * scale));
-                clone.resize(targetW, targetH);
-              }
-              croppedBuffer = await clone.getBufferAsync("image/png");
-            } else {
-              // ImageScript path
-              const clone = baseImage.clone();
-              const cropped = clone.crop(section.x, section.y, section.w, section.h);
-              if (cropped.width < 256 || cropped.height < 256) {
-                const scale = Math.max(256 / cropped.width, 256 / cropped.height);
-                const targetW = Math.max(256, Math.round(cropped.width * scale));
-                const targetH = Math.max(256, Math.round(cropped.height * scale));
-                cropped.resize(targetW, targetH);
-              }
-              croppedBuffer = await cropped.encode(1);
+            let cropped = cropRGBA(rawImage.data, rawImage.width, rawImage.height, section.x, section.y, section.w, section.h);
+            
+            if (cropped.width < 256 || cropped.height < 256) {
+              const scale = Math.max(256 / cropped.width, 256 / cropped.height);
+              const targetW = Math.max(256, Math.round(cropped.width * scale));
+              const targetH = Math.max(256, Math.round(cropped.height * scale));
+              const resizedData = resizeRGBA(cropped.data, cropped.width, cropped.height, targetW, targetH);
+              cropped = { data: resizedData, width: targetW, height: targetH };
             }
 
-            if (croppedBuffer) {
-              const fileName = `decomposed/${crypto.randomUUID()}.png`;
-              const { error: uploadError } = await supabase.storage
-                .from("ugc-assets")
-                .upload(fileName, croppedBuffer, { contentType: "image/png" });
+            const croppedBuffer = encodeRGBAToPNG(cropped.data, cropped.width, cropped.height);
 
-              if (!uploadError) {
-                croppedUrl = supabase.storage.from("ugc-assets").getPublicUrl(fileName).data.publicUrl;
-                console.log(`Cropped variation ${i + 1} (${itemMeta.name}): x=${section.x} y=${section.y} w=${section.w} h=${section.h} → ${croppedUrl}`);
-              }
+            const fileName = `decomposed/${crypto.randomUUID()}.png`;
+            const { error: uploadError } = await supabase.storage
+              .from("ugc-assets")
+              .upload(fileName, croppedBuffer, { contentType: "image/png" });
+
+            if (!uploadError) {
+              croppedUrl = supabase.storage.from("ugc-assets").getPublicUrl(fileName).data.publicUrl;
+              console.log(`Cropped variation ${i + 1} (${itemMeta.name}): x=${section.x} y=${section.y} w=${section.w} h=${section.h} → ${croppedUrl}`);
             }
           } catch (cropErr) {
             console.warn(`Crop failed for section ${i + 1}:`, cropErr);
@@ -318,12 +383,12 @@ Return ONLY valid JSON, no markdown, no explanation:
           }
         });
       }
-      
+
       analysisResult.distinctColorCount = variants.length;
       analysisResult.garments = variants.map(v => v.details);
 
     } catch (e) {
-      console.error("Cropping engine failed — falling back to Qwen-analysis-only variants:", e);
+      console.error("Pure JS cropping engine failed — falling back to Qwen-analysis-only variants:", e);
       if (detectedItems.length > 0) {
         variants = detectedItems.map((item: any, i: number) => ({
           url: imageUrl,

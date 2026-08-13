@@ -3008,16 +3008,21 @@ Deno.serve(async (req) => {
 
     // Only add payload URLs if we didn't already get authoritative DB images
     if (inventoryImages.length === 0) {
-      addCandidates(body.productImageUrl);
-      addCandidates(body.product?.images);
-      addCandidates(body.product?.side_images);
-      addCandidates(body.product?.closeups);
-      addCandidates(body.product?.textures);
-      addCandidates(body.side_images);
-      addCandidates(body.closeups);
-      addCandidates(body.textures);
+      if (body.productImageUrl) {
+        // If explicit variant URL was provided, prioritize it as the primary candidate
+        addCandidates(body.productImageUrl);
+      } else {
+        addCandidates(body.product?.images);
+        addCandidates(body.product?.side_images);
+        addCandidates(body.product?.closeups);
+        addCandidates(body.product?.textures);
+        addCandidates(body.side_images);
+        addCandidates(body.closeups);
+        addCandidates(body.textures);
+      }
     } else {
       // Even if we have DB images, include extra payload references as supplemental views
+      if (body.productImageUrl) addCandidates(body.productImageUrl);
       addCandidates(body.product?.side_images);
       addCandidates(body.product?.closeups);
       addCandidates(body.product?.textures);

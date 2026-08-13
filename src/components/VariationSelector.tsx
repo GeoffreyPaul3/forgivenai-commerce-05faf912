@@ -19,7 +19,20 @@ export function VariationSelector({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!product || !product.images?.[0]) {
+    if (!product) {
+      setVariations([]);
+      setSelectedIds(new Set());
+      onVariationsChange([]);
+      return;
+    }
+
+    const primaryImage = (Array.isArray(product.images) && product.images[0])
+      ? product.images[0]
+      : (typeof product.images === "string" && product.images.trim()
+          ? product.images.trim()
+          : (product.image_url || product.product_image || product.url || ""));
+
+    if (!primaryImage) {
       setVariations([]);
       setSelectedIds(new Set());
       onVariationsChange([]);
@@ -31,11 +44,11 @@ export function VariationSelector({
       setLoading(true);
       try {
         const { data, error } = await supabase.functions.invoke("decompose-image", {
-          body: { imageUrl: product.images[0], productId: product.id, forceRegenerate: true }
+          body: { imageUrl: primaryImage, productId: product.id, forceRegenerate: true }
         });
         
         if (error) throw error;
-        if (data?.variants && data.variants.length > 1) {
+        if (data?.variants && data.variants.length > 0) {
           if (isMounted) {
             setVariations(data.variants);
             const allIds = new Set<number>();
@@ -43,6 +56,10 @@ export function VariationSelector({
               const conf = v.details?.confidence;
               if (conf === undefined || conf >= 90) allIds.add(i);
             });
+            // If all confidences are below 90, select all by default so user isn't stuck with 0 selected
+            if (allIds.size === 0) {
+              data.variants.forEach((_: any, i: number) => allIds.add(i));
+            }
             setSelectedIds(allIds);
             onVariationsChange(data.variants.filter((_: any, i: number) => allIds.has(i)));
           }
@@ -61,7 +78,7 @@ export function VariationSelector({
     
     fetchVariations();
     return () => { isMounted = false; };
-  }, [product?.id, product?.images?.[0]]);
+  }, [product?.id, Array.isArray(product?.images) ? product?.images?.[0] : product?.images, product?.image_url]);
 
   const toggleSelection = (index: number) => {
     const newSet = new Set(selectedIds);
@@ -81,7 +98,7 @@ export function VariationSelector({
     );
   }
 
-  if (variations.length <= 1) return null;
+  if (variations.length < 1) return null;
 
   return (
     <div className="rounded-xl border border-primary/20 bg-card p-4 space-y-3 mt-4">
