@@ -2739,6 +2739,10 @@ async function runUnifiedVTON(
   // Best-effort tracking: serve the highest-scoring result if nothing reaches the pass threshold
   let bestResultUrl: string | null = null;
   let bestResultScore = 0;
+  // Shape-audit-failed best candidate: used only as last resort when ALL shape-passing attempts fail
+  // (e.g. Wan generates trousers instead of a skirt every time but every other engine is dead)
+  let shapeFailedBestUrl: string | null = null;
+  let shapeFailedBestScore = 0;
   // Track if fal.ai balance is exhausted to avoid repeated failed calls
   let falBalanceExhausted = false;
 
@@ -2880,8 +2884,14 @@ YOUR MAIN MANDATE: Dress the person from Image 2 in the exact garment from Image
           if (!shapeAudit.pass) {
             console.warn(`[Unified VTON] ❌ Clothing Shape Audit FAILED: ${shapeAudit.reason}`);
             lastReasoning = "Failed shape audit: " + shapeAudit.reason;
-            // Candidate only registered if shape audit passes
-            console.warn(`[Unified VTON] Shape audit failed — attempt will NOT be registered as fallback.`);
+            // Track as shape-failed best candidate so we can serve it as last resort
+            // if every other engine is also unavailable (Fal exhausted, HF spaces dead, Photta skipped)
+            const shapeFailedFidelity = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl, enterprisePromptObj.profile.qualityRequirements);
+            if (shapeFailedFidelity.score > shapeFailedBestScore) {
+              shapeFailedBestScore = shapeFailedFidelity.score;
+              shapeFailedBestUrl = resultUrl;
+              console.warn(`[Unified VTON] 📌 Saved shape-failed candidate (score ${shapeFailedFidelity.score}%): ${engine.name}`);
+            }
             continue;
           }
 
@@ -2919,6 +2929,24 @@ YOUR MAIN MANDATE: Dress the person from Image 2 in the exact garment from Image
       `[Unified VTON] ⚠️ Serving best-effort candidate (${bestResultScore}%) after retries. Reason: ${lastReasoning}`
     );
     return bestResultUrl;
+  }
+
+  // Last resort: serve the highest-scoring shape-failed result when no shape-passing candidate exists.
+  // This occurs when Wan is the only working engine but consistently generates a wrong silhouette
+  // (e.g. trousers instead of a skirt) — better to return the best available image than a hard error.
+  if (shapeFailedBestUrl && shapeFailedBestScore >= 60) {
+    console.warn(
+      `[Unified VTON] ⚠️ Serving shape-failed best-effort result (${shapeFailedBestScore}%) — no shape-passing engine available. Reason: ${lastReasoning}`
+    );
+    return shapeFailedBestUrl;
+  }
+
+  // Absolute last resort: any Wan result even if fidelity score is very low
+  if (shapeFailedBestUrl) {
+    console.warn(
+      `[Unified VTON] ⚠️ Serving any available shape-failed result (${shapeFailedBestScore}%) as absolute fallback.`
+    );
+    return shapeFailedBestUrl;
   }
 
   throw { 
