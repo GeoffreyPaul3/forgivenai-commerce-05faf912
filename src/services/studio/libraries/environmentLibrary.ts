@@ -5,8 +5,8 @@ export const EnvironmentLibrary: Record<string, EnvironmentProfile> = {
     id: "ENV_FLAGSHIP_ARCH_001",
     version: "3.0.0",
     name: "Flagship FSC Signature Studio",
-    architecturePrompt: "Modern African luxury retail architecture (Forgiven Shopping Centre, Lilongwe, Malawi). Signature cream stone arch (1.8m radius, 3.2m height) outlined by glowing integrated magenta LED strip (#B0208D). Flanked by vertical black fluted architectural panels (#111111) with warm vertical sconces. Low travertine podium on polished Calacatta marble floor.",
-    keyMaterials: ["TRAVERTINE", "CREAM_PLASTER", "CALACATTA_MARBLE", "FLUTED_WOOD", "BRUSHED_BRASS"]
+    architecturePrompt: "Modern African luxury retail architecture (Forgiven Shopping Centre, Lilongwe, Malawi). Signature pristine white arch (1.8m radius, 3.2m height) on seamless white plaster wall outlined by glowing integrated magenta LED strip (#B0208D). Flanked by vertical black fluted architectural panels (#111111) with warm vertical sconces. Low seamless white circular podium on polished white Calacatta marble floor.",
+    keyMaterials: ["WHITE_CYCLORAMA", "CREAM_PLASTER", "CALACATTA_MARBLE", "FLUTED_WOOD", "BRUSHED_BRASS"]
   },
   ENV_LUXURY_WHITE_002: {
     id: "ENV_LUXURY_WHITE_002",
@@ -47,7 +47,7 @@ export const EnvironmentLibrary: Record<string, EnvironmentProfile> = {
     id: "ENV_PRODUCT_LAB_007",
     version: "3.0.0",
     name: "FSC Commercial Product Lab",
-    architecturePrompt: "Seamless sweep of warm off-white cream plaster (#F5F0EA) with a solid honed travertine stone pedestal (40cm high, 50cm diameter).",
-    keyMaterials: ["CREAM_PLASTER", "TRAVERTINE"]
+    architecturePrompt: "Seamless sweep of pristine white studio plaster (#FFFFFF) with a solid smooth white circular stone pedestal (40cm high, 50cm diameter).",
+    keyMaterials: ["CREAM_PLASTER", "WHITE_CYCLORAMA"]
   }
 };

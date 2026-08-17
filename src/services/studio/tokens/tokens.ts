@@ -3,10 +3,10 @@ import { StudioTokensSpec } from "../types/types";
 export const StudioTokens: StudioTokensSpec = {
   colors: {
     FSC_MAGENTA: { hex: "#B0208D", role: "Primary Brand LED Accent & Architectural Logo" },
-    CREAM_TRAVERTINE: { hex: "#F5F0EA", role: "Flagship Plaster & Pedestal Finish" },
+    CREAM_TRAVERTINE: { hex: "#FFFFFF", role: "Flagship White Plaster & Circular Pedestal Finish" },
     OBSIDIAN_BLACK: { hex: "#111111", role: "Fluted Architectural Wall Panels & Arena Floor" },
     BRUSHED_GOLD: { hex: "#D4AF37", role: "Hardware, Sconces, & Metallic Details" },
-    CALACATTA_CREAM: { hex: "#FAF8F5", role: "Polished Marble Floor with Natural Veining" }
+    CALACATTA_CREAM: { hex: "#FFFFFF", role: "Polished White Marble Floor with Natural Veining" }
   },
   lightingTemperatures: {
     WARM_TUNGSTEN: { kelvin: 2700, description: "Festive Holiday & Cozy Practical Accent Fill" },
@@ -33,9 +33,9 @@ export const StudioTokens: StudioTokensSpec = {
     FULL_LOOKBOOK: { distanceMeters: 3.5, viewType: "Full Architectural & Model Frame" }
   },
   materials: {
-    TRAVERTINE: { finish: "Honed natural travertine stone with porous texture", reflectionType: "Diffused Matte" },
-    CREAM_PLASTER: { finish: "Micro-textured cream limestone plaster wall", reflectionType: "Soft Velvet Matte" },
-    CALACATTA_MARBLE: { finish: "Polished cream marble with soft natural veining", reflectionType: "High Gloss Specular" },
+    TRAVERTINE: { finish: "Seamless smooth white circular podium & stone pedestal", reflectionType: "Diffused Soft White" },
+    CREAM_PLASTER: { finish: "Micro-textured pristine white plaster wall", reflectionType: "Soft Velvet White Matte" },
+    CALACATTA_MARBLE: { finish: "Polished white marble with soft natural grey veining", reflectionType: "High Gloss Specular" },
     WHITE_CYCLORAMA: { finish: "Seamless smooth white studio sweep", reflectionType: "Clean Diffused Sweep" },
     FLUTED_WOOD: { finish: "Matte black fluted wooden wall panels (#111111)", reflectionType: "Ribbed Shadow Grid" },
     BRUSHED_BRASS: { finish: "Satin metallic brushed gold accent brass", reflectionType: "Metallic Metallic Glow" }

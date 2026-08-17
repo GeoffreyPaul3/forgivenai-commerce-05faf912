@@ -14,7 +14,7 @@ export const CompositionLibrary: Record<string, CompositionProfile> = {
     id: "COMP_PRODUCT_HERO_002",
     version: "3.0.0",
     name: "Commercial Product Hero",
-    framingRule: "Product centered on travertine pedestal, seams and textures critically sharp.",
+    framingRule: "Product centered on smooth white pedestal, seams and textures critically sharp.",
     ruleOfThirds: false,
     offCenterBias: "CENTER",
     depthPrompt: "Pedestal foreground contact shadow -> Clean sweep background."
