@@ -41,12 +41,12 @@ STUDIO REPRODUCTION DIRECTIVE — FSC FLAGSHIP STUDIO (NON-NEGOTIABLE):
 You MUST reproduce the exact physical interior shown below. This is NOT a creative brief. This is a technical reproduction order. Do NOT invent a new room. Do NOT simplify. Reproduce every element listed here exactly.
 
 ══ ELEMENT 1: BACK WALL ══
-Full-width smooth cream/ivory plaster wall (#F2EBD9), floor-to-ceiling. No texture variation. No patterns. Pure warm cream.
+Full-width smooth pristine white plaster wall (#FFFFFF), floor-to-ceiling. No texture variation. No patterns. Pure crisp white.
 
 ══ ELEMENT 2: THE ARCH (most distinctive feature — MUST BE PRESENT) ══
 A large, wide architectural arch centered on the back wall. The arch has a smooth, clean semicircular top.
-  MAGENTA LED TRIM: The entire inner edge of the arch (both sides and the curved top) has a BRIGHT PINK-MAGENTA (#B0208D) glowing LED strip inset. This creates a vivid magenta halo/glow on the cream wall around the arch opening. This glowing magenta arch trim is the most distinctive visual signature of this studio — it MUST be visible and accurate.
-  The wall SURFACE inside the arch opening is the same smooth warm cream plaster as the back wall (#F2EBD9). The arch interior is NOT dark, NOT shadowed — it is a brightly lit, cream-coloured recess.
+  MAGENTA LED TRIM: The entire inner edge of the arch (both sides and the curved top) has a BRIGHT PINK-MAGENTA (#B0208D) glowing LED strip inset. This creates a vivid magenta halo/glow on the white wall around the arch opening. This glowing magenta arch trim is the most distinctive visual signature of this studio — it MUST be visible and accurate.
+  The wall SURFACE inside the arch opening is the same smooth pristine white plaster as the back wall (#FFFFFF). The arch interior is NOT dark, NOT shadowed — it is a brightly lit, white-coloured recess.
 
 ══ ELEMENT 3: OFFICIAL FSC LOGO (PRESERVE FROM STUDIO MASTER) ══
 The studio master reference image (studio.jpeg) already contains the official Forgiven Shopping Centre wall-mounted logo inside the central arch.
@@ -62,16 +62,16 @@ On the fluted panel, behind/above the planter: a slender vertical TUBE SCONCE li
 
 ══ ELEMENT 5: RIGHT SIDE (camera-right) ══
 Far-right edge: a full-height section of deep charcoal/near-black fluted vertical wood panels (#1A1A1A), matching the left side.
-Set INTO these panels: a RECESSED OPEN SHELF UNIT with three shelves, illuminated from behind with warm amber backlighting. Shelves hold luxury objects: top shelf — a small pink/dried floral arrangement; middle shelf — stacked cream books + a small gold object; bottom shelf — a brass/gold ring sculpture and small vase.
+Set INTO these panels: a RECESSED OPEN SHELF UNIT with three shelves, illuminated from behind with warm amber backlighting. Shelves hold luxury objects: top shelf — a small pink/dried floral arrangement; middle shelf — stacked white books + a small gold object; bottom shelf — a brass/gold ring sculpture and small vase.
 On the fluted panel: a slender vertical TUBE SCONCE light, matching the left side sconce.
 
 ══ ELEMENT 6: FLOOR ══
-Continuous large-format POLISHED CREAM MARBLE tiles covering the entire studio floor. Warm cream/ivory tone (#F0E8D0). High-gloss surface with soft warm reflections of the studio lights and the arch magenta LED visible as a faint pink reflection on the marble.
+Continuous large-format POLISHED WHITE MARBLE tiles covering the entire studio floor. Pure pristine white tone (#FFFFFF) with subtle light grey natural veining. High-gloss surface with soft reflections of the studio lights and the arch magenta LED visible as a faint pink reflection on the marble.
 
 ══ ELEMENT 7: FOREGROUND PODIUM ══
-At frame centre, in the foreground, directly in front of the arch: a LOW, WIDE circular disc pedestal made of smooth matte cream stone. Dimensions: approximately 55cm diameter, only 15–18cm tall. It is a flat, low platform — NOT a tall column or display stand. The podium sits on the marble floor at the very base of the arch.
+At frame centre, in the foreground, directly in front of the arch: a LOW, WIDE circular disc pedestal made of smooth matte white stone. Dimensions: approximately 55cm diameter, only 15–18cm tall. It is a flat, low platform — NOT a tall column or display stand. The podium sits on the marble floor at the very base of the arch.
 
-Warm, luminous studio lighting (3000K–3200K). Soft overhead key light. Warm amber sconces on both fluted panel sides. The magenta LED arch trim (#B0208D) casts a pink-magenta glow onto the surrounding cream wall. Gentle specular reflections on the marble floor and brass planter surface.
+Luminous commercial studio lighting (5000K daylight-calibrated white key lighting). Soft overhead key light. Warm amber sconces on both fluted panel sides. The magenta LED arch trim (#B0208D) casts a pink-magenta glow onto the surrounding pristine white wall. Gentle specular reflections on the white marble floor and brass planter surface.
 `.trim();
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -86,13 +86,13 @@ ABSOLUTE PROHIBITIONS — ZERO TOLERANCE:
 ✗ DO NOT render random acronyms, text fragments, or gibberish on the wall.
 ✗ DO NOT generate wrinkled, creased, rumpled, or saggy clothing — the garment MUST be 100% freshly ironed, pressed, tailored, and pristine.
 ✗ DO NOT generate a plain tan/beige arch with no LED trim — the arch MUST have the magenta LED glow (#B0208D).
-✗ DO NOT generate a tall rectangular display board, banner stand, or signage pillar in the centre — the ONLY centrepiece is the LOW CIRCULAR CREAM PODIUM.
-✗ DO NOT generate a plain, minimal, or simplified studio — ALL elements (fluted panels, brass planter, shelf unit, marble floor, magenta LED arch, podium) MUST be present.
+✗ DO NOT generate a tall rectangular display board, banner stand, or signage pillar in the centre — the ONLY centrepiece is the LOW CIRCULAR WHITE PODIUM.
+✗ DO NOT generate a plain, minimal, or simplified studio — ALL elements (fluted panels, brass planter, shelf unit, white marble floor, magenta LED arch, white podium) MUST be present.
 ✗ DO NOT render any LV, Louis Vuitton monogram, or third-party logo inside the shopping bag on the wall — the bag face MUST show only a clean white capital letter "F".
 ✗ DO NOT place the model in the center of the frame blocking the logo or podium.
 ✗ DO NOT obscure, cover, or block the 3D Forgiven logo on the wall or the central arch.
 ✗ NO logo redesign, NO fake logo, NO altered logo, NO missing Shopping Centre text, NO distorted shopping bag, NO duplicate logo, NO floating 2D watermark overlays.
-✗ NO plain white background, NO plain grey backdrop, NO seamless paper roll.
+✗ NO plain grey backdrop, NO paper roll background.
 ✗ NO alternative room — no hotel lobby, office, bedroom, outdoor location, bare warehouse.
 ✗ NO harsh bright neon tubes outlining the arch — use soft, warm magenta LED cove lighting.
 ✗ NO oversized, cartoonish, or neon glowing logos on the wall.
@@ -169,7 +169,7 @@ function renderPositioning(sc: SceneComposition): string {
   if (!allowsModel) {
     return [
       `SHOT TYPE: Product-only hero shot. NO human model in frame.`,
-      `PRODUCT PLACEMENT: The hero product is displayed prominently on the cream circular podium at frame centre.`,
+      `PRODUCT PLACEMENT: The hero product is displayed prominently on the white circular podium at frame centre.`,
       `CAMERA: ${sc.cameraProfile.promptDescription}`,
     ].join("\n");
   }
@@ -179,8 +179,8 @@ function renderPositioning(sc: SceneComposition): string {
     `CRITICAL MODEL FRAMING & POSITIONING (FSC LOOKBOOK HERO STANDARD):`,
     `  • EXACTLY ONE SINGLE HUMAN MODEL: Standing in the frame (65%-75% height). DO NOT generate two models. DO NOT generate twin figures.`,
     `  • MODEL POSITION (BESIDE PODIUM): The model stands proudly beside the central podium at 65% frame width on the right (NOT pushed into the far corner or hidden behind plants).`,
-    `  • PERFECT LIGHTING ON MODEL: Warm, luminous 3200K key light directly illuminating the model and garment. Vibrant, crisp detail, natural skin tones, zero dark corner shadows on the model.`,
-    `  • UNBLOCKED BACKGROUND BRANDING: Because the model stands beside the podium at 65% width, the central arch, cream podium, and 3D Forgiven wall logo remain 100% visible and unblocked in the background centre.`,
+    `  • PERFECT LIGHTING ON MODEL: Daylight-calibrated commercial white key light directly illuminating the model and garment. Vibrant, crisp detail, natural skin tones, zero dark corner shadows on the model.`,
+    `  • UNBLOCKED BACKGROUND BRANDING: Because the model stands beside the podium at 65% width, the central arch, white podium, and 3D Forgiven wall logo remain 100% visible and unblocked in the background centre.`,
     compositionRules.length > 0 ? `  • Additional rules: ${compositionRules.join(" ")}` : ``,
     `CAMERA: ${sc.cameraProfile.promptDescription}`,
   ].filter(Boolean).join("\n");
@@ -198,7 +198,7 @@ export function buildPromptFromComposition(
   // Header with explicit composition rule upfront
   blocks.push(
     `Photorealistic professional fashion editorial photograph for Forgiven Shopping Centre (FSC) flagship studio shoot. ` +
-    `HERO MODEL COMPOSITION: Prominent model (65%-75% height) standing beside the central podium at 65% width in bright warm studio key light. Central arch, 3D Forgiven wall logo, and cream podium remain 100% unblocked in the background centre. ` +
+    `HERO MODEL COMPOSITION: Prominent model (65%-75% height) standing beside the central podium at 65% width in bright studio key light. Central arch, 3D Forgiven wall logo, and white podium remain 100% unblocked in the background centre. ` +
     `Output must be indistinguishable from a real medium-format fashion photography shot.`
   );
 
@@ -279,7 +279,7 @@ function renderVTONSceneDecorator(sceneType: string): string | null {
 
   const lines = [
     `══ SCENE THEME DECORATIONS — ${dec.name.toUpperCase()} ══`,
-    `This generation uses the "${dec.name}" theme. Add the following thematic decorations and props into the studio environment (the permanent FSC studio arch, cream wall, 3D Forgiven logo, and cream podium MUST remain intact as the base structure):`,
+    `This generation uses the "${dec.name}" theme. Add the following thematic decorations and props into the studio environment (the permanent FSC studio arch, white wall, 3D Forgiven logo, and white podium MUST remain intact as the base structure):`,
     ...zoneAdditions,
   ];
 
@@ -317,8 +317,8 @@ It is a single physical architectural element of the studio.
 HERO MODEL SPATIAL PLACEMENT & FULL-LENGTH FRAMING CONTRACT:
 • EXACTLY ONE SINGLE HUMAN MODEL standing in the frame (occupying 65%-75% height). DO NOT generate two models. DO NOT generate twin figures.
 • FULL-LENGTH HEAD-TO-TOE FRAMING MANDATE: Camera MUST capture the model's ENTIRE HEIGHT from top of head down to ankles, feet, and shoes standing on the marble floor. ZERO CROPPING at thighs, knees, or ankles.
-• POSITION: The model stands OFF-CENTRE on the RIGHT side of the podium (65% frame width), standing beside the low cream circular podium.
-• The central arch and low cream circular podium remain visible and unblocked in the background centre.
+• POSITION: The model stands OFF-CENTRE on the RIGHT side of the podium (65% frame width), standing beside the low white circular podium.
+• The central arch and low white circular podium remain visible and unblocked in the background centre.
 `.trim();
 
   const sceneOverlay = renderVTONSceneDecorator(sceneType);
@@ -406,13 +406,13 @@ function getProductCompositionDirective(compositionType: string, _category: stri
       `COMPOSITION — PRODUCT THREE-QUARTER VIEW:`,
       `Position the product at a premium three-quarter camera angle (approximately 30°–45° off-centre).`,
       `The product occupies 60%–70% of the frame. Studio architecture clearly visible behind it.`,
-      `Product rests naturally on the cream podium surface.`,
+      `Product rests naturally on the white podium surface.`,
     ].join("\n");
   }
   // Default: PRODUCT_HERO_PODIUM
   return [
     `COMPOSITION — PRODUCT HERO PODIUM:`,
-    `A single hero product is positioned centrally on the cream circular stone podium at frame centre.`,
+    `A single hero product is positioned centrally on the white circular stone podium at frame centre.`,
     `Product occupies 55%–65% of the frame height. Premium eye-level camera angle.`,
     `The product is placed in a natural, physically believable resting position.`,
     `The signature FSC arch and wall logo remain fully visible and unobstructed in the background.`,
@@ -442,7 +442,7 @@ function getProductCategoryHint(category: string): string {
   if (cat.includes("cosmetic") || cat.includes("beauty") || cat.includes("makeup") || cat.includes("skincare")) {
     return `COSMETICS PLACEMENT:\n• Arrange beauty products on the podium in an elegant hero composition.\n• Preserve: exact product colors, packaging design, typography, logos.\n• NO person. NO hand.`;
   }
-  return `PRODUCT PLACEMENT:\n• Display the product prominently on the cream circular studio podium.\n• Preserve all visual details from the reference image exactly.\n• NO person. NO model.`;
+  return `PRODUCT PLACEMENT:\n• Display the product prominently on the white circular studio podium.\n• Preserve all visual details from the reference image exactly.\n• NO person. NO model.`;
 }
 
 /**
@@ -546,10 +546,10 @@ export function buildProductStudioPrompt(params: {
     `CAMERA & LIGHTING:\n` +
     `• Camera: Medium format equivalent, 85mm–90mm prime lens.\n` +
     `• Aperture: f/4–f/8 for product sharpness with natural background separation.\n` +
-    `• Lighting: 3000K–3200K warm premium studio key light. Soft octabox from upper-left.\n` +
+    `• Lighting: Daylight-calibrated commercial white studio key light. Soft octabox from upper-left.\n` +
     `• Secondary fill: soft reflector on opposite side — eliminates harsh shadows while preserving depth.\n` +
-    `• Foreground: gentle contact shadow/reflection on the polished cream marble floor.\n` +
-    `• The magenta arch LED glow (#B0208D) creates a warm ambient halo in the background.`
+    `• Foreground: gentle contact shadow/reflection on the polished white marble floor.\n` +
+    `• The magenta arch LED glow (#B0208D) creates a vivid ambient halo in the background.`
   );
 
   // [9] Reference Analysis block
@@ -586,8 +586,7 @@ export function buildProductStudioPrompt(params: {
   blocks.push(
     `STUDIO GOVERNANCE — ABSOLUTE PROHIBITIONS (inherited):\n` +
     `✗ NO DUPLICATE LOGOS. NO SECOND LOGO. ONE official FSC logo only.\n` +
-    `✗ DO NOT redesign the FSC studio. DO NOT replace the arch or cream wall.\n` +
-    `✗ DO NOT generate a plain white/grey background.\n` +
+    `✗ DO NOT redesign the FSC studio. DO NOT replace the arch or white wall.\n` +
     `✗ DO NOT generate random text or acronyms on the wall.\n` +
     `✗ NOT a 3D render. NOT CGI. NOT illustration. REAL PRODUCT PHOTOGRAPH.\n` +
     `✗ DO NOT generate an alternative room or location.`

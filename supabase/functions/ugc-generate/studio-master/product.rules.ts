@@ -56,9 +56,9 @@ export const ProductRuleRegistry: Record<string, ProductRule> = {
     depthOfField: "shallow",
     allowsModel: false,
     compositionRules: [
-      "Product placed centrally on polished cream travertine podium.",
+      "Product placed centrally on polished white pedestal.",
       "Razor-sharp focus on metal brilliance, gemstone facets, and fine details.",
-      "Shallow depth of field isolations with creamy studio background bokeh."
+      "Shallow depth of field isolations with smooth studio background bokeh."
     ]
   },
   shoes: {
@@ -70,9 +70,9 @@ export const ProductRuleRegistry: Record<string, ProductRule> = {
     depthOfField: "medium",
     allowsModel: false,
     compositionRules: [
-      "Hero footwear placement on travertine pedestal surface.",
+      "Hero footwear placement on white pedestal surface.",
       "Low-angle camera (0.5m height) emphasizing silhouette, sole curvature, and material grain.",
-      "Specular marble floor reflection in foreground."
+      "Specular white marble floor reflection in foreground."
     ]
   },
   footwear: {
@@ -84,9 +84,9 @@ export const ProductRuleRegistry: Record<string, ProductRule> = {
     depthOfField: "medium",
     allowsModel: false,
     compositionRules: [
-      "Hero footwear placement on travertine pedestal surface.",
+      "Hero footwear placement on white pedestal surface.",
       "Low-angle camera (0.5m height) emphasizing silhouette, sole curvature, and material grain.",
-      "Specular marble floor reflection in foreground."
+      "Specular white marble floor reflection in foreground."
     ]
   },
   bags: {
@@ -98,7 +98,7 @@ export const ProductRuleRegistry: Record<string, ProductRule> = {
     depthOfField: "medium",
     allowsModel: false,
     compositionRules: [
-      "Bag displayed upright on cream travertine pedestal.",
+      "Bag displayed upright on white stone pedestal.",
       "Clear presentation of hardware, leather grain texture, straps, and buckles.",
       "Eye-level 85mm prime lens perspective."
     ]
@@ -112,7 +112,7 @@ export const ProductRuleRegistry: Record<string, ProductRule> = {
     depthOfField: "medium",
     allowsModel: false,
     compositionRules: [
-      "Bag displayed upright on cream travertine pedestal.",
+      "Bag displayed upright on white stone pedestal.",
       "Clear presentation of hardware, leather grain texture, straps, and buckles.",
       "Eye-level 85mm prime lens perspective."
     ]
@@ -126,7 +126,7 @@ export const ProductRuleRegistry: Record<string, ProductRule> = {
     depthOfField: "deep",
     allowsModel: false,
     compositionRules: [
-      "Device positioned at 45-degree angle on clean pedestal.",
+      "Device positioned at 45-degree angle on clean white pedestal.",
       "D50 color precision lighting for true-to-life metallic and glass finishes.",
       "Zero screen glare, crisp bevel edge visibility."
     ]
@@ -140,7 +140,7 @@ export const ProductRuleRegistry: Record<string, ProductRule> = {
     depthOfField: "shallow",
     allowsModel: false,
     compositionRules: [
-      "Hero packaging arrangement on cream travertine stone.",
+      "Hero packaging arrangement on white stone pedestal.",
       "Soft directional key light highlighting bottle transparency and cap shine.",
       "Macro lens shallow depth of field."
     ]

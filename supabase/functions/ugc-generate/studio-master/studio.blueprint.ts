@@ -103,7 +103,7 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       id: StudioZone.ARCH,
       name: "Central Architectural Arch",
       isLocked: true,
-      baseDescription: "Signature architectural 1.8m radius cream plaster arch centered in the room with an integrated glowing neon magenta (#B0208D) LED perimeter strip running along the inner arch contour.",
+      baseDescription: "Signature architectural 1.8m radius pristine white plaster arch centered in the room with an integrated glowing neon magenta (#B0208D) LED perimeter strip running along the inner arch contour.",
       spatialAnchor: "Center background wall"
     },
     [StudioZone.LOGO]: {
@@ -115,9 +115,9 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
     },
     [StudioZone.PODIUM]: {
       id: StudioZone.PODIUM,
-      name: "Cream Travertine Display Podium",
+      name: "White Display Podium",
       isLocked: true,
-      baseDescription: "Low circular cream stone display pedestal/podium (40cm height × 50cm diameter) centered directly in front of the central arch.",
+      baseDescription: "Low circular white stone display pedestal/podium (40cm height × 50cm diameter) centered directly in front of the central arch.",
       spatialAnchor: "Center foreground floor"
     },
     [StudioZone.LED_STRIP]: {
@@ -131,7 +131,7 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       id: StudioZone.FLOOR,
       name: "Calacatta Marble Floor",
       isLocked: true,
-      baseDescription: "High-gloss polished warm cream/white Calacatta marble floor reflecting the warm studio lighting and magenta LED arch.",
+      baseDescription: "High-gloss polished white Calacatta marble floor reflecting the studio lighting and magenta LED arch.",
       spatialAnchor: "Entire studio floor plane"
     },
     [StudioZone.LEFT_DECOR]: {
@@ -152,14 +152,14 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       id: StudioZone.BACKGROUND,
       name: "Studio Background Wall",
       isLocked: false,
-      baseDescription: "Warm cream plaster arch wall flanked by dark black fluted wooden side panels with warm glowing brass sconce lights.",
+      baseDescription: "Pristine white plaster arch wall flanked by dark black fluted wooden side panels with warm glowing brass sconce lights.",
       spatialAnchor: "Rear perimeter wall"
     },
     [StudioZone.FOREGROUND]: {
       id: StudioZone.FOREGROUND,
       name: "Foreground Plane",
       isLocked: false,
-      baseDescription: "High-gloss polished cream marble floor with soft specular reflections.",
+      baseDescription: "High-gloss polished white Calacatta marble floor with soft specular reflections.",
       spatialAnchor: "Immediate camera foreground"
     },
     [StudioZone.SUBJECT]: {
@@ -173,14 +173,14 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       id: StudioZone.PRODUCT,
       name: "Product Hero Zone",
       isLocked: false,
-      baseDescription: "Worn by model or displayed on cream travertine podium with FSC packaging.",
+      baseDescription: "Worn by model or displayed on white pedestal with FSC packaging.",
       spatialAnchor: "Center podium or model body"
     },
     [StudioZone.LIGHTING]: {
       id: StudioZone.LIGHTING,
       name: "Studio Commercial Lighting",
       isLocked: false,
-      baseDescription: "Premium warm luxury studio lighting (3000K-3200K), soft key light from 45 degrees, warm ambient glow.",
+      baseDescription: "Premium daylight-calibrated commercial white studio lighting (5000K-5600K), soft key light from 45 degrees, warm ambient glow.",
       spatialAnchor: "Overhead and perimeter rigs"
     },
     [StudioZone.CAMERA]: {
@@ -228,7 +228,7 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       name: "Commercial Product Angle (50mm)",
       height_mm: 1200,
       focalLength_mm: 50,
-      promptDescription: "50mm lens shot at 45-degree angle to product on cream stone pedestal."
+      promptDescription: "50mm lens shot at 45-degree angle to product on white stone pedestal."
     }
   };
 
@@ -240,7 +240,7 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       fillLight: "Diffuse white bounce board",
       rimLight: "Warm magenta arch LED strip",
       ambientKelvin: 3200,
-      promptDescription: "Premium warm luxury studio lighting (3000K-3200K): soft key light from 45 degrees, warm ambient glow, glowing magenta arch LED accent, specular marble floor reflection."
+      promptDescription: "Premium luxury studio lighting: soft key light from 45 degrees, warm ambient glow, glowing magenta arch LED accent, specular white marble floor reflection."
     },
     editorial_octabox: {
       id: "editorial_octabox",
@@ -249,7 +249,7 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       fillLight: "Silver reflector fill",
       rimLight: "Focused spot rim",
       ambientKelvin: 3200,
-      promptDescription: "Editorial fashion lighting: warm 3200K key light, crisp catchlights in eyes, controlled contrast, high-end commercial fashion feel."
+      promptDescription: "Editorial fashion lighting: warm key light, crisp catchlights in eyes, controlled contrast, high-end commercial fashion feel."
     },
     hard_rim_macro: {
       id: "hard_rim_macro",
@@ -291,7 +291,7 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
   brandVisibilityRules: BrandRule[] = [
     { id: "single_logo_rule", rule: "EXACTLY ONE physical Forgiven Shopping Centre logo exists on the arch wall. Do NOT generate, duplicate, repeat, overlay, or add another logo.", isMandatory: true },
     { id: "arch_geometry", rule: "Central architectural arch with magenta LED outline must match flagship FSC studio sheet exactly.", isMandatory: true },
-    { id: "podium_center", rule: "Cream travertine podium must remain centered on floor plane in front of arch.", isMandatory: true }
+    { id: "podium_center", rule: "White pedestal must remain centered on floor plane in front of arch.", isMandatory: true }
   ];
 
   decoratorSlots: StudioZone[] = [
@@ -303,7 +303,7 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
   ];
 
   negativeRules = [
-    "DO NOT redesign, move, remove, recreate, recolor, or alter: central arch with magenta LED, official Forgiven Shopping Centre logo, cream travertine podium, Calacatta marble floor, dark fluted side panels.",
+    "DO NOT redesign, move, remove, recreate, recolor, or alter: central arch with magenta LED, official Forgiven Shopping Centre logo, white podium, white Calacatta marble floor, dark fluted side panels.",
     "DO NOT position model in exact center of the arch.",
     "DO NOT omit the signature arch or generate a plain gray/white seamless backdrop.",
     "NO DUPLICATE LOGOS. NO SECOND LOGO. NO ADDITIONAL BRAND MARKS. NO REPEATED WORDMARK. NO OVERLAPPING LOGOS. NO STACKED LOGOS. NO EXTRA F SYMBOLS. NO EXTRA SHOPPING BAG ICONS. NO ADDITIONAL WALL SIGNAGE. NO GENERATED FORGIVEN LOGO. NO RECONSTRUCTED FORGIVEN LOGO. NO SECOND BRAND SIGN."

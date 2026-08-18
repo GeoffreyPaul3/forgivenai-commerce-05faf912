@@ -181,15 +181,15 @@ Any deviation from the uploaded product reference constitutes a critical failure
 // Ensures every FSC Signature Studio render feels like the same physical space.
 // ----------------------------------------------------------------------------
 const StudioSeed = {
-  archDimensions: "Central signature arch: 1.8m radius curvature, 3.2m total height, 2.2m width at base, smooth-edged plaster finish",
-  ledSpecification: "Integrated magenta LED strip (#B0208D): 25mm width, continuous glowing outline seamlessly embedded in arch plaster, constant intensity",
-  podiumDimensions: "Low circular cream travertine stone podium: 40cm height, 50cm diameter, positioned center-foreground",
+  archDimensions: "Central signature arch: 1.8m radius curvature, 3.2m total height, 2.2m width at base, smooth-edged pristine white plaster finish",
+  ledSpecification: "Integrated magenta LED strip (#B0208D): 25mm width, continuous glowing outline seamlessly embedded in white arch plaster, constant intensity",
+  podiumDimensions: "Low circular white stone podium: 40cm height, 50cm diameter, positioned center-foreground",
   planterPosition: "Tall cylindrical polished brass/gold planter: strictly left floor position, 120cm height, 40cm diameter, containing full Bird of Paradise or Monstera plant",
   shelvingPosition: "Vertical recessed illuminated shelving unit: strictly on right wall, 180cm height, 60cm wide, warm 2700K backlighting, minimal brass decor accents",
   panelDimensions: "Black fluted vertical side panels (#111111): extend full floor-to-ceiling height, warm tube sconces positioned at 160cm height",
   lightingPositions: "Key light: 45° overhead camera-left. Fill light: large V-flat camera-right. Rim: behind subject, LED from arch. Sconces: practical ambient at 3000K",
-  floorSpecification: "Polished cream Calacatta marble, visible natural veining, controlled specular reflections showing product/model silhouette softly",
-  prompt: "STUDIO SEED (FSC FLAGSHIP PERMANENT DIMENSIONS): This studio is a permanent physical location photographed repeatedly — not recreated each generation. Apply consistent spatial dimensions: arch radius 1.8m, podium 40cm × 50cm travertine, brass planter strictly left at 120cm height, illuminated shelving strictly right wall, black fluted panels full height with sconces at 160cm. The environment feels like one unchanged flagship retail studio visited many times, not a different AI-imagined space each time."
+  floorSpecification: "Polished white Calacatta marble, visible natural light grey veining, controlled specular reflections showing product/model silhouette softly",
+  prompt: "STUDIO SEED (FSC FLAGSHIP PERMANENT DIMENSIONS): This studio is a permanent physical location photographed repeatedly — not recreated each generation. Apply consistent spatial dimensions: arch radius 1.8m, podium 40cm × 50cm white stone, brass planter strictly left at 120cm height, illuminated shelving strictly right wall, black fluted panels full height with sconces at 160cm. The environment feels like one unchanged flagship retail studio visited many times, not a different AI-imagined space each time."
 };
 
 // ----------------------------------------------------------------------------
@@ -207,22 +207,22 @@ export interface BaseStudioDNASpec {
 export const BaseStudioDNA: BaseStudioDNASpec = {
   architecturePrompt: `FLAGSHIP FSC LUXURY ARCHITECTURAL DESTINATION (Forgiven Shopping Centre, Lilongwe, Malawi): Modern African luxury retail architecture engineered to international flagship boutique standards. ${StudioSeed.archDimensions}. The arch is seamlessly outlined by a glowing integrated magenta LED accent light strip (${StudioSeed.ledSpecification}). Flanking both the far left and right edges are vertical black fluted architectural panels (#111111) equipped with warm vertical tube sconces. On the right wall: ${StudioSeed.shelvingPosition}. On the left floor: ${StudioSeed.planterPosition}. In front of the arch on the floor sits ${StudioSeed.podiumDimensions}. The flooring is ${StudioSeed.floorSpecification}. ${StudioSeed.prompt}`,
 
-  lightingPrompt: `Warm premium luxury commercial studio lighting (3000K-3500K). ${StudioSeed.lightingPositions}. Key light provides soft, directional illumination, gentle fill opens shadows naturally, warm vertical tube sconces glow softly, and the integrated magenta arch LED strip (#B0208D) casts a radiant neon-pink accent outline on the cream stone wall. Physically accurate shadow falloff, zero blown-out highlights, and natural specular reflections on marble and brass.`,
+  lightingPrompt: `Daylight-calibrated commercial white studio lighting (5000K-5600K). ${StudioSeed.lightingPositions}. Key light provides soft, directional illumination, gentle fill opens shadows naturally, warm vertical tube sconces glow softly, and the integrated magenta arch LED strip (#B0208D) casts a radiant neon-pink accent outline on the pristine white plaster wall. Physically accurate shadow falloff, zero blown-out highlights, and natural specular reflections on white marble and brass.`,
 
-  materialsPrompt: "Authentic physical material finishes: micro-textured cream limestone plaster, honed travertine stone, polished cream Calacatta marble flooring with realistic natural veining and soft reflections, brushed brass metal fixtures, matte black fluted wooden panels (#111111), and organic tropical botanical greenery with real leaf veining.",
+  materialsPrompt: "Authentic physical material finishes: micro-textured pristine white plaster, smooth white stone, polished white Calacatta marble flooring with realistic natural veining and soft reflections, brushed brass metal fixtures, matte black fluted wooden panels (#111111), and organic tropical botanical greenery with real leaf veining.",
 
-  brandingPrompt: "PHYSICALLY MOUNTED 3D ARCHITECTURAL LOGO (FLAGSHIP RETAIL SIGNAGE): The official Forgiven Shopping Centre logo — a bold magenta (#B0208D) shopping bag icon containing a crisp, solid, bold WHITE CAPITAL LETTER 'F' (CRITICAL: A clean white letter 'F' ONLY, NEVER any LV monogram or third-party logo!), with 'Forgiven' written in bold magenta text directly below and 'Shopping Centre' in smaller dark text beneath — is physically mounted onto the cream stone wall inside the signature arch as dimensional 3D acrylic and metal architectural lettering. The logo has real physical depth, sharp edges, casts a subtle natural drop shadow onto the textured cream stone wall behind it, and catches warm specular reflections from the studio sconces. It is permanently installed on the wall like a flagship retail boutique sign — NEVER floating, NEVER a digital watermark overlay, NEVER composited in post.",
+  brandingPrompt: "PHYSICALLY MOUNTED 3D ARCHITECTURAL LOGO (FLAGSHIP RETAIL SIGNAGE): The official Forgiven Shopping Centre logo — a bold magenta (#B0208D) shopping bag icon containing a crisp, solid, bold WHITE CAPITAL LETTER 'F' (CRITICAL: A clean white letter 'F' ONLY, NEVER any LV monogram or third-party logo!), with 'Forgiven' written in bold magenta text directly below and 'Shopping Centre' in smaller dark text beneath — is physically mounted onto the pristine white plaster wall inside the signature arch as dimensional 3D acrylic and metal architectural lettering. The logo has real physical depth, sharp edges, casts a subtle natural drop shadow onto the textured white plaster wall behind it, and catches warm specular reflections from the studio sconces. It is permanently installed on the wall like a flagship retail boutique sign — NEVER floating, NEVER a digital watermark overlay, NEVER composited in post.",
 
   qualityRequirements: [
     "Signature arch (1.8m radius, 3.2m height) with integrated glowing magenta LED strip (#B0208D)",
-    "Textured cream stone back wall with physically mounted 3D brand logo inside arch",
+    "Textured pristine white plaster back wall with physically mounted 3D brand logo inside arch",
     "Black fluted vertical side panels (#111111) full ceiling height with warm sconce lights at 160cm",
-    "Polished cream Calacatta marble floor with realistic natural veining and soft reflections",
-    "Low circular cream travertine podium (40cm × 50cm) center-foreground",
+    "Polished white Calacatta marble floor with realistic natural veining and soft reflections",
+    "Low circular white podium (40cm × 50cm) center-foreground",
     "Tall polished brass planter (120cm) with lush Bird of Paradise / Monstera on left",
     "Built-in recessed illuminated shelving unit (180cm) with warm 2700K backlighting on right",
     "Forgiven Shopping Centre 3D physical logo 100% visible and unblocked inside arch",
-    "Warm premium commercial studio lighting (3000K-3500K) with realistic shadow falloff",
+    "Daylight-calibrated commercial white studio lighting with realistic shadow falloff",
     "Product is the primary hero with immaculate material fidelity and true colour"
   ],
 
@@ -420,8 +420,8 @@ export const CategoryDNARegistry: Record<string, CategoryDNASpec> = {
     isFashion: false,
     allowsModel: false,
     defaultComposition: "LUXURY FOOTWEAR HERO PODIUM — LOW ANGLE",
-    framingPrompt: "Eye-level to slightly low commercial shoe photography. Pair of shoes rests elegantly on the circular cream stone podium. Sole geometry, heel height, lacing, and side silhouette critically sharp. No human model unless explicitly requested.",
-    productAdaptationPrompt: "Eye-level 3/4 angle highlighting leather/canvas texture, stitching, sole tread pattern, buckle/lace hardware, heel profile, toe box curvature. Natural contact ground shadow on cream marble.",
+    framingPrompt: "Eye-level to slightly low commercial shoe photography. Pair of shoes rests elegantly on the circular white stone podium. Sole geometry, heel height, lacing, and side silhouette critically sharp. No human model unless explicitly requested.",
+    productAdaptationPrompt: "Eye-level 3/4 angle highlighting leather/canvas texture, stitching, sole tread pattern, buckle/lace hardware, heel profile, toe box curvature. Natural contact ground shadow on white marble.",
     brandRetentionRule: "Preserve authentic shoe brand (e.g. Nike swoosh, Adidas stripes, Christian Louboutin red sole, Jimmy Choo logo) on heel, tongue, and sole. FSC branding on wall logo and optional FSC shopping bag.",
     stylingPrompt: "SHOE CATEGORY STYLING: Low camera angle for product authority. Side profile showing heel height and sole stack. 3/4 angle showing toe box curvature. Lace routing preserved exactly. Pair placed naturally — not arranged artificially. Real leather creasing and material texture."
   },
@@ -430,7 +430,7 @@ export const CategoryDNARegistry: Record<string, CategoryDNASpec> = {
     isFashion: false,
     allowsModel: false,
     defaultComposition: "HERO LUXURY HANDBAG DISPLAY — SLIGHTLY LOW ANGLE",
-    framingPrompt: "Slightly low camera hero angle for bag authority. Luxury handbag on the low circular cream stone podium or polished marble floor. FSC white shopping bag placed naturally beside it as styling prop.",
+    framingPrompt: "Slightly low camera hero angle for bag authority. Luxury handbag on the low circular white stone podium or polished white marble floor. FSC white shopping bag placed naturally beside it as styling prop.",
     productAdaptationPrompt: "Focus on leather grain scale, edge paint finish, metallic clasp hardware, handle drop distance, shoulder strap geometry, quilting pattern density, interior construction if partially visible. Contact shadow on marble.",
     brandRetentionRule: "Preserve authentic brand hardware (clasp, logo charm, canvas monogram) on the product bag itself. FSC branding belongs ONLY to the architectural wall logo and FSC shopping bag prop — NEVER overlaid onto the product.",
     stylingPrompt: "BAG CATEGORY STYLING: Handle or strap positioned naturally — not artificially propped. Hardware catches real specular highlights from key light. Leather surface shows authentic grain character and slight natural patina. Quilting stitches are counted and accurate."
@@ -440,27 +440,27 @@ export const CategoryDNARegistry: Record<string, CategoryDNASpec> = {
     isFashion: false,
     allowsModel: false,
     defaultComposition: "CLOSE-UP MACRO JEWELLERY DISPLAY",
-    framingPrompt: "Macro detail photography. Jewellery rests on pristine cream travertine block or velvet display pedestal inside the illuminated recessed wall niche. Soft background bokeh.",
+    framingPrompt: "Macro detail photography. Jewellery rests on pristine white stone block or velvet display pedestal inside the illuminated recessed wall niche. Soft background bokeh.",
     productAdaptationPrompt: "Precision macro focus: gemstone facets emit brilliant multi-spectral sparkle, polished gold/platinum catches crisp specular highlights, ring/pendant engraving razor-sharp, prong setting precisely rendered.",
     brandRetentionRule: "Preserve maker's hallmark and brand engraving (e.g. Cartier, Tiffany & Co., Van Cleef) on interior band. FSC branding on architectural wall logo.",
-    stylingPrompt: "JEWELLERY CATEGORY STYLING: Minimal props — clean travertine or velvet surface only. Gemstones show genuine fire and brilliance under focused macro light. Metal surfaces show no AI-smoothing — authentic polish with micro-scratches. Ring interior engraving visible with raking light."
+    stylingPrompt: "JEWELLERY CATEGORY STYLING: Minimal props — clean white stone or velvet surface only. Gemstones show genuine fire and brilliance under focused macro light. Metal surfaces show no AI-smoothing — authentic polish with micro-scratches. Ring interior engraving visible with raking light."
   },
   perfume: {
     categoryName: "Perfume & Fragrance",
     isFashion: false,
     allowsModel: false,
     defaultComposition: "MACRO FRAGRANCE BOTTLING PORTRAIT",
-    framingPrompt: "Commercial fragrance portrait. Perfume bottle stands on honed travertine pedestal inside recessed illuminated shelving or central podium. FSC shopping bag and gift box as styling props nearby.",
+    framingPrompt: "Commercial fragrance portrait. Perfume bottle stands on white stone pedestal inside recessed illuminated shelving or central podium. FSC shopping bag and gift box as styling props nearby.",
     productAdaptationPrompt: "Glass wall thickness, internal liquid transparency and color at correct fill level, spray atomizer nozzle detail, cap reflection and proportion, embossed label typography rendered with 100% optical accuracy.",
     brandRetentionRule: "Preserve authentic perfume brand label (e.g. Chanel N°5, Dior Sauvage, Tom Ford Oud Wood, Creed Aventus) on bottle front panel. FSC branding on 3D wall logo and FSC shopping bag.",
-    stylingPrompt: "PERFUME CATEGORY STYLING: Glass bottle catches ambient light with multiple internal reflections showing liquid color and depth. Cap is precisely proportioned and rendered. Atomizer nozzle detail sharp. Natural shadow cast by bottle glass onto travertine surface. No artificial flare or CGI chrome effects."
+    stylingPrompt: "PERFUME CATEGORY STYLING: Glass bottle catches ambient light with multiple internal reflections showing liquid color and depth. Cap is precisely proportioned and rendered. Atomizer nozzle detail sharp. Natural shadow cast by bottle glass onto white stone surface. No artificial flare or CGI chrome effects."
   },
   watches: {
     categoryName: "Watches & Timepieces",
     isFashion: false,
     allowsModel: false,
     defaultComposition: "LUXURY HOROLOGY DISPLAY — MACRO",
-    framingPrompt: "Macro timepiece photography. Watch mounted on watch cushion or stone display block resting on circular stone podium. Diffused side key light for dial legibility.",
+    framingPrompt: "Macro timepiece photography. Watch mounted on watch cushion or stone display block resting on circular white stone podium. Diffused side key light for dial legibility.",
     productAdaptationPrompt: "Watch bezel style (smooth, fluted, ceramic), watch face dial numerals and indices, hand positions, sapphire glass anti-reflective sheen, leather grain or metallic bracelet link geometry rendered with microscopic precision.",
     brandRetentionRule: "Preserve authentic watch manufacturer branding (e.g. Rolex crown logo, Omega constellation logo, Patek Philippe Calatrava cross, TAG Heuer dial text) exactly on watch dial. FSC branding on background wall architecture.",
     stylingPrompt: "WATCH CATEGORY STYLING: Dial is completely legible — no blown-out highlights on face. Bezel edges show real physical depth and dimension. Crown correctly positioned at 3 o'clock. Bracelet links show authentic finishing — polished vs satin alternation. Time set to 10:10 position for classic horology presentation."
@@ -470,7 +470,7 @@ export const CategoryDNARegistry: Record<string, CategoryDNASpec> = {
     isFashion: false,
     allowsModel: false,
     defaultComposition: "BEAUTY PRODUCT HERO ARRANGEMENT",
-    framingPrompt: "Commercial cosmetics arrangement on cream marble or travertine pedestal with soft wrap-around softbox illumination and minimal botanical styling accent.",
+    framingPrompt: "Commercial cosmetics arrangement on white marble or white stone pedestal with soft wrap-around softbox illumination and minimal botanical styling accent.",
     productAdaptationPrompt: "Packaging typography crisp, cap texture accurate, formula shade color precisely matched, compact finish and lipstick bullet geometry exactly reproduced.",
     brandRetentionRule: "Preserve original cosmetics brand label (e.g. Fenty Beauty, MAC Cosmetics, Estée Lauder, Charlotte Tilbury). FSC branding on retail packaging and architectural background.",
     stylingPrompt: "COSMETICS CATEGORY STYLING: Products arranged in editorial cluster — not in a single line. Packaging labels face camera at legible angle. Shade bullets or applicators suggest the formula color accurately. Subtle botanical prop (single dried flower, leaf) for luxury beauty editorial feel."
@@ -595,7 +595,7 @@ const StudioProfileRegistry: Record<string, StudioProfile> = {
     id: "christmas_studio",
     name: "FSC Christmas Pavilion",
     inheritedFrom: "fsc_signature",
-    environmentPrompt: "FSC CHRISTMAS PAVILION (Festive Holiday Studio at Forgiven Shopping Centre, Lilongwe): FSC Signature Studio architecture fully inherited — cream stone arch, magenta LED strip, polished marble floor, black fluted panels, brass planter — decorated for luxury holiday season. Twin tall Christmas trees with deep hunter green velvet backdrop accents, brushed gold baubles, burgundy satin ribbon, warm fairy lights bokeh. FSC burgundy gift box with gold ribbon in foreground.",
+    environmentPrompt: "FSC CHRISTMAS PAVILION (Festive Holiday Studio at Forgiven Shopping Centre, Lilongwe): FSC Signature Studio architecture fully inherited — pristine white arch, magenta LED strip, polished white marble floor, black fluted panels, brass planter — decorated for luxury holiday season. Twin tall Christmas trees with deep hunter green velvet backdrop accents, brushed gold baubles, burgundy satin ribbon, warm fairy lights bokeh. FSC burgundy gift box with gold ribbon in foreground.",
     lightingPrompt: "Warm tungsten key (2700K) + fairy light bokeh orbs background. Practical antique gold lantern adding warm floor pool. Magenta LED arch retained (#B0208D).",
     compositionPrompt: "Opulent festive luxury composition. Product/model off-center with Christmas trees and warm bokeh framing background. " + DepthDNA.prompt,
     cameraPrompt: "Canon R5 with 85mm f/1.4 RF at f/2.0 for round bokeh orbs. Warm 3200K holiday color grading.",
@@ -607,7 +607,7 @@ const StudioProfileRegistry: Record<string, StudioProfile> = {
     id: "black_friday_studio",
     name: "FSC Black Friday Arena",
     inheritedFrom: "fsc_signature",
-    environmentPrompt: "FSC BLACK FRIDAY ARENA (High-Energy Promotional Studio at Forgiven Shopping Centre, Lilongwe): FSC Signature Studio architecture fully inherited — cream stone arch modified with dramatic magenta LED intensity, cream stone wall retained — with dramatic high-contrast black promotional set treatment. Matte black ribbed/fluted architectural wall panels (#111111) extend full width. Mid-wall continuous horizontal magenta LED strip (#B0208D) intensified. Polished obsidian-black marble floor with mirror reflections.",
+    environmentPrompt: "FSC BLACK FRIDAY ARENA (High-Energy Promotional Studio at Forgiven Shopping Centre, Lilongwe): FSC Signature Studio architecture fully inherited — white arch modified with dramatic magenta LED intensity, white wall retained — with dramatic high-contrast black promotional set treatment. Matte black ribbed/fluted architectural wall panels (#111111) extend full width. Mid-wall continuous horizontal magenta LED strip (#B0208D) intensified. Polished obsidian-black marble floor with mirror reflections.",
     lightingPrompt: "Dramatic high-contrast spotlight from above (4000K) with sharp rim kicker. Magenta LED strip (#B0208D) vibrant ambient accent at full intensity.",
     compositionPrompt: "Bold high-energy power stance. Dynamic framing, high contrast, prominent magenta LED accent. " + DepthDNA.prompt,
     cameraPrompt: "Sony A7R V with 50mm f/1.2 GM. High contrast color grade with deep rich blacks and magenta shadow tones.",
@@ -619,13 +619,13 @@ const StudioProfileRegistry: Record<string, StudioProfile> = {
     id: "minimal_product_studio",
     name: "FSC Product Lab",
     inheritedFrom: "fsc_signature",
-    environmentPrompt: "FSC PRODUCT LAB (Commercial Product Photography Studio at Forgiven Shopping Centre, Lilongwe): Seamless sweep of warm off-white cream plaster (#F5F0EA) with subtle hand-applied texture. Solid honed travertine stone pedestal (40cm high, 50cm diameter) in warm honey-cream tones. Travertine floor with natural grain.",
+    environmentPrompt: "FSC PRODUCT LAB (Commercial Product Photography Studio at Forgiven Shopping Centre, Lilongwe): Seamless sweep of pristine white studio plaster (#FFFFFF) with subtle hand-applied texture. Solid smooth white circular stone pedestal (40cm high, 50cm diameter). Polished white marble floor with natural grain.",
     lightingPrompt: "Precision product photography rig: 180cm Profoto Octabox overhead key, rectangular fill softbox at 45°, 5000K D50 color-neutral standard. Zero color cast. Zero shadows outside product contact shadow.",
-    compositionPrompt: "Pure product-focused commercial composition. Garment or product centered on travertine pedestal. Seams, stitching, hardware critically sharp at 100MP resolution. " + DepthDNA.prompt,
+    compositionPrompt: "Pure product-focused commercial composition. Garment or product centered on white pedestal. Seams, stitching, hardware critically sharp at 100MP resolution. " + DepthDNA.prompt,
     cameraPrompt: "Hasselblad X2D 100C with 90mm f/3.2 at f/11 for 100MP extreme detail capture. Tethered color accuracy.",
-    brandingPrompt: "FSC logo displayed as physical 3D brass plaque affixed to front face of travertine pedestal.",
+    brandingPrompt: "FSC logo displayed as physical 3D brass plaque affixed to front face of white pedestal.",
     negativePrompt: "cluttered props, patterned backdrops, colorful background, dramatic colored lighting, soft focus, dark atmosphere.",
-    qualityRequirements: ["Warm cream plaster backdrop (#F5F0EA)", "Honed travertine stone pedestal", "5000K D50 neutral precision lighting", "Hasselblad 100MP extreme detail", "FSC 3D brass plaque logo on pedestal"]
+    qualityRequirements: ["Pristine white plaster backdrop (#FFFFFF)", "Smooth white stone pedestal", "5000K D50 neutral precision lighting", "Hasselblad 100MP extreme detail", "FSC 3D brass plaque logo on pedestal"]
   }
 };
 
@@ -642,9 +642,9 @@ The Forgiven Shopping Centre logo must appear physically mounted inside the arch
 - Brand name line 1: 'Forgiven' in bold magenta (#B0208D) text directly below the bag icon
 - Brand name line 2: 'Shopping Centre' in smaller magenta (#B0208D) text beneath 'Forgiven'
 - The logo lockup is always vertical: bag icon on top, 'Forgiven' below, 'Shopping Centre' below that
-- Physical Mounting: Mounted on the cream stone wall inside the arch as 3D dimensional lettering with real depth and natural drop shadows
+- Physical Mounting: Mounted on the pristine white plaster wall inside the arch as 3D dimensional lettering with real depth and natural drop shadows
 - THIRD-PARTY BRAND INTEGRITY: Third-party manufacturer logos on products MUST be preserved 100% authentic and untouched on the product itself. FSC branding belongs ONLY to the retail architecture (the wall logo inside the arch) and FSC shopping bags/packaging.
-- CRITICAL LOGO RULE: The shopping bag icon mounted on the cream wall inside the arch MUST contain a clean, solid, bold WHITE CAPITAL LETTER "F" — NEVER any third-party monogram, NEVER any LV pattern, NEVER any other brand mark.`;
+- CRITICAL LOGO RULE: The shopping bag icon mounted on the white wall inside the arch MUST contain a clean, solid, bold WHITE CAPITAL LETTER "F" — NEVER any third-party monogram, NEVER any LV pattern, NEVER any other brand mark.`;
 
 // ----------------------------------------------------------------------------
 // MODULE K: CAMPAIGN DNA — Multi-Image Photoshoot Consistency Engine
@@ -746,12 +746,12 @@ export const RegenerationDirectives: Record<QAFailureType, string> = {
   color_drift: "STRICT COLOUR CORRECTION DIRECTIVE (REGENERATION): The previous attempt produced incorrect product colour. The dominant colour from the reference MUST be reproduced exactly — match hue, saturation, and value with scientific precision. Do NOT reinterpret, neutralize, or shift the colour. If the reference shows Olive Green, output MUST be Olive Green. If Jet Black, output MUST be Jet Black. Colour drift is a critical failure.",
   wrong_material: "STRICT MATERIAL RECONSTRUCTION DIRECTIVE (REGENERATION): The previous attempt rendered the wrong material. Reproduce the exact physical material from the reference — leather grain scale, fabric weave pattern, surface finish (matte/satin/gloss), and material weight must be physically accurate. Do NOT substitute a generic material.",
   missing_arch_led: "STRICT STUDIO ARCHITECTURE DIRECTIVE (REGENERATION): The previous attempt was missing the magenta LED arch outline. The signature arch with continuously glowing integrated magenta LED strip (#B0208D, 25mm width) is MANDATORY in every FSC Signature Studio render. This architectural element is non-negotiable and must be clearly visible.",
-  missing_logo: "STRICT FSC LOGO DIRECTIVE (REGENERATION): The previous attempt was missing the Forgiven Shopping Centre 3D physical logo. The physically mounted magenta (#B0208D) shopping bag logo with 'Forgiven Shopping Centre' text MUST appear inside the arch on the cream stone wall with real physical depth and natural drop shadows. It is never a watermark — it is architectural signage.",
-  weak_reflections: "STRICT REFLECTION & SURFACE DIRECTIVE (REGENERATION): The previous attempt had unrealistic or absent floor reflections. The polished cream Calacatta marble floor MUST show authentic natural specular reflections of the product or model silhouette. Reflections should be soft, not mirror-perfect — realistic marble physics.",
+  missing_logo: "STRICT FSC LOGO DIRECTIVE (REGENERATION): The previous attempt was missing the Forgiven Shopping Centre 3D physical logo. The physically mounted magenta (#B0208D) shopping bag logo with 'Forgiven Shopping Centre' text MUST appear inside the arch on the pristine white plaster wall with real physical depth and natural drop shadows. It is never a watermark — it is architectural signage.",
+  weak_reflections: "STRICT REFLECTION & SURFACE DIRECTIVE (REGENERATION): The previous attempt had unrealistic or absent floor reflections. The polished white Calacatta marble floor MUST show authentic natural specular reflections of the product or model silhouette. Reflections should be soft, not mirror-perfect — realistic marble physics.",
   incorrect_stitching: "STRICT PRODUCT CONSTRUCTION DIRECTIVE (REGENERATION): The previous attempt hallucinated or misrendered garment stitching, seams, or construction details. Apply Product Identity Lock with maximum strictness. Reproduce the exact stitch density, seam placement, pocket construction, and hem finish from the reference image. Do NOT invent new construction details.",
   poor_composition: "STRICT COMPOSITION DIRECTIVE (REGENERATION): The previous attempt had poor compositional balance. Apply Depth DNA and Composition Balance Engine: Hero Subject ≈60% of frame weight, Negative Space ≈25%, Architecture ≈15%. Product/model MUST be off-center to reveal the arch logo. Apply a different Composition DNA template from the pose library.",
-  weak_lighting: "STRICT LIGHTING DIRECTIVE (REGENERATION): The previous attempt had weak, flat, or incorrectly colored lighting. The FSC studio uses warm premium commercial lighting (3000K-3500K) with a large key softbox, V-flat fill, and the integrated magenta LED arch accent. Reproduce natural shadow falloff, real specular highlights on marble and brass, and physically accurate contact shadows.",
-  inconsistent_architecture: "STRICT STUDIO CONSISTENCY DIRECTIVE (REGENERATION): The previous attempt rendered an inconsistent studio environment. Apply StudioSeed dimensions exactly: arch radius 1.8m, podium 40cm × 50cm travertine, brass planter strictly left at 120cm, illuminated shelving strictly right wall, black fluted panels full ceiling height with sconces at 160cm. This studio is a permanent physical space photographed repeatedly — not a new AI invention.",
+  weak_lighting: "STRICT LIGHTING DIRECTIVE (REGENERATION): The previous attempt had weak, flat, or incorrectly colored lighting. The FSC studio uses daylight-calibrated commercial white studio lighting with a large key softbox, V-flat fill, and the integrated magenta LED arch accent. Reproduce natural shadow falloff, real specular highlights on white marble and brass, and physically accurate contact shadows.",
+  inconsistent_architecture: "STRICT STUDIO CONSISTENCY DIRECTIVE (REGENERATION): The previous attempt rendered an inconsistent studio environment. Apply StudioSeed dimensions exactly: arch radius 1.8m, podium 40cm × 50cm white stone, brass planter strictly left at 120cm, illuminated shelving strictly right wall, black fluted panels full ceiling height with sconces at 160cm. This studio is a permanent physical space photographed repeatedly — not a new AI invention.",
   hallucinated_product: "STRICT PRODUCT IDENTITY LOCK DIRECTIVE (REGENERATION — CRITICAL): The previous attempt redesigned, modernized, or hallucinated product details not present in the reference. Apply maximum Product Identity Lock. You are a commercial photographer. Photograph the EXACT product shown in the reference. Do NOT add details. Do NOT improve the design. Do NOT reinterpret the product. Reproduce it as a camera would.",
   poor_photography_quality: "STRICT COMMERCIAL PHOTOGRAPHY DIRECTIVE (REGENERATION): The previous attempt had poor photographic quality — AI artifacts, over-sharpening, plastic skin, HDR glow, or unnatural color science. Reproduce the image as a real commercial photographer would using the specified camera system. Zero AI glow. Zero over-processing. Authentic physical material rendering. Real skin texture. Natural depth of field falloff."
 };
@@ -1708,7 +1708,7 @@ async function runSpecializedObjectVTON(
     poseGuide,
     extraRefsPrompt ? `Additional product reference angles for 3D fidelity: ${extraRefsPrompt}.` : "",
 
-    `MODEL POSITION: stands LEFT or RIGHT of the cream pedestal — NEVER dead centre blocking the Forgiven logo inside the arch.`,
+    `MODEL POSITION: stands LEFT or RIGHT of the white pedestal — NEVER dead centre blocking the Forgiven logo inside the arch.`,
 
     `Output: photorealistic commercial photograph indistinguishable from a real camera shot by a world-class fashion photographer.`
   ].filter(Boolean).join("\n\n");
@@ -2809,16 +2809,16 @@ YOUR MAIN MANDATE: Dress the person from Image 2 in the exact garment from Image
 
             // [4] SHOT TYPE & HERO MODEL FRAMING — mirrors FRAME LAYOUT CONTRACT
             `SHOT TYPE & CAMERA FRAMING: FULL-LENGTH HEAD-TO-TOE VERTICAL FASHION PHOTOGRAPH (9:16 ASPECT RATIO).
-• COMPLETE HEIGHT MANDATE: Camera MUST capture the model's COMPLETE HEIGHT from top of head all the way down to their feet and shoes standing on the polished cream marble floor.
+• COMPLETE HEIGHT MANDATE: Camera MUST capture the model's COMPLETE HEIGHT from top of head all the way down to their feet and shoes standing on the polished white marble floor.
 • ABSOLUTELY ZERO CROPPING: NO cropping at thighs, knees, or ankles. Both legs, lower hem/skirt bottom, feet, and shoes MUST be 100% visible resting on the marble floor plane.`,
             `HERO MODEL SPATIAL PLACEMENT (SPLIT-FRAME RULE):`,
             `  • The model stands OFF-CENTRE — at 30–38% frame width on the LEFT side, OR 62–70% frame width on the RIGHT side.`,
             `  • NEVER at 50% dead centre — the centre zone belongs to the arch, podium, and logo.`,
-            `  • The model stands BESIDE the cream circular podium (foreground), NOT inside the arch, NOT on the podium, NOT blocking the logo.`,
+            `  • The model stands BESIDE the white circular podium (foreground), NOT inside the arch, NOT on the podium, NOT blocking the logo.`,
             `  • The model's body faces slightly inward toward the podium — elegant editorial stance.`,
             `  • PROMINENT SCALE: The model occupies 65%–75% of the total frame height. Tall, proud, in crisp sharp focus.`,
-            `  • BRIGHT WARM LIGHTING: Direct 3200K studio key light illuminating the model and outfit — vibrant fabric texture, natural glowing skin, zero dark corner shadows on the model.`,
-            `  • The central arch, cream podium, and 3D Forgiven wall logo remain FULLY VISIBLE and unobstructed in the background centre.`,
+            `  • BRIGHT WHITE LIGHTING: Daylight-calibrated commercial white studio key light illuminating the model and outfit — vibrant fabric texture, natural glowing skin, zero dark corner shadows on the model.`,
+            `  • The central arch, white podium, and 3D Forgiven wall logo remain FULLY VISIBLE and unobstructed in the background centre.`,
 
             // [5] STRICTNESS ESCALATION (on retry)
             strictnessPromptModifier,
