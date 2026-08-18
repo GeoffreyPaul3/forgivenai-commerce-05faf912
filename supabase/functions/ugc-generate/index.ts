@@ -2607,7 +2607,6 @@ async function runProductStudioShot(
 }
 
 async function runUnifiedVTON(
-
   keys: { qwenKey: string; falKey: string; phottaKey: string; hfToken: string },
   personImageUrl: string,
   productImages: string[],
@@ -2621,10 +2620,9 @@ async function runUnifiedVTON(
   hairstyle?: string,
   makeup?: string,
   brandLogoUrl?: string,
-  // When provided, skip AI re-detection and use this as the verified garment descriptor.
-  // This is populated from the decompose-image step for grid/variant products, where the
-  // garment details were already verified against the clean full grid image — not the crop.
-  garmentDetailsOverride?: string
+  garmentDetailsOverride?: string,
+  complexion?: string,
+  bodyType?: string
 ): Promise<string> {
   const targetEthnicity = ethnicity || "person";
   const targetGender = gender || "female";
@@ -2637,10 +2635,6 @@ async function runUnifiedVTON(
   const primaryProductUrl = productImages[0];
 
   // 1. Resolve garment details.
-  // PRIORITY: Use the pre-verified override (from decompose-image analysis of the full grid image)
-  // when available, because it is more accurate than re-detecting on a cropped sub-image which
-  // may be small, partially occluded, or poorly extracted — leading to hallucinated garments.
-  // Fallback: run AI vision detection against the primaryProductUrl (original behavior).
   let garmentDetails: string;
   if (garmentDetailsOverride && garmentDetailsOverride.trim()) {
     garmentDetails = garmentDetailsOverride;
@@ -2692,21 +2686,20 @@ async function runUnifiedVTON(
         );
 
         // Verify visual fidelity via 10-Point Audit
-        
-          const humanAudit = await verifyHumanQuality(keys.qwenKey, resultUrl, personImageUrl);
-          if (!humanAudit.pass) {
-            console.warn(`[Unified VTON] ❌ Human Quality Audit FAILED: ${humanAudit.issues.join(", ")}`);
-            lastReasoning = "Failed human anatomy check: " + humanAudit.issues.join(", ");
-            continue;
-          }
-          const shapeAudit = await verifyClothingShape(keys.qwenKey, productImages, resultUrl);
-          if (!shapeAudit.pass) {
-            console.warn(`[Unified VTON] ❌ Clothing Shape Audit FAILED: ${shapeAudit.reason}`);
-            lastReasoning = "Failed shape audit: " + shapeAudit.reason;
-            continue;
-          }
+        const humanAudit = await verifyHumanQuality(keys.qwenKey, resultUrl, personImageUrl);
+        if (!humanAudit.pass) {
+          console.warn(`[Unified VTON] ❌ Human Quality Audit FAILED: ${humanAudit.issues.join(", ")}`);
+          lastReasoning = "Failed human anatomy check: " + humanAudit.issues.join(", ");
+          continue;
+        }
+        const shapeAudit = await verifyClothingShape(keys.qwenKey, productImages, resultUrl);
+        if (!shapeAudit.pass) {
+          console.warn(`[Unified VTON] ❌ Clothing Shape Audit FAILED: ${shapeAudit.reason}`);
+          lastReasoning = "Failed shape audit: " + shapeAudit.reason;
+          continue;
+        }
 
-          const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl, enterprisePromptObj.profile.qualityRequirements);
+        const audit = await verifyProductFidelity(keys.qwenKey, productImages, resultUrl, enterprisePromptObj.profile.qualityRequirements);
 
         if (audit.pass) {
           console.log(`[Unified VTON] ✅ Specialized fidelity audit PASSED on attempt ${attempt} (Score: ${audit.score}%)`);
@@ -2736,36 +2729,37 @@ async function runUnifiedVTON(
 
   let lastReasoning = "";
   const maxRetries = 3;
-  // Best-effort tracking: serve the highest-scoring result if nothing reaches the pass threshold
   let bestResultUrl: string | null = null;
   let bestResultScore = 0;
-  // Shape-audit-failed best candidate: used only as last resort when ALL shape-passing attempts fail
-  // (e.g. Wan generates trousers instead of a skirt every time but every other engine is dead)
   let shapeFailedBestUrl: string | null = null;
   let shapeFailedBestScore = 0;
-  // Track if fal.ai balance is exhausted to avoid repeated failed calls
   let falBalanceExhausted = false;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     console.log(`[Unified VTON] Attempt ${attempt} of ${maxRetries} for apparel try-on...`);
 
-    // Mutate seed based on attempt
     const seed = attempt === 1 ? 42 : attempt === 2 ? 738920 : 1948302;
+
+    const falPersonaPrompt = [
+      `${garmentDetails} — worn by the REAL HUMAN ${targetGender} ${targetEthnicity} model shown in the reference photo.`,
+      `STRICT FACIAL IDENTITY LOCK: Preserve the EXACT face, eyes, nose, lips, jawline, skin tone, and facial features from the reference person photo 100% identically.`,
+      complexion ? `Complexion: ${complexion}.` : ``,
+      hairstyle ? `Hair: ${hairstyle}.` : ``,
+      makeup ? `Makeup: ${makeup}.` : ``,
+      bodyType ? `Body type: ${bodyType}.` : ``,
+      `DO NOT generate a mannequin or a different person. Preserve exact sleeve length, exact colour, exact design details. The clothes MUST match the reference image exactly. seed: ${seed}`
+    ].filter(Boolean).join(" ");
 
     const engines = [
       {
         name: "Fal.ai VTON",
         available: !!keys.falKey && !falBalanceExhausted,
         fn: async () => {
-          // Use primaryProductUrl (raw vendor photo) — NOT segmentedGarmentUrl.
-          // Photta ghost-mannequin segmentation mangles multi-piece outfits (e.g. wrap
-          // dresses with rose details, 2-piece sets with blazers). The raw product
-          // image preserves every colour, sleeve, and garment detail for Fal.ai to
           return await callFalAI(
             keys.falKey,
             personImageUrl,
             primaryProductUrl,
-            `${garmentDetails} — worn by a REAL HUMAN ${targetGender} ${targetEthnicity} model. DO NOT generate a mannequin. Preserve exact sleeve length, exact colour, exact design details. The clothes MUST match the reference image exactly. seed: ${seed}`
+            falPersonaPrompt
           );
         }
       },
@@ -2782,9 +2776,6 @@ async function runUnifiedVTON(
 
           const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
 
-          // MULTIMODAL VTON PROMPT STRUCTURE:
-          // [1] VIRTUAL TRY-ON MANDATE MUST BE FIRST — gives maximum token priority to Image 1 + Image 2 garment transfer.
-          //     This prevents the model from being distracted by studio details and defaulting to generic black clothing.
           const wanPrompt = [
             // [1] VIRTUAL TRY-ON MANDATE — PRIMARY TASK (MAXIMUM TOKEN PRIORITY)
             `VIRTUAL TRY-ON MANDATE — PRIMARY TASK (CRITICAL):
@@ -2801,8 +2792,15 @@ YOUR MAIN MANDATE: Dress the person from Image 2 in the exact garment from Image
 • Product Name: ${description}
 • Selected Variation: ${garmentDetails}`,
 
-            // [2] MODEL IDENTITY from Image 2
-            `MODEL IDENTITY: Use the EXACT person from Image 2 (${targetGender} ${targetEthnicity}). The face, skin tone, body shape, and height MUST be identical to Image 2. Do NOT generate a different person. REAL HUMAN — not a mannequin, not CGI.`,
+            // [2] MODEL IDENTITY & PERSONA LOCK from Image 2
+            `MODEL IDENTITY & FACIAL CONSISTENCY LOCK (STRICT PERSONA MANDATE):
+• EXACT FACE REPRODUCTION: The generated model MUST have the EXACT SAME face, eyes, nose, lips, jawline, facial structure, and skin tone as the reference person in Image 2 (${targetGender} ${targetEthnicity}).
+• IMMUTABLE PERSONA: Do NOT generate a different face, do NOT change ethnicity, do NOT alter skin complexion. This is a locked brand persona.
+${complexion ? `• COMPLEXION / SKIN TONE: ${complexion}.` : ""}
+${hairstyle ? `• HAIRSTYLE: ${hairstyle}.` : ""}
+${makeup ? `• MAKEUP: ${makeup}.` : ""}
+${bodyType ? `• BODY TYPE & POSTURE: ${bodyType}.` : ""}
+• REAL HUMAN PHOTOGRAPH — exact facial identity preserved from Image 2.`,
 
             // [3] BACKGROUND ENVIRONMENT — FSC SIGNATURE STUDIO & 3D LOGO
             buildVTONStudioBlock(scene || "studio"),
@@ -3188,27 +3186,23 @@ Deno.serve(async (req) => {
             return new Response(JSON.stringify({ success: true, imageUrl: persistedUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
           }
         } else {
-          let url;
-          // useExactPhoto is ONLY honoured when:
-          //  - The reference is a true user upload (base64 data URI), AND
-          //  - The user has NOT explicitly specified an ethnicity override.
-          // If an ethnicity is specified (e.g. "african"), always generate via AI so the
-          // selection is actually respected — not silently skipped by returning an old avatar.
+          let url: string;
+          // When the user uploads their own photo (useExactPhoto or base64 image data URI),
+          // persist THAT exact uploaded photo to storage and return its public URL.
           const isUserUploadedBase64 = referenceImage && referenceImage.startsWith("data:");
-          const hasEthnicityOverride = !!(body.ethnicity);
-          if (body.useExactPhoto && isUserUploadedBase64 && !hasEthnicityOverride) {
+          if ((body.useExactPhoto || isUserUploadedBase64) && referenceImage) {
             url = referenceImage;
-            console.log(`[generate-avatar] Using uploaded exact photo directly without AI generation.`);
+            console.log(`[generate-avatar] Using uploaded exact photo as locked persona reference image.`);
           } else {
-            // Creating a baseline influencer identity portrait (no product selected)
-            // Always respects the user's chosen gender + ethnicity selection.
+            // Creating a baseline influencer identity portrait via AI (no user photo uploaded)
+            // Always respects the user's chosen gender + ethnicity + metadata settings.
             const modelDesc = `Stunningly beautiful high-fashion supermodel. Striking editorial facial features.`;
             const identityDesc = `GENDER: ${gender}. ETHNICITY/SKIN TONE: ${ethnicity} ${skinTone}. The model MUST have clearly ${ethnicity} facial features, skin tone, and appearance — this is mandatory.`;
             const styleDesc = `${hairstyle ? `HAIRSTYLE: ${hairstyle}.` : ""} ${makeup ? `MAKEUP: ${makeup}.` : ""}`;
             const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
             const prompt = `High-end fashion portrait. ${modelDesc} ${identityDesc} ${styleDesc} SETTING: ${setting || "studio"}. ${anatomyPrompt}`;
-            console.log(`[generate-avatar] Generating fresh AI portrait for ${gender} ${ethnicity} (useExactPhoto=${body.useExactPhoto}, isBase64=${isUserUploadedBase64}, ethnicityOverride=${hasEthnicityOverride}).`);
-            // Only pass referenceImage as a style hint when it's an actual uploaded file, not a previously-generated avatar URL
+            console.log(`[generate-avatar] Generating fresh AI portrait for ${gender} ${ethnicity}.`);
+            // Only pass referenceImage as a style hint when it's an actual uploaded file
             const styleHints = isUserUploadedBase64 ? [{ type: 'influencer' as const, url: referenceImage! }] : [];
             url = await callImageAI(QWEN_API_KEY, prompt, styleHints, supabase);
           }
@@ -3447,9 +3441,14 @@ Deno.serve(async (req) => {
 
     if (action === "generate-campaign-shot") {
       const { influencer, product, scene } = body;
-      const influencerImageUrl = influencer.avatar_url || "";
-      const influencerEthnicity = influencer.ethnicity || influencer.skin_tone || "";
-      const influencerGender = influencer.gender || "female";
+      const influencerImageUrl = influencer?.avatar_url || "";
+      const influencerEthnicity = influencer?.ethnicity || influencer?.skin_tone || "";
+      const influencerGender = influencer?.gender || "female";
+      const meta = influencer?.metadata || {};
+      const hairstyle = body.hairstyle || meta.hair || meta.hairstyle || influencer?.hairstyle || "";
+      const makeup = body.makeup || meta.makeup || influencer?.makeup || "";
+      const complexion = body.complexion || meta.complexion || influencer?.complexion || "";
+      const bodyType = body.bodyType || meta.body_type || influencer?.body_type || "";
 
       // Build a verified garment descriptor from the decompose-image variant details when
       // the frontend sends them (i.e. for grid/composite products). This bypasses the
@@ -3519,7 +3518,7 @@ Deno.serve(async (req) => {
       }
 
       // ── EXISTING FASHION / VTON PIPELINE (UNTOUCHED) ──────────────────────
-      const cacheKey = await getCacheKey(influencerImageUrl, primaryProductUrl, `${scene}|${influencerEthnicity}|${influencerGender}|${variantCacheKey}`);
+      const cacheKey = await getCacheKey(influencerImageUrl, primaryProductUrl, `${scene}|${influencerEthnicity}|${influencerGender}|${variantCacheKey}|${hairstyle}|${makeup}|${complexion}`);
       const cachedUrl = await checkCache(supabase, cacheKey);
       if (cachedUrl) return new Response(JSON.stringify({ success: true, imageUrl: cachedUrl, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
@@ -3528,17 +3527,19 @@ Deno.serve(async (req) => {
           { qwenKey: QWEN_API_KEY, falKey: FAL_KEY, phottaKey: PHOTTA_API_KEY, hfToken: HF_TOKEN },
           influencerImageUrl,
           productImages,
-          product.category || "apparel",
-          product.name || "garment",
+          product?.category || "apparel",
+          product?.name || "garment",
           supabase,
           influencerEthnicity,
           influencerGender,
           scene,
           body.style || "",
-          undefined,
-          undefined,
+          hairstyle,
+          makeup,
           body.brandLogoUrl,
-          variantGarmentOverride
+          variantGarmentOverride,
+          complexion,
+          bodyType
         );
 
         // --- OFFICIAL BRAND LOGO COMPOSITING (HARD REQUIREMENT) ---
