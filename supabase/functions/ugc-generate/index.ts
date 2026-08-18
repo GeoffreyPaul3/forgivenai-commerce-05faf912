@@ -256,7 +256,7 @@ export const PoseDNA: Record<PoseTemplate, string> = {
   hands_in_pocket: "Hands in pocket: casual confident stance with one or both hands loosely in pockets, weight on back foot, relaxed facial expression. Feels editorial not stiff.",
   crossed_legs: "Crossed legs standing: model standing with legs gently crossed at ankles or knees, arms folded loosely or resting. Relaxed sophisticated stance.",
   sitting_chair: "Seated editorial: model seated elegantly on modern chair or low stool, knees together, straight posture, one hand resting in lap. Shows garment sit-behavior and hem.",
-  podium_lean: "Podium lean: model leaning elegantly with one hand resting on top of cream stone podium, weight shifted, creating a diagonal line through the composition.",
+  podium_lean: "Podium lean: model leaning elegantly with one hand resting on top of white stone podium, weight shifted, creating a diagonal line through the composition.",
   mirror_pose: "Mirror reflection: model positioned facing a floor-length mirror in the set, showing both the garment front and the mirror reflection in one composition.",
   catalogue_front: "Catalogue front: model standing directly facing the camera, arms relaxed at sides, completely upright. Clean symmetrical catalogue reference shot showing exact garment construction.",
   catalogue_45: "Catalogue 45°: model positioned at 45 degrees to the camera, looking slightly off-lens. Shows side seam construction and garment silhouette profile.",
@@ -333,7 +333,7 @@ const DepthDNA = {
     "FOREGROUND (0–50cm from lens): Subtle out-of-focus props, soft shadow of product/model, FSC shopping bag or gift box edge",
     "HERO PRODUCT PLANE (50–100cm from lens): The primary subject — product or model with garment — occupying approximately 60% of visual frame weight, critically sharp",
     "MIDGROUND (100–200cm from lens): Travertine podium, marble floor surface, base of planter or shelving. Slightly soft with natural depth of field fall-off",
-    "ARCHITECTURAL PLANE (200–350cm from lens): Signature arch outline with magenta LED, cream stone back wall, black fluted side panels, shelving unit, sconce lights",
+    "ARCHITECTURAL PLANE (200–350cm from lens): Signature arch outline with magenta LED, pristine white stone back wall, black fluted side panels, shelving unit, sconce lights",
     "BACKGROUND (350cm+ from lens): Soft vignetting on wall surface, subtle lighting falloff creating atmosphere and depth, FSC 3D logo inside arch at focal plane"
   ],
   compositionalBalance: {
@@ -571,25 +571,25 @@ const StudioProfileRegistry: Record<string, StudioProfile> = {
     id: "lifestyle_home",
     name: "FSC Lifestyle Residence",
     inheritedFrom: "fsc_signature",
-    environmentPrompt: "FSC LIFESTYLE RESIDENCE (Luxury Residential Showroom at Forgiven Shopping Centre, Lilongwe): Real modern African luxury apartment interior. Warm cream limewash plaster walls, honed travertine marble floor in herringbone pattern, floor-to-ceiling window with white sheer linen curtains diffusing natural morning sunlight. Cream bouclé sofa, dark wood side table, raffia accent rug, hardcover art volume.",
-    lightingPrompt: "Natural morning sunlight through floor-to-ceiling windows (5500K) paired with 2700K practical lamp ambient fill — casting soft architectural shadows.",
+    environmentPrompt: "FSC LIFESTYLE RESIDENCE (Luxury Residential Showroom at Forgiven Shopping Centre, Lilongwe): Real modern African luxury apartment interior. Pure white limewash plaster walls, white marble floor in herringbone pattern, floor-to-ceiling window with white sheer linen curtains diffusing natural morning sunlight. White bouclé sofa, dark wood side table, raffia accent rug, hardcover art volume.",
+    lightingPrompt: "Natural morning sunlight through floor-to-ceiling windows (5500K) paired with neutral fill — casting soft architectural shadows.",
     compositionPrompt: "Editorial lifestyle composition. Model or product in an authentic relaxed moment. Story-driven framing with natural human behavior. " + DepthDNA.prompt,
-    cameraPrompt: "Hasselblad X2D 100C with 90mm f/3.2 lens. Creamy background bokeh, critically sharp subject, natural daylight color science.",
-    brandingPrompt: "Forgiven Shopping Centre logo physically integrated into the interior: engraved into the travertine feature wall or displayed as 3D brass plaque on side table.",
-    negativePrompt: "cluttered rooms, worn furniture, cheap apartment, harsh flash, cold blue light, plastic surfaces, staged room, IKEA generic furniture.",
-    qualityRequirements: ["Warm cream limewash plaster walls", "Honed travertine herringbone floor", "Floor-to-ceiling window with natural sunlight", "Contemporary African luxury furniture", "FSC logo physically in interior feature wall"]
+    cameraPrompt: "Hasselblad X2D 100C with 90mm f/3.2 lens. Soft background bokeh, critically sharp subject, natural daylight color science.",
+    brandingPrompt: "Forgiven Shopping Centre logo physically integrated into the interior: engraved into the white travertine feature wall or displayed as 3D brass plaque on side table.",
+    negativePrompt: "cluttered rooms, worn furniture, cheap apartment, harsh flash, cold blue light, plastic surfaces, staged room, IKEA generic furniture, cream color cast, yellow tint.",
+    qualityRequirements: ["Pure white limewash plaster walls", "White marble herringbone floor", "Floor-to-ceiling window with natural sunlight", "Contemporary African luxury furniture", "FSC logo physically in interior feature wall"]
   },
   outdoor_fashion: {
     id: "outdoor_fashion",
     name: "FSC Outdoor Courtyard",
     inheritedFrom: "fsc_signature",
-    environmentPrompt: "FSC OUTDOOR COURTYARD (Contemporary Outdoor Terrace at Forgiven Shopping Centre, Lilongwe, Malawi): Large-format rough-honed travertine pavers in warm cream/beige. Textured dry-stack limestone boundary wall with lush tropical African garden plants (Birds of Paradise, Elephant Ears). Mature shade tree with dappled shadows. Vivid deep African blue sky.",
-    lightingPrompt: "Golden hour sunlight at 15–20° angle — warm amber-orange directional light (3200K-4000K) creating a warm rim highlight. Soft sky fill and dappled tree shadow patterns.",
+    environmentPrompt: "FSC OUTDOOR COURTYARD (Contemporary Outdoor Terrace at Forgiven Shopping Centre, Lilongwe, Malawi): Large-format rough-honed white travertine pavers in crisp white. Textured dry-stack limestone boundary wall with lush tropical African garden plants (Birds of Paradise, Elephant Ears). Mature shade tree with dappled shadows. Vivid deep African blue sky.",
+    lightingPrompt: "Daylight sunlight at 15–20° angle — 5500K directional daylight light creating a clean rim highlight. Soft sky fill and dappled tree shadow patterns.",
     compositionPrompt: "High-fashion outdoor editorial composition. Authentic interaction with architecture and garden. Layered visual depth. " + DepthDNA.prompt,
-    cameraPrompt: "Sony A7R V with 85mm f/1.4 GM II at f/2.0 for soft background bokeh. Warm golden RAW color science.",
-    brandingPrompt: "FSC logo physically sandblasted into travertine wall or mounted as slim 3D brass plaque on limestone boundary wall.",
-    negativePrompt: "concrete city streets, European garden, resort palms, mid-day harsh sun, flat overcast sky, fake plastic plants, oversaturated sky.",
-    qualityRequirements: ["Travertine stone paver terrace", "Dry-stack limestone boundary wall", "Authentic African tropical garden plants", "Golden hour warm sunlight (3200K-4000K)", "Deep African blue sky", "FSC logo physically in architecture"]
+    cameraPrompt: "Sony A7R V with 85mm f/1.4 GM II at f/2.0 for soft background bokeh. Clean neutral RAW color science.",
+    brandingPrompt: "FSC logo physically sandblasted into white wall or mounted as slim 3D brass plaque on limestone boundary wall.",
+    negativePrompt: "concrete city streets, European garden, resort palms, mid-day harsh sun, flat overcast sky, fake plastic plants, oversaturated sky, cream cast, yellow tint.",
+    qualityRequirements: ["White travertine stone paver terrace", "Dry-stack limestone boundary wall", "Authentic African tropical garden plants", "Daylight sunlight (5500K)", "Deep African blue sky", "FSC logo physically in architecture"]
   },
   christmas_studio: {
     id: "christmas_studio",

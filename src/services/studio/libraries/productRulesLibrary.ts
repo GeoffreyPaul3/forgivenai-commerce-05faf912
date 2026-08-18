@@ -18,7 +18,7 @@ export const ProductRulesLibrary: Record<string, ProductCategoryRule> = {
     preferredLens: "SONY_85MM_GM",
     preferredLighting: "COMMERCIAL_WARM",
     preferredComposition: "COMP_HERO_PORTRAIT_001",
-    materialPairing: ["WHITE_CYCLORAMA", "CREAM_PLASTER"],
+    materialPairing: ["WHITE_CYCLORAMA"],
     mandatoryShots: ["SHOT_HERO_001", "SHOT_SIDE_003"]
   },
   PRULE_ELECTRONICS_003: {
@@ -38,7 +38,7 @@ export const ProductRulesLibrary: Record<string, ProductCategoryRule> = {
     preferredLens: "SONY_85MM_GM",
     preferredLighting: "COMMERCIAL_WARM",
     preferredComposition: "COMP_EDITORIAL_003",
-    materialPairing: ["WHITE_CYCLORAMA", "CALACATTA_MARBLE", "CREAM_PLASTER"],
+    materialPairing: ["WHITE_CYCLORAMA", "CALACATTA_MARBLE"],
     mandatoryShots: ["SHOT_HERO_001", "SHOT_LOOKBOOK_002"]
   }
 };

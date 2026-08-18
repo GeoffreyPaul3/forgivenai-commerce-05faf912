@@ -6,7 +6,7 @@ export const EnvironmentLibrary: Record<string, EnvironmentProfile> = {
     version: "3.0.0",
     name: "Flagship FSC Signature Studio",
     architecturePrompt: "Modern African luxury retail architecture (Forgiven Shopping Centre, Lilongwe, Malawi). Signature pristine white arch (1.8m radius, 3.2m height) on seamless white plaster wall outlined by glowing integrated magenta LED strip (#B0208D). Flanked by vertical black fluted architectural panels (#111111) with warm vertical sconces. Low seamless white circular podium on polished white Calacatta marble floor.",
-    keyMaterials: ["WHITE_CYCLORAMA", "CREAM_PLASTER", "CALACATTA_MARBLE", "FLUTED_WOOD", "BRUSHED_BRASS"]
+    keyMaterials: ["WHITE_CYCLORAMA", "CALACATTA_MARBLE", "FLUTED_WOOD", "BRUSHED_BRASS"]
   },
   ENV_LUXURY_WHITE_002: {
     id: "ENV_LUXURY_WHITE_002",
@@ -19,15 +19,15 @@ export const EnvironmentLibrary: Record<string, EnvironmentProfile> = {
     id: "ENV_LIFESTYLE_RESIDENCE_003",
     version: "3.0.0",
     name: "FSC Lifestyle Showroom Residence",
-    architecturePrompt: "Modern African luxury apartment interior. Warm cream limewash plaster walls, honed travertine marble floor in herringbone pattern, floor-to-ceiling windows with white sheer linen curtains diffusing natural morning sunlight. Bouclé sofa, dark wood side table, raffia accent rug.",
-    keyMaterials: ["CREAM_PLASTER", "TRAVERTINE", "BRUSHED_BRASS"]
+    architecturePrompt: "Modern African luxury apartment interior. Pristine white limewash plaster walls, white travertine marble floor in herringbone pattern, floor-to-ceiling windows with white sheer linen curtains diffusing natural morning sunlight. White bouclé sofa, dark wood side table, raffia accent rug.",
+    keyMaterials: ["WHITE_CYCLORAMA", "TRAVERTINE", "BRUSHED_BRASS"]
   },
   ENV_OUTDOOR_TERRACE_004: {
     id: "ENV_OUTDOOR_TERRACE_004",
     version: "3.0.0",
     name: "FSC Outdoor Courtyard Terrace",
-    architecturePrompt: "Rough-honed cream travertine pavers, textured dry-stack limestone boundary wall with tropical African plants (Birds of Paradise, Elephant Ears). Mature shade tree casting dappled shadows against deep African blue sky.",
-    keyMaterials: ["TRAVERTINE", "CREAM_PLASTER"]
+    architecturePrompt: "Rough-honed white travertine pavers, textured dry-stack limestone boundary wall with tropical African plants (Birds of Paradise, Elephant Ears). Mature shade tree casting dappled shadows against deep African blue sky.",
+    keyMaterials: ["TRAVERTINE", "WHITE_CYCLORAMA"]
   },
   ENV_CHRISTMAS_PAVILION_005: {
     id: "ENV_CHRISTMAS_PAVILION_005",
@@ -48,6 +48,6 @@ export const EnvironmentLibrary: Record<string, EnvironmentProfile> = {
     version: "3.0.0",
     name: "FSC Commercial Product Lab",
     architecturePrompt: "Seamless sweep of pristine white studio plaster (#FFFFFF) with a solid smooth white circular stone pedestal (40cm high, 50cm diameter).",
-    keyMaterials: ["CREAM_PLASTER", "WHITE_CYCLORAMA"]
+    keyMaterials: ["WHITE_CYCLORAMA"]
   }
 };

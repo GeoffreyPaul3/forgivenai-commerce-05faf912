@@ -58,20 +58,26 @@ The studio master reference image (studio.jpeg) already contains the official Fo
 ══ ELEMENT 4: LEFT SIDE (camera-left) ══
 Far-left edge: a full-height section of deep charcoal/near-black fluted vertical wood panels (#1A1A1A). These panels have crisp vertical grooves running their full height.
 In front of these panels: a tall cylindrical planter made of polished GOLD/BRASS metal (~60cm tall). Inside the planter: a lush dark-green tropical plant with large broad leaves (Monstera/Bird of Paradise). The plant is healthy, full, and large.
-On the fluted panel, behind/above the planter: a slender vertical TUBE SCONCE light, casting a warm amber glow (3000K) downward.
+On the fluted panel, behind/above the planter: a slender vertical TUBE SCONCE light, casting a soft white glow (5500K) downward.
 
 ══ ELEMENT 5: RIGHT SIDE (camera-right) ══
 Far-right edge: a full-height section of deep charcoal/near-black fluted vertical wood panels (#1A1A1A), matching the left side.
-Set INTO these panels: a RECESSED OPEN SHELF UNIT with three shelves, illuminated from behind with warm amber backlighting. Shelves hold luxury objects: top shelf — a small pink/dried floral arrangement; middle shelf — stacked white books + a small gold object; bottom shelf — a brass/gold ring sculpture and small vase.
+Set INTO these panels: a RECESSED OPEN SHELF UNIT with three shelves, illuminated from behind with soft white backlighting. Shelves hold luxury objects: top shelf — a small pink/dried floral arrangement; middle shelf — stacked white books + a small gold object; bottom shelf — a brass/gold ring sculpture and small vase.
 On the fluted panel: a slender vertical TUBE SCONCE light, matching the left side sconce.
 
 ══ ELEMENT 6: FLOOR ══
 Continuous large-format POLISHED WHITE MARBLE tiles covering the entire studio floor. Pure pristine white tone (#FFFFFF) with subtle light grey natural veining. High-gloss surface with soft reflections of the studio lights and the arch magenta LED visible as a faint pink reflection on the marble.
 
 ══ ELEMENT 7: FOREGROUND PODIUM ══
-At frame centre, in the foreground, directly in front of the arch: a LOW, WIDE circular disc pedestal made of smooth matte white stone. Dimensions: approximately 55cm diameter, only 15–18cm tall. It is a flat, low platform — NOT a tall column or display stand. The podium sits on the marble floor at the very base of the arch.
+At frame centre, in the foreground, directly in front of the arch: a LOW, WIDE circular disc pedestal made of smooth matte white stone (#FFFFFF). Dimensions: approximately 55cm diameter, only 15–18cm tall. It is a flat, low platform — NOT a tall column or display stand. The podium sits on the marble floor at the very base of the arch.
 
-Luminous commercial studio lighting (5000K daylight-calibrated white key lighting). Soft overhead key light. Warm amber sconces on both fluted panel sides. The magenta LED arch trim (#B0208D) casts a pink-magenta glow onto the surrounding pristine white wall. Gentle specular reflections on the white marble floor and brass planter surface.
+══ COLOR BALANCE & HIGH-KEY LIGHTING (MANDATORY) ══
+• COLOR BALANCE: 100% pure neutral white backdrop (#FFFFFF). High-key 5600K daylight commercial studio photography lighting.
+• ABSOLUTELY ZERO cream color cast, ZERO yellow tint, ZERO tan tone, ZERO warm color cast on white surfaces.
+• The walls, arch interior, marble floor, and circular podium MUST be crisp, pristine, brilliant white (#FFFFFF).
+• WIDE CAMERA FRAMING: Capture the full wide studio architecture from the left fluted panel and gold planter, through the central magenta arch and wall logo, to the right fluted panel with illuminated white shelves.
+
+Luminous commercial studio lighting (5600K daylight-calibrated pure white key lighting). Soft overhead key light. Neutral white sconces on both fluted panel sides. The magenta LED arch trim (#B0208D) casts a vibrant pink-magenta accent glow on the pristine white wall. Clean specular reflections on the white marble floor.
 `.trim();
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -79,6 +85,7 @@ Luminous commercial studio lighting (5000K daylight-calibrated white key lightin
 // ════════════════════════════════════════════════════════════════════════════
 const STUDIO_NEGATIVE = `
 ABSOLUTE PROHIBITIONS — ZERO TOLERANCE:
+✗ NO CREAM BACKGROUND. NO CREAM WALLS. NO BEIGE WALLS. NO WARM COLOR CAST ON WHITE SURFACES. NO YELLOW TINT. NO IVORY WALLS. NO TAN TONE. The background plaster wall and marble floor MUST be crisp pure white (#FFFFFF) under 5500K daylight studio lighting.
 ✗ NO DUPLICATE LOGOS. NO SECOND LOGO. NO ADDITIONAL BRAND MARKS. NO REPEATED WORDMARK. NO OVERLAPPING LOGOS. NO STACKED LOGOS. NO EXTRA F SYMBOLS. NO EXTRA SHOPPING BAG ICONS. NO ADDITIONAL WALL SIGNAGE. NO GENERATED FORGIVEN LOGO. NO RECONSTRUCTED FORGIVEN LOGO. NO SECOND BRAND SIGN.
 ✗ NO CROPPED LEGS. NO CUT-OFF FEET. NO THIGH-LEVEL CROP. NO KNEE-LEVEL CROP. The model MUST be shown full-length head-to-toe with feet and shoes resting on the marble floor.
 ✗ NO WRONG GARMENT SILHOUETTE. If the product reference is a SKIRT, SKIRT SUIT, or DRESS — DO NOT generate trousers, pants, or jeans.
@@ -416,7 +423,7 @@ function getProductCompositionDirective(compositionType: string, _category: stri
     `Product occupies 55%–65% of the frame height. Premium eye-level camera angle.`,
     `The product is placed in a natural, physically believable resting position.`,
     `The signature FSC arch and wall logo remain fully visible and unobstructed in the background.`,
-    `Warm, directional 3200K studio key light — crisp texture, realistic contact shadows.`,
+    `Daylight-calibrated 5500K studio key light — pure white background, crisp texture, realistic contact shadows.`,
   ].join("\n");
 }
 

@@ -145,14 +145,14 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       id: StudioZone.RIGHT_DECOR,
       name: "Right Decorative Bay",
       isLocked: false,
-      baseDescription: "Dark black vertical fluted wooden slat paneling on camera-right wall with a warm backlit recessed display shelf holding luxury vessels/perfumes and a vertical glowing tube sconce light.",
+      baseDescription: "Dark black vertical fluted wooden slat paneling on camera-right wall with a soft white backlit recessed display shelf holding luxury vessels/perfumes and a vertical glowing tube sconce light.",
       spatialAnchor: "Wall camera-right"
     },
     [StudioZone.BACKGROUND]: {
       id: StudioZone.BACKGROUND,
       name: "Studio Background Wall",
       isLocked: false,
-      baseDescription: "Pristine white plaster arch wall flanked by dark black fluted wooden side panels with warm glowing brass sconce lights.",
+      baseDescription: "Pristine white plaster arch wall flanked by dark black fluted wooden side panels with soft white glowing brass sconce lights.",
       spatialAnchor: "Rear perimeter wall"
     },
     [StudioZone.FOREGROUND]: {
@@ -180,7 +180,7 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       id: StudioZone.LIGHTING,
       name: "Studio Commercial Lighting",
       isLocked: false,
-      baseDescription: "Premium daylight-calibrated commercial white studio lighting (5000K-5600K), soft key light from 45 degrees, warm ambient glow.",
+      baseDescription: "Premium daylight-calibrated commercial white studio lighting (5000K-5600K), soft key light from 45 degrees, neutral ambient white glow.",
       spatialAnchor: "Overhead and perimeter rigs"
     },
     [StudioZone.CAMERA]: {
@@ -235,12 +235,12 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
   lightingProfiles: Record<string, LightingProfile> = {
     commercial_warm: {
       id: "commercial_warm",
-      name: "Commercial Warm Lifestyle (3200K)",
+      name: "Commercial Clean White Studio (5500K)",
       keyLight: "Large softbox overhead at 45 degrees",
       fillLight: "Diffuse white bounce board",
-      rimLight: "Warm magenta arch LED strip",
-      ambientKelvin: 3200,
-      promptDescription: "Premium luxury studio lighting: soft key light from 45 degrees, warm ambient glow, glowing magenta arch LED accent, specular white marble floor reflection."
+      rimLight: "Glowing magenta arch LED strip",
+      ambientKelvin: 5500,
+      promptDescription: "Premium luxury studio lighting: 5500K daylight key light, neutral ambient fill, pure crisp white studio background wall (#FFFFFF), glowing magenta arch LED accent, specular white marble floor reflection."
     },
     editorial_octabox: {
       id: "editorial_octabox",
@@ -248,8 +248,8 @@ export class FSCFlagshipBlueprintV1 implements FlagshipStudioBlueprint {
       keyLight: "Deep 150cm octabox key light",
       fillLight: "Silver reflector fill",
       rimLight: "Focused spot rim",
-      ambientKelvin: 3200,
-      promptDescription: "Editorial fashion lighting: warm key light, crisp catchlights in eyes, controlled contrast, high-end commercial fashion feel."
+      ambientKelvin: 5500,
+      promptDescription: "Editorial fashion lighting: 5500K daylight key light, crisp catchlights in eyes, pure white studio background wall, neutral color balance, high-end commercial fashion feel."
     },
     hard_rim_macro: {
       id: "hard_rim_macro",

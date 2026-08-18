@@ -10,14 +10,14 @@ export const StudioTokens: StudioTokensSpec = {
   },
   lightingTemperatures: {
     WARM_TUNGSTEN: { kelvin: 2700, description: "Festive Holiday & Cozy Practical Accent Fill" },
-    COMMERCIAL_WARM: { kelvin: 3200, description: "Flagship Retail Warm Key (3000K-3500K)" },
+    COMMERCIAL_WARM: { kelvin: 5500, description: "Flagship Retail Clean White Daylight Key (5500K)" },
     GOLDEN_HOUR: { kelvin: 3800, description: "Outdoor Courtyard Low-Angle Sunlight" },
     HIGH_CONTRAST_SPOT: { kelvin: 4000, description: "Arena Overhead Kicker & High Power Spotlight" },
     PRODUCT_NEUTRAL: { kelvin: 5000, description: "D50 Color Standard Precision Product Key" },
     DAYLIGHT_STROBE: { kelvin: 5600, description: "E-Commerce Cyclorama Clean Daylight Fill" }
   },
   lensProfiles: {
-    SONY_85MM_GM: { focalLength: "85mm", aperture: "f/1.4", dofDescription: "Creamy portraits & product background separation" },
+    SONY_85MM_GM: { focalLength: "85mm", aperture: "f/1.4", dofDescription: "Crisp portraits & product background separation" },
     CANON_50MM_RF: { focalLength: "50mm", aperture: "f/1.2", dofDescription: "Color-calibrated true-to-life editorial sweep" },
     HASSELBLAD_90MM: { focalLength: "90mm", aperture: "f/3.2", dofDescription: "100MP extreme detail macro & texture resolution" }
   },
@@ -46,8 +46,9 @@ export const StudioTokens: StudioTokensSpec = {
     NATURAL_SUNLIGHT: { density: 0.45, softness: "Dappled leaf & window frame shadow cast" }
   },
   negativePromptLibrary: [
+    "cream background", "cream walls", "beige background", "yellow tint", "cream color cast",
     "cheap tinsel", "tacky decorations", "blue/purple lights", "cold temperature", "cluttered floor",
-    "plastic trees", "grey background", "dirty walls", "visible floor joins", "yellow tint",
+    "plastic trees", "grey background", "dirty walls", "visible floor joins", "ivory tone",
     "blown-out highlights", "warm color cast", "Instagram filter", "visible grain", "cluttered rooms",
     "worn furniture", "cheap apartment", "harsh flash", "cold blue light", "plastic surfaces",
     "IKEA generic furniture", "concrete city streets", "European garden", "resort palms", "overcast sky",
