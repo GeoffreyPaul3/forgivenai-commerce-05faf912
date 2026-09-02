@@ -2029,8 +2029,8 @@ function InfluencerManager() {
 
         // Save to content gallery
         const variantTitleSuffix = variantsToGenerate.length > 1 ? ` (Variant ${i + 1})` : "";
-        // Store the original product image URL for comparison purposes
-        const originalProductUrl = variantUrl || selectedProd?.images?.[0] || null;
+        const fullProductUrl = selectedProd?.images?.[0] || null;
+        const variantProductUrl = variantUrl || null;
         const { error: insertError } = await supabase.from("content").insert({
           type: "ai_visual",
           title: `${selectedInfluencer.name} x ${selectedProd.name} Campaign${variantTitleSuffix}`,
@@ -2043,7 +2043,10 @@ function InfluencerManager() {
             scene: sceneType,
             campaign_ready: true,
             is_variant: variantsToGenerate.length > 1,
-            original_product_url: originalProductUrl
+            full_product_url: fullProductUrl,
+            variant_product_url: variantProductUrl,
+            variant_details: variant.details || null,
+            original_product_url: fullProductUrl || variantProductUrl
           } as any
         });
 
@@ -2070,16 +2073,85 @@ function InfluencerManager() {
     }
   };
 
+  const [regeneratingVisualId, setRegeneratingVisualId] = useState<string | null>(null);
+
+  const handleRegenerateVisual = async (visual: any) => {
+    if (!visual) return;
+    setRegeneratingVisualId(visual.id);
+    try {
+      const influencerId = visual.metadata?.influencer_id;
+      const productId = visual.product_id || visual.metadata?.product_id;
+      const infl = influencers?.find((i: any) => i.id === influencerId) || selectedInfluencer;
+      const prod = allProducts?.find((p: any) => p.id === productId) || selectedProd;
+      const variantUrl = visual.metadata?.variant_product_url || visual.metadata?.original_product_url || prod?.images?.[0];
+      const variantDetails = visual.metadata?.variant_details || null;
+      const style = visual.metadata?.style || styleMode;
+      const scene = visual.metadata?.scene || sceneType;
+
+      const modifiedProd = { ...prod, id: `live_${prod?.id || 'gen'}`, images: [variantUrl] };
+
+      const { data, error } = await supabase.functions.invoke("ugc-generate", {
+        body: {
+          action: "generate-campaign-shot",
+          influencer: infl,
+          product: modifiedProd,
+          productImageUrl: variantUrl,
+          style,
+          scene,
+          variantDetails,
+          forceRegenerate: true,
+          brandLogoUrl: window.location.origin + "/forgiven.png"
+        }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const { error: updError } = await supabase.from("content").update({
+        media_url: data.imageUrl,
+        body: `Regenerated Campaign Visual: ${style.replace("_", " ")} styling in ${scene.replace("_", " ")} scene.`,
+        metadata: {
+          ...visual.metadata,
+          regenerated_at: new Date().toISOString()
+        }
+      }).eq("id", visual.id);
+
+      if (updError) throw updError;
+
+      await refetchVisuals();
+      if (compareVisual?.id === visual.id) {
+        setCompareVisual((prev: any) => ({ ...prev, media_url: data.imageUrl }));
+      }
+      toast({ title: "Campaign Visual Regenerated! ✨", description: "The visual has been re-rendered with full fidelity." });
+    } catch (err: any) {
+      console.error("Regeneration failed:", err);
+      toast({ variant: "destructive", title: "Regeneration failed", description: err.message || "An error occurred during regeneration." });
+    } finally {
+      setRegeneratingVisualId(null);
+    }
+  };
+
+  // Helper: resolve full original product image for comparison modal
+  const getFullProductUrl = (visual: any): string | null => {
+    if (visual?.metadata?.full_product_url) return visual.metadata.full_product_url;
+    const productId = visual?.product_id || visual?.metadata?.product_id;
+    if (productId) {
+      const prod = allProducts?.find((p: any) => p.id === productId);
+      if (prod?.images?.[0]) return prod.images[0];
+    }
+    return visual?.metadata?.original_product_url || null;
+  };
+
   // Helper: resolve original product image for a visual record
   const getOriginalProductUrl = (visual: any): string | null => {
-    // First try what we stored at generation time
+    if (visual?.metadata?.full_product_url) return visual.metadata.full_product_url;
     if (visual?.metadata?.original_product_url) return visual.metadata.original_product_url;
-    // Fallback: look up from allProducts by product_id
     const productId = visual?.product_id || visual?.metadata?.product_id;
     if (!productId) return null;
     const prod = allProducts?.find((p: any) => p.id === productId);
     return prod?.images?.[0] || null;
   };
+
 
   const handleDownload = async (url: string, title: string) => {
     try {
@@ -2497,11 +2569,28 @@ function InfluencerManager() {
                         {heroCompareMode ? "Exit Compare" : "Compare to Original"}
                       </Button>
                     )}
+                    {/* Regenerate Button */}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5 text-[11px] font-bold"
+                      onClick={() => handleRegenerateVisual(generatedVisuals[0])}
+                      disabled={regeneratingVisualId === generatedVisuals[0].id}
+                      title="Regenerate this visual"
+                    >
+                      {regeneratingVisualId === generatedVisuals[0].id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5 text-primary" />
+                      )}
+                      {regeneratingVisualId === generatedVisuals[0].id ? "Regenerating..." : "Regenerate"}
+                    </Button>
                     <Button 
                       variant="outline" 
                       size="icon" 
                       className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20"
                       onClick={() => handleView(generatedVisuals[0].media_url)}
+                      title="View Full Size"
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
@@ -2510,6 +2599,7 @@ function InfluencerManager() {
                       size="icon" 
                       className="rounded-full bg-white/10 border-white/20 text-white hover:bg-white/20"
                       onClick={() => handleDownload(generatedVisuals[0].media_url, generatedVisuals[0].title)}
+                      title="Download"
                     >
                       <Download className="w-4 h-4" />
                     </Button>
@@ -2594,6 +2684,17 @@ function InfluencerManager() {
                        <Columns2 className="w-4 h-4" />
                      </Button>
                    )}
+                   {/* Regenerate Button */}
+                   <Button 
+                    size="icon" 
+                    variant="secondary" 
+                    className="h-8 w-8 rounded-full bg-amber-500/90 hover:bg-amber-500 text-slate-950"
+                    onClick={(e) => { e.stopPropagation(); handleRegenerateVisual(visual); }}
+                    disabled={regeneratingVisualId === visual.id}
+                    title="Regenerate Visual"
+                   >
+                    {regeneratingVisualId === visual.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                   </Button>
                    <Button 
                     size="icon" 
                     variant="secondary" 
@@ -2672,20 +2773,27 @@ function InfluencerManager() {
 
                 {/* Split comparison panels */}
                 <div className="grid grid-cols-2 divide-x divide-border">
-                  {/* Left: Original product photo */}
+                  {/* Left: Original real product photo */}
                   <div className="relative p-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-amber-500" />
-                      <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Original Product Photo</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-amber-500" />
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Original Real Product Photo</span>
+                      </div>
+                      {compareVisual?.metadata?.variant_details?.primaryColor && (
+                        <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-500/30 font-semibold">
+                          Variant: {compareVisual.metadata.variant_details.primaryColor}
+                        </Badge>
+                      )}
                     </div>
                     <div className="rounded-xl overflow-hidden border border-border bg-white/5 aspect-square flex items-center justify-center">
                       <img
-                        src={getOriginalProductUrl(compareVisual)!}
-                        alt="Original product"
+                        src={getFullProductUrl(compareVisual)!}
+                        alt="Original real product"
                         className="w-full h-full object-contain"
                       />
                     </div>
-                    <p className="text-[10px] text-muted-foreground font-body text-center">The source product image used during AI generation</p>
+                    <p className="text-[10px] text-muted-foreground font-body text-center">The full real product image from our store inventory</p>
                   </div>
 
                   {/* Right: AI generated campaign shot */}
@@ -2711,6 +2819,16 @@ function InfluencerManager() {
                     <span className="font-bold text-foreground">Tip:</span> Verify garment color, texture, logos, and design details match between both images before publishing.
                   </p>
                   <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="rounded-xl gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/10" 
+                      onClick={() => handleRegenerateVisual(compareVisual)}
+                      disabled={regeneratingVisualId === compareVisual.id}
+                    >
+                      {regeneratingVisualId === compareVisual.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                      {regeneratingVisualId === compareVisual.id ? "Regenerating..." : "Regenerate Visual"}
+                    </Button>
                     <Button variant="outline" size="sm" className="rounded-xl gap-1.5 text-xs" onClick={() => handleView(compareVisual.media_url)}>
                       <Eye className="w-3.5 h-3.5" /> Full Size
                     </Button>
@@ -2722,6 +2840,7 @@ function InfluencerManager() {
               </div>
             </div>
           )}
+
 
           {generatedVisuals && generatedVisuals.length > GALLERY_PAGE_SIZE && (
             <div className="pt-4">
