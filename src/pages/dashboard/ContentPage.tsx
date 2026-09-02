@@ -2013,12 +2013,14 @@ function InfluencerManager() {
             action: "generate-campaign-shot",
             influencer: selectedInfluencer,
             product: modifiedProd,
+            productImageUrl: variantUrl,
             style: styleMode,
             scene: sceneType,
             variantDetails: variant.details,
             brandLogoUrl: window.location.origin + "/forgiven.png"
           }
         });
+
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);

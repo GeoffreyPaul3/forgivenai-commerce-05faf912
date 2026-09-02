@@ -2769,9 +2769,9 @@ async function runUnifiedVTON(
         fn: async () => {
           let strictnessPromptModifier = "";
           if (attempt === 2) {
-            strictnessPromptModifier = `CRITICAL SILHOUETTE & COLOUR REGENERATION: The garment MUST match Image 2's exact color (${garmentDetails}) and shape. If Image 2 is a SKIRT, LONG SKIRT, or SKIRT SUIT, the model MUST wear a SKIRT — DO NOT generate trousers or pants!`;
+            strictnessPromptModifier = `CRITICAL SILHOUETTE & COLOUR REGENERATION: The garment MUST match Image 3's exact color (${garmentDetails}) and structural shape. If Image 3 is a VEST / WAISTCOAT SET, the model MUST wear the vest/waistcoat set in the exact color. If a SKIRT or SKIRT SUIT, the model MUST wear a SKIRT. If TROUSERS, match the trousers!`;
           } else if (attempt === 3) {
-            strictnessPromptModifier = `CRITICAL AUDIT NOTICE: Zero tolerance for garment shape modifications. Reconstruct Image 2's exact outfit (${garmentDetails}) with 100% fidelity. If Image 2 is a skirt suit, output MUST be a skirt suit (NO pants!).`;
+            strictnessPromptModifier = `CRITICAL AUDIT NOTICE: Zero tolerance for garment alterations. Reconstruct Image 3's exact outfit (${garmentDetails}) with 100% fidelity in color, cut, and layering.`;
           }
 
           const anatomyPrompt = "ANATOMY CONTROLS: Perfect anatomy, highly detailed face, flawless hands, five fingers, physically correct proportions. NO mutated hands, NO broken fingers, NO extra limbs, NO distorted face.";
@@ -2782,13 +2782,18 @@ async function runUnifiedVTON(
 THREE REFERENCE IMAGES PROVIDED:
 • Image 1 (Studio Master) — use for BACKGROUND ENVIRONMENT ONLY.
 • Image 2 (REAL HUMAN MODEL, ${targetGender} ${targetEthnicity}) — use this person's face, skin tone, and body.
-• Image 3 (EXACT PRODUCT) — the garment to transfer onto the model.
-YOUR MAIN MANDATE: Dress the person from Image 2 in the exact garment from Image 3, photographed in the studio from Image 1.
-• 100% EXACT TOP & BOTTOM GARMENT RECONSTRUCTION: Reconstruct the EXACT garment pieces from Image 3 (${garmentDetails}).
-  - TOP PIECE LOCK: If Image 3 is a COLLARED BUTTON-DOWN SHIRT / BLOUSE with CHEST FLAP POCKETS — the model MUST wear a collared button-down shirt with chest flap pockets and front buttons! DO NOT generate a blazer! DO NOT generate wide lapels!
-  - BOTTOM PIECE LOCK: If Image 3 is a SKIRT or SKIRT SUIT — the model MUST wear a SKIRT! If Image 3 is TROUSERS/PANTS — match the matching straight-leg trousers!
-• 100% EXACT COLOUR & HUE SHADE MATCH: Match the exact shade and colour from Image 3 (${garmentDetails}). DO NOT alter shade (e.g. powder light blue MUST remain powder light blue, purple MUST remain purple).
-• POCKETS, BUTTONS & DETAILS LOCK: Transfer every pocket, button placket, gold/silver button, seam, and collar structure from Image 3 onto the model with 100% exact fidelity.
+• Image 3 (EXACT PRODUCT) — the exact garment to transfer onto the model.
+YOUR MAIN MANDATE: Dress the person from Image 2 in the exact garment from Image 3 (${garmentDetails}), photographed in the studio from Image 1.
+• 100% EXACT GARMENT RECONSTRUCTION & STRUCTURE MATCH:
+  - Reconstruct the EXACT garment design, cut, collar, sleeves, layering, and silhouette shown in Image 3 (${garmentDetails}).
+  - If Image 3 is a VEST / WAISTCOAT SUIT SET (e.g. asymmetrical or single-breasted vest over shirt with matching trousers), the model MUST wear that EXACT vest and trousers!
+  - If Image 3 is a TAILORED SUIT, BLAZER, JUMPSUIT, DRESS, TOP, BLOUSE, or TROUSERS — faithfully replicate the exact pieces, collar, buttons, lapels, waistline, and structure from Image 3.
+  - DO NOT invent chest flap pockets, collars, or cuts that do not exist in Image 3.
+• 100% EXACT COLOUR & HUE SHADE MATCH:
+  - Match the exact color and shade from Image 3 and Selected Variation (${garmentDetails}).
+  - If the garment is Navy Blue, it MUST be Navy Blue. If Cognac/Rust Brown, it MUST be Cognac/Rust Brown. If Cream/Beige, it MUST be Cream/Beige.
+  - DO NOT alter the color to black, maroon, or any different hue.
+• POCKETS, BUTTONS & DETAILS LOCK: Transfer every genuine seam, button, and design detail from Image 3 onto the model with 100% exact fidelity.
 • Product Name: ${description}
 • Selected Variation: ${garmentDetails}`,
 
@@ -2830,10 +2835,9 @@ ${bodyType ? `• BODY TYPE & POSTURE: ${bodyType}.` : ""}
 
             // [8] FINAL MANDATORY CHECK — PRODUCT FIDELITY
             `MANDATORY FINAL PRODUCT FIDELITY CHECK:
-1. GARMENT COLOUR: The model MUST wear the exact hue from Image 3 (${garmentDetails}). If the product is powder light blue — the outfit MUST be powder light blue. If purple — it MUST be purple.
-2. TOP GARMENT CUT: Match the exact collar, chest pockets, and button placket from Image 3. DO NOT substitute a collared shirt for a blazer or vice versa.
-3. BOTTOM PIECE: Match the exact bottom garment from Image 3. Skirts remain skirts. Trousers remain trousers.
-4. FULL BODY: The model MUST be shown head-to-toe with feet and shoes visible on the marble floor.`,
+1. GARMENT COLOUR: The model MUST wear the exact hue from Image 3 (${garmentDetails}). Match the selected variation color 100%.
+2. GARMENT CUT & PIECES: Match the exact garment type, collar, sleeves, vest/jacket, and trousers/skirt from Image 3. DO NOT alter the garment silhouette.
+3. FULL BODY: The model MUST be shown head-to-toe with feet and shoes visible on the marble floor.`,
 
             `Output: photorealistic commercial photograph indistinguishable from a real camera shot taken by a world-class fashion photographer.`
           ].filter(Boolean).join("\n\n");
@@ -2843,6 +2847,7 @@ ${bodyType ? `• BODY TYPE & POSTURE: ${bodyType}.` : ""}
             { type: 'influencer', url: personImageUrl },
             { type: 'product', url: primaryProductUrl }
           ], supabaseClient);
+
         }
       },
       {
@@ -3026,47 +3031,54 @@ Deno.serve(async (req) => {
     }
 
     // Collect all potential product image references into a deduplicated list.
-    // Inventory DB images take PRIORITY — they are prepended before any payload URLs.
-    const candidateUrls: string[] = [...inventoryImages];
+    // If an explicit variant/crop URL is provided (e.g. for multi-variation products),
+    // it MUST be the primary reference [0] so the VTON pipeline dresses the model in that exact variation.
+    const explicitVariantUrl = body.productImageUrl || (Array.isArray(body.product?.images) && body.product?.images[0] ? body.product.images[0] : null);
+    const candidateUrls: string[] = [];
+
+    if (explicitVariantUrl && (body.variantDetails || String(incomingProductId).startsWith("live_") || inventoryImages.length === 0)) {
+      candidateUrls.push(explicitVariantUrl);
+    }
+
+    // Add authoritative inventory images if available
+    inventoryImages.forEach(img => {
+      if (img && !candidateUrls.includes(img)) candidateUrls.push(img);
+    });
+
     const addCandidates = (val: any) => {
       if (!val) return;
       if (Array.isArray(val)) {
         val.forEach(item => {
-          if (typeof item === 'string' && item.trim()) {
+          if (typeof item === 'string' && item.trim() && !candidateUrls.includes(item.trim())) {
             candidateUrls.push(item.trim());
           }
         });
-      } else if (typeof val === 'string' && val.trim()) {
+      } else if (typeof val === 'string' && val.trim() && !candidateUrls.includes(val.trim())) {
         candidateUrls.push(val.trim());
       }
     };
 
-    // Only add payload URLs if we didn't already get authoritative DB images
-    if (inventoryImages.length === 0) {
-      if (body.productImageUrl) {
-        // If explicit variant URL was provided, prioritize it as the primary candidate
-        addCandidates(body.productImageUrl);
-      } else {
-        addCandidates(body.product?.images);
-        addCandidates(body.product?.side_images);
-        addCandidates(body.product?.closeups);
-        addCandidates(body.product?.textures);
-        addCandidates(body.side_images);
-        addCandidates(body.closeups);
-        addCandidates(body.textures);
-      }
+    if (inventoryImages.length === 0 || candidateUrls.length === 0) {
+      if (body.productImageUrl) addCandidates(body.productImageUrl);
+      addCandidates(body.product?.images);
+      addCandidates(body.product?.side_images);
+      addCandidates(body.product?.closeups);
+      addCandidates(body.product?.textures);
+      addCandidates(body.side_images);
+      addCandidates(body.closeups);
+      addCandidates(body.textures);
     } else {
-      // Even if we have DB images, include extra payload references as supplemental views
       if (body.productImageUrl) addCandidates(body.productImageUrl);
       addCandidates(body.product?.side_images);
       addCandidates(body.product?.closeups);
       addCandidates(body.product?.textures);
     }
 
-    // Deduplicate while preserving order (DB images first = highest priority)
+    // Deduplicate while preserving order (Target variant first)
     const productImages = [...new Set(candidateUrls)];
     const primaryProductUrl = productImages[0] || "";
-    console.log(`[Product Images] Total references for generation: ${productImages.length} (inventory DB: ${inventoryImages.length}, payload extras: ${productImages.length - inventoryImages.length})`);
+    console.log(`[Product Images] Total references for generation: ${productImages.length} (primary variant URL: ${primaryProductUrl.substring(0, 80)}...)`);
+
 
     
     // --- STOCK PROTECTION GATE ---

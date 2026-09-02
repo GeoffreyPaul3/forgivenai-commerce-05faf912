@@ -153,6 +153,19 @@ export const APPLICATION_REGISTRY: ApplicationDefinition[] = [
     searchKeywords: ["customers", "buyers", "profiles", "crm", "contacts", "engagement"],
   },
   {
+    code: "conversations",
+    title: "Conversations",
+    description: "Real-time WhatsApp customer conversations, AI sales assistant chats, and order inquiries.",
+    icon: "MessageSquare",
+    route: "/dashboard/conversations",
+    type: "module",
+    placement: "sidebar",
+    navigationGroup: "commerce",
+    requiredPermissions: ["customers.view"],
+    priority: 125,
+    searchKeywords: ["conversations", "whatsapp", "chat", "messages", "support", "inbox"],
+  },
+  {
     code: "vendors",
     title: "Vendors",
     description: "Vendor directory, performance metrics, approvals, and exclusivity contracts.",
@@ -165,6 +178,20 @@ export const APPLICATION_REGISTRY: ApplicationDefinition[] = [
     priority: 130,
     searchKeywords: ["vendors", "suppliers", "partners", "marketplace", "sla", "performance"],
   },
+  {
+    code: "agents",
+    title: "Agents",
+    description: "Manage commission sales agents, referrals, tiers, and partner payouts.",
+    icon: "ShieldCheck",
+    route: "/dashboard/agents",
+    type: "module",
+    placement: "sidebar",
+    navigationGroup: "commerce",
+    requiredPermissions: ["staff.manage"],
+    priority: 135,
+    searchKeywords: ["agents", "sales agents", "commission", "referrals", "partners"],
+  },
+
 
   // ─── Operations Modules (priority 140–199) ────────────────────────────────
 
