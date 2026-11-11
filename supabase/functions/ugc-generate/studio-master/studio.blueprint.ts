@@ -63,7 +63,9 @@ export interface FlagshipStudioBlueprint {
   compiledGovernanceDirective(): string;
 }
 
-export const FSC_FLAGSHIP_STUDIO_URL = "https://wzncegnkhybtmybqftbv.supabase.co/storage/v1/object/public/ugc-assets/brand/fsc-flagship-studio.jpeg";
+const SUPABASE_BASE_URL = (typeof Deno !== 'undefined' ? Deno.env.get("SUPABASE_URL") : null) || "https://prweavmmpmoutdcsrseh.supabase.co";
+
+export const FSC_FLAGSHIP_STUDIO_URL = `${SUPABASE_BASE_URL}/storage/v1/object/public/ugc-assets/brand/fsc-flagship-studio.jpeg`;
 
 /**
  * The official Forgiven Shopping Centre brand logo (forgiven.png).
@@ -77,7 +79,7 @@ export const FSC_FLAGSHIP_STUDIO_URL = "https://wzncegnkhybtmybqftbv.supabase.co
  *  - Below cluster: "Forgiven" in bold rounded sans-serif, primary magenta (#A72087)
  *  - Below that: "Shopping Centre" in smaller lighter-weight same colour, wider tracking
  */
-export const FSC_LOGO_URL = "https://wzncegnkhybtmybqftbv.supabase.co/storage/v1/object/public/ugc-assets/brand/fsc-logo.png";
+export const FSC_LOGO_URL = `${SUPABASE_BASE_URL}/storage/v1/object/public/ugc-assets/brand/fsc-logo.png`;
 
 export const SINGLE_LOGO_RULE = {
   id: "FSC_OFFICIAL_WALL_LOGO_001",

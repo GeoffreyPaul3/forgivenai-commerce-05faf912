@@ -220,10 +220,11 @@ Return ONLY valid JSON (no markdown formatting, no other text):
 
             const pngBuffer = await cropped.encode(1);
 
-            const fileName = `decomposed/${crypto.randomUUID()}.png`;
+            // Deterministic path based on cacheKey to prevent duplicate orphaned files on retries
+            const fileName = `decomposed/${cacheKey}_v${i + 1}.png`;
             const { error: uploadError } = await supabase.storage
               .from("ugc-assets")
-              .upload(fileName, pngBuffer, { contentType: "image/png" });
+              .upload(fileName, pngBuffer, { contentType: "image/png", upsert: true });
 
             if (!uploadError) {
               croppedUrl = supabase.storage.from("ugc-assets").getPublicUrl(fileName).data.publicUrl;

@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const FSC_WATERMARK_STORAGE_URL = "https://wzncegnkhybtmybqftbv.supabase.co/storage/v1/object/public/ugc-assets/brand/fsc-logo.png";
+const FSC_WATERMARK_STORAGE_URL = `${Deno.env.get('SUPABASE_URL') || 'https://prweavmmpmoutdcsrseh.supabase.co'}/storage/v1/object/public/ugc-assets/brand/fsc-logo.png`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {

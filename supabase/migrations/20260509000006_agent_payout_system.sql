@@ -75,42 +75,38 @@ $$;
 -- 1. Add payment_details to agents table
 ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS payment_details TEXT;
 
--- 2. Create agent_payouts table
-CREATE TABLE IF NOT EXISTS public.agent_payouts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    agent_id UUID NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
-    amount NUMERIC(15,2) NOT NULL,
-    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'rejected')),
-    notes TEXT,
-    period_start TIMESTAMPTZ,
-    period_end TIMESTAMPTZ,
-    rejected_reason TEXT,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now()
-);
+-- 2. Extend agent_payouts table with additional columns
+ALTER TABLE public.agent_payouts ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.agent_payouts ADD COLUMN IF NOT EXISTS period_start TIMESTAMPTZ;
+ALTER TABLE public.agent_payouts ADD COLUMN IF NOT EXISTS period_end TIMESTAMPTZ;
+ALTER TABLE public.agent_payouts ADD COLUMN IF NOT EXISTS rejected_reason TEXT;
+ALTER TABLE public.agent_payouts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
--- 3. Enable RLS on agent_payouts
+-- 3. Enable RLS and define policies on agent_payouts
 ALTER TABLE public.agent_payouts ENABLE ROW LEVEL SECURITY;
 
--- Agents can view their own payouts
+DROP POLICY IF EXISTS "Agents can view their own payouts" ON public.agent_payouts;
 CREATE POLICY "Agents can view their own payouts" ON public.agent_payouts
     FOR SELECT TO authenticated
     USING (auth.uid() IN (SELECT user_id FROM public.agents WHERE id = agent_id));
 
--- Agents can insert their own payout requests (withdrawals)
+DROP POLICY IF EXISTS "Agents can request payouts" ON public.agent_payouts;
+DROP POLICY IF EXISTS "Agents can request withdrawals" ON public.agent_payouts;
 CREATE POLICY "Agents can request withdrawals" ON public.agent_payouts
     FOR INSERT TO authenticated
     WITH CHECK (auth.uid() IN (SELECT user_id FROM public.agents WHERE id = agent_id));
 
--- Admins can manage all agent payouts
+DROP POLICY IF EXISTS "Admins can manage agent payouts" ON public.agent_payouts;
+DROP POLICY IF EXISTS "Admins can manage all agent payouts" ON public.agent_payouts;
 CREATE POLICY "Admins can manage all agent payouts" ON public.agent_payouts
     FOR ALL TO authenticated
     USING (true)
     WITH CHECK (true);
 
 -- 4. Trigger to update updated_at
+DROP TRIGGER IF EXISTS update_agent_payouts_updated_at ON public.agent_payouts;
 CREATE TRIGGER update_agent_payouts_updated_at BEFORE UPDATE ON public.agent_payouts
-    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- 5. Helper function to calculate agent balance (available for withdrawal)
 CREATE OR REPLACE FUNCTION public.get_agent_balance(p_agent_id UUID)
