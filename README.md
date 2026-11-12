@@ -135,9 +135,21 @@ flowchart TD
 * **High-Risk Approval Engine (`approval_requests`)**: Workflows for price overrides, emergency transfers, reserve withdrawals, and vendor exclusivity contracts.
 * **Immutable Audit Ledger (`audit_logs`)**: Cryptographically identifiable actor records detailing actor position, permission invoked, module, before/after states, and IP telemetry.
 
+### 8. Bi-Directional Enterprise ERP Integration Bridge
+* **Durable Event Queuing & Outbound Dispatcher (`erp-sync-webhook`)**:
+  - Automatically dispatches commerce lifecycle events (`commerce.order.created`, `commerce.order.paid`, `commerce.order.confirmed`, `commerce.order.cancelled`, `commerce.customer.created`, `commerce.inventory.updated`).
+  - Cryptographically signs payloads using HMAC-SHA256 (`whsec_` key derivation via SHA-256 hex digest) with a strict 300-second replay window.
+  - Implements exponential backoff retries with graceful idempotency acknowledgment (`{ isDuplicate: true }`).
+* **Inbound Sync Receiver (`erp-inbound-listener`)**:
+  - Securely receives ERP retail POS sales, inventory deductions (`erp.inventory.updated`), and master catalog updates (`erp.catalog.price_updated`).
+  - Enforces timing-safe HMAC signature verification and rejects timestamps older than 5 minutes.
+  - Automatically reconciles stock quantities and pricing in `public.products`.
+* **Durable Delivery Audit Ledger (`public.erp_sync_logs`)**:
+  - Complete traceability for every inbound and outbound event (latency, HTTP status, attempts, response payloads).
+
 ---
 
-## ⚡ Serverless Edge Functions (18 Deployed)
+## ⚡ Serverless Edge Functions (20 Deployed)
 
 All edge functions run on Deno within Supabase's global edge network:
 
@@ -161,13 +173,15 @@ All edge functions run on Deno within Supabase's global edge network:
 | **`sync-tracking-statuses`** | `true` | Automated batch courier milestone polling for in-flight deliveries. |
 | **`ugc-generate`** | `false` | Studio Master visual generator compiling multi-model generative pipelines. |
 | **`whatsapp-webhook`** | `false` | Conversational commerce webhook receiving Twilio WhatsApp inbound traffic. |
+| **`erp-sync-webhook`** | `false` | Outbound ERP event dispatcher with HMAC-SHA256 signing and exponential retries. |
+| **`erp-inbound-listener`** | `false` | Inbound ERP event receiver for POS inventory sync and price updates with replay protection. |
 
 ---
 
 ## 🗄️ Database & Storage Architecture
 
 ### PostgreSQL Database
-* **71 Sequential Migrations**: Tracking enterprise RBAC, multi-vendor splits, automated commissions, courier providers, and financial intelligence.
+* **72 Sequential Migrations**: Tracking enterprise RBAC, multi-vendor splits, automated commissions, courier providers, financial intelligence, and ERP integration sync.
 * **Row-Level Security (RLS)**: Enforced on 100% of public tables. Non-admin users are strictly scoped to their own records.
 * **Asynchronous Webhooks (`pg_net`)**: Database triggers dispatch transactional webhooks to Edge Functions asynchronously without blocking client transactions.
 * **Automated Cron Jobs (`pg_cron`)**: Schedules periodic background syncing (`sync-catalog-every-5-minutes`) directly inside PostgreSQL.
@@ -316,7 +330,7 @@ export SUPABASE_ACCESS_TOKEN="your-access-token"
 # Link to your Supabase project
 supabase link --project-ref "your-project-ref"
 
-# Push all 71 migrations to remote database
+# Push all 72 migrations to remote database
 supabase db push
 
 # (Optional) Verify migration diff
@@ -325,7 +339,7 @@ supabase db diff
 
 ### 4. Deploy Serverless Edge Functions
 ```bash
-# Deploy all 18 functions to the remote project
+# Deploy all 20 functions to the remote project
 supabase functions deploy --project-ref "your-project-ref"
 ```
 
@@ -356,6 +370,7 @@ npm run build
 ```
 
 ### Current Test Coverage Highlights
+* **`src/test/erpIntegration.test.ts`**: 9 unit tests validating HMAC-SHA256 signature generation, SHA-256 key derivation (`whsec_`), 300s replay window enforcement, tamper resistance, and envelope creation.
 * **`src/test/storageSafeguards.test.ts`**: 25 automated tests verifying path traversal prevention, protected file classification, folder boundaries, and orphan identification.
 * **`src/test/backendPromptBuilder.test.ts`**: Validates dynamic prompt construction and studio blueprint directives.
 * **`src/test/studioPipeline.test.ts`**: Tests the end-to-end UGC composition lifecycle.
