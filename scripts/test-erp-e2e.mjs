@@ -192,30 +192,49 @@ let priceEventId;
 }
 
 // ============================================================
-// TEST 6: Outbound function — dispatch a commerce event (expect delivery attempt logged)
+// TEST 6: Outbound function — dispatch commerce.order.created event
 // ============================================================
 console.log("\n🧪 Test 6: Outbound — dispatch commerce.order.created event");
 let outboundEventId;
+let outboundPayload;
 {
+  outboundPayload = {
+    entity_type: "order",
+    entity_id: crypto.randomUUID(),
+    customer_id: crypto.randomUUID(),
+    total_amount: 15000,
+    currency: "MWK",
+    items_count: 2,
+    channel: "web",
+  };
   const eventPayload = {
     eventType: "commerce.order.created",
-    payload: {
-      entity_type: "order",
-      entity_id: crypto.randomUUID(),
-      customer_id: crypto.randomUUID(),
-      total_amount: 15000,
-      currency: "MWK",
-      items_count: 2,
-      channel: "web",
-    },
+    payload: outboundPayload,
   };
   const { status, latency, json } = await callFunction("erp-sync-webhook", eventPayload, true);
   console.log(`  Response: HTTP ${status} (${latency}ms) — ${JSON.stringify(json).slice(0, 160)}...`);
   outboundEventId = json?.eventId;
-  assert("Response status is 200 (if ERP alive) or 502 (if ERP upstream returns error)", status === 200 || status === 502, `Got ${status}`);
+  assert("HTTP 200 returned from outbound dispatcher", status === 200, `Got ${status}`);
+  assert("success: true in response", json?.success === true, JSON.stringify(json));
   assert("eventId present in response", typeof json?.eventId === "string", JSON.stringify(json));
   assert("attempts tracked", typeof json?.attempts === "number", JSON.stringify(json));
-  assert("httpStatus captured from upstream ERP", typeof json?.httpStatus === "number", JSON.stringify(json));
+  assert("httpStatus 200 from upstream ERP", json?.httpStatus === 200, JSON.stringify(json));
+}
+
+// ============================================================
+// TEST 6b: Outbound function — re-dispatch same event (idempotency acknowledgment)
+// ============================================================
+console.log("\n🧪 Test 6b: Outbound — idempotent duplicate to ERP");
+{
+  const duplicatePayload = {
+    eventId: outboundEventId,
+    eventType: "commerce.order.created",
+    payload: outboundPayload,
+  };
+  const { status, latency, json } = await callFunction("erp-sync-webhook", duplicatePayload, true);
+  console.log(`  Response: HTTP ${status} (${latency}ms) — ${JSON.stringify(json).slice(0, 160)}...`);
+  assert("HTTP 200 returned", status === 200, `Got ${status}`);
+  assert("isDuplicate: true reported from ERP", json?.isDuplicate === true, JSON.stringify(json));
 }
 
 // ============================================================
