@@ -1,19 +1,22 @@
 /**
  * ERP Integration End-to-End Live Test
  * Tests the full outbound + inbound pipeline against the live Supabase project.
- * Run: node scripts/test-erp-e2e.mjs
+ * Run: SUPABASE_SERVICE_ROLE_KEY=... node --env-file=.env scripts/test-erp-e2e.mjs
  */
 import { createHmac, createHash } from "node:crypto";
 
-const SUPABASE_URL = "https://prweavmmpmoutdcsrseh.supabase.co";
-const ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InByd2Vhdm1tcG1vdXRkY3Nyc2VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzOTMwNDksImV4cCI6MjEwOTk2OTA0OX0.PBRb5bHvH19FrSjw_S1KUFLySODM94QHaF1ppBiP7SE";
-const SERVICE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InByd2Vhdm1tcG1vdXRkY3Nyc2VoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5NDM5MzA0OSwiZXhwIjoyMTA5OTY5MDQ5fQ.pYAFeC-7Folt3Dn9ZVR0gTWRTuRyQPxBQ1F9PPeXbhc";
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://prweavmmpmoutdcsrseh.supabase.co";
+const ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 // --- Crypto helpers (mirror of erpSignature.ts logic) ---
-const WEBHOOK_SECRET = "whsec_e0a51c7126807b292906ca4b6c90ae70014a6180d821382b";
-const CONNECTION_ID = "fsc_cb66ba75_9434a40fca1d87cb0e9d336813ad310f9dccc897cf2c4d86";
+const WEBHOOK_SECRET = process.env.FORGIVEN_ERP_WEBHOOK_SECRET || "";
+const CONNECTION_ID = process.env.FORGIVEN_ERP_CONNECTION_ID || "";
+
+if (!WEBHOOK_SECRET || !CONNECTION_ID || !SERVICE_KEY) {
+  console.error("❌ Missing env vars. Run with: SUPABASE_SERVICE_ROLE_KEY=... node --env-file=.env scripts/test-erp-e2e.mjs");
+  process.exit(1);
+}
 
 function deriveKey(secret) {
   if (secret.startsWith("whsec_")) {

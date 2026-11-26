@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-forgiven-connection-id, x-forgiven-signature, x-forgiven-timestamp",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-forgiven-connection-id, x-forgiven-signature, x-forgiven-timestamp, x-forgiven-event-id, x-forgiven-event-type",
 };
 
 const ERP_MAX_REPLAY_WINDOW_MS = 300_000; // 5 minutes
@@ -45,6 +45,46 @@ async function computeSignature(secret: string, timestamp: number, payload: unkn
     .join("");
 }
 
+/**
+ * Resolves a Commerce OS product by UUID first, then falls back to metadata->>sku / metadata->>vendor_sku.
+ */
+async function findProductByIdOrSku(
+  supabase: ReturnType<typeof createClient>,
+  productId: string | undefined,
+  sku: string | undefined
+): Promise<{ id: string; stock_quantity: number | null; name: string } | null> {
+  if (productId) {
+    const { data } = await supabase
+      .from("products")
+      .select("id, stock_quantity, name")
+      .eq("id", productId)
+      .maybeSingle();
+    if (data) return data;
+  }
+
+  if (sku && sku.trim()) {
+    const rawSku = sku.trim();
+    const upperSku = rawSku.toUpperCase();
+    for (const candidate of Array.from(new Set([rawSku, upperSku]))) {
+      const { data: bySku } = await supabase
+        .from("products")
+        .select("id, stock_quantity, name")
+        .contains("metadata", { sku: candidate })
+        .maybeSingle();
+      if (bySku) return bySku;
+
+      const { data: byVendorSku } = await supabase
+        .from("products")
+        .select("id, stock_quantity, name")
+        .contains("metadata", { vendor_sku: candidate })
+        .maybeSingle();
+      if (byVendorSku) return byVendorSku;
+    }
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -55,8 +95,15 @@ serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const ERP_WEBHOOK_SECRET =
-      Deno.env.get("FORGIVEN_ERP_WEBHOOK_SECRET") || "whsec_forgiven_commerce_erp_dev_secret_2026";
+    const ERP_WEBHOOK_SECRET = Deno.env.get("FORGIVEN_ERP_WEBHOOK_SECRET") ?? "";
+
+    if (!ERP_WEBHOOK_SECRET) {
+      console.error("[ERP Inbound Listener] Missing required env var: FORGIVEN_ERP_WEBHOOK_SECRET");
+      return new Response(JSON.stringify({ error: "ERP webhook secret not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -75,7 +122,7 @@ serve(async (req) => {
       });
     }
 
-    const { connectionId, eventId, eventType, timestamp, signature, payload } = body;
+    const { eventId, eventType, timestamp, signature, payload } = body;
 
     // 1. Mandatory Field Validation
     if (!eventId || !eventType || !timestamp || !signature || !payload) {
@@ -146,34 +193,29 @@ serve(async (req) => {
 
     // 5. Inbound Business Logic Execution
     let actionSummary = "No database mutation required";
+    const productId = (payload.product_id as string | undefined) || (payload.entity_id as string | undefined);
+    const sku = payload.sku as string | undefined;
 
     if (eventType === "erp.inventory.updated" || eventType === "erp.stock.adjusted") {
-      const productId = (payload.product_id as string) || (payload.entity_id as string);
-      const sku = payload.sku as string | undefined;
-      const newStock = typeof payload.stock_quantity === "number" ? payload.stock_quantity : undefined;
-      const delta = typeof payload.delta === "number" ? payload.delta : undefined;
+      const newStock =
+        typeof payload.stock_quantity === "number"
+          ? payload.stock_quantity
+          : typeof payload.new_quantity === "number"
+          ? payload.new_quantity
+          : undefined;
+      const deltaQty = typeof payload.delta === "number" ? payload.delta : undefined;
 
-      let targetProduct = null;
-      if (productId) {
-        const { data } = await supabase.from("products").select("id, stock_quantity, name").eq("id", productId).maybeSingle();
-        targetProduct = data;
-      }
-
-      if (!targetProduct && sku) {
-        const { data } = await supabase.from("products").select("id, stock_quantity, name").contains("metadata", { sku }).maybeSingle();
-        targetProduct = data;
-      }
-
+      const targetProduct = await findProductByIdOrSku(supabase, productId, sku);
       if (targetProduct) {
         let finalStock = targetProduct.stock_quantity || 0;
         if (newStock !== undefined) {
           finalStock = Math.max(0, newStock);
-        } else if (delta !== undefined) {
-          finalStock = Math.max(0, finalStock + delta);
+        } else if (deltaQty !== undefined) {
+          finalStock = Math.max(0, finalStock + deltaQty);
         }
 
         const stockStatus =
-          finalStock <= 0 ? "out_of_stock" : finalStock <= 5 ? "low_stock" : "in_stock";
+          finalStock <= 0 ? "unavailable" : finalStock <= 5 ? "low_stock" : "available";
 
         await supabase
           .from("products")
@@ -191,16 +233,33 @@ serve(async (req) => {
         console.warn(`[ERP Inbound Listener] ${actionSummary}`);
       }
     } else if (eventType === "erp.catalog.price_updated" || eventType === "erp.product.updated") {
-      const productId = (payload.product_id as string) || (payload.entity_id as string);
+      const targetProduct = await findProductByIdOrSku(supabase, productId, sku);
+      const resolvedId = targetProduct?.id ?? productId;
+      const resolvedPrice =
+        typeof payload.price === "number"
+          ? payload.price
+          : typeof payload.new_price === "number"
+          ? payload.new_price
+          : typeof payload.selling_price === "number"
+          ? payload.selling_price
+          : undefined;
+      const resolvedCost =
+        typeof payload.vendor_cost === "number"
+          ? payload.vendor_cost
+          : typeof payload.cost_price === "number"
+          ? payload.cost_price
+          : undefined;
+
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (resolvedPrice !== undefined) updates.price = resolvedPrice;
+      if (resolvedCost !== undefined) updates.vendor_cost = resolvedCost;
 
-      if (typeof payload.price === "number") updates.price = payload.price;
-      if (typeof payload.vendor_cost === "number") updates.vendor_cost = payload.vendor_cost;
-
-      if (productId && (updates.price !== undefined || updates.vendor_cost !== undefined)) {
-        await supabase.from("products").update(updates).eq("id", productId);
-        actionSummary = `Updated product ${productId} pricing: price=${updates.price}, vendor_cost=${updates.vendor_cost}`;
+      if (resolvedId && (updates.price !== undefined || updates.vendor_cost !== undefined)) {
+        await supabase.from("products").update(updates).eq("id", resolvedId);
+        actionSummary = `Updated product ${resolvedId} pricing: price=${updates.price ?? "unchanged"}, vendor_cost=${updates.vendor_cost ?? "unchanged"}`;
         console.log(`[ERP Inbound Listener] ${actionSummary}`);
+      } else {
+        actionSummary = `Target product not found or no price fields for id=${productId || "none"}, sku=${sku || "none"}`;
       }
     } else if (eventType === "erp.sale.completed") {
       actionSummary = `Logged retail sale event from ERP for POS reference ${payload.receipt_number || payload.sale_id || "N/A"}`;
@@ -250,4 +309,3 @@ serve(async (req) => {
     });
   }
 });
-
